@@ -6,9 +6,12 @@
 
 This document establishes the authoritative **Use-Case Inventory** for the Elsasa Student Information System (SIS) V3. It translates the 86 operational business workflows identified across all six core domains into actionable, actor-centric use cases.
 
-Each use case defines the **actual work** that an authorized human or institutional actor needs to accomplish to achieve a business goal. In accordance with architectural principles:
+This inventory has been **fully reconciled** against the authoritative [`actors.md`](file:///d:/Project.Private/elsasa-sis-v3/actors.md) catalog and incorporates the formal resolutions to all nine architectural and policy questions (Section 3 of `actors.md`).
+
+In accordance with architectural principles:
 - **Business-goal oriented:** Every use case is defined by what the actor needs to accomplish and the expected business outcome, not by database entities, data structures, or CRUD operations (Create, Read, Update, Delete).
 - **Actor-centric and boundary-respecting:** Use cases strictly enforce actor responsibilities, decision authority hierarchies, and domain boundaries established in `actors.md` and primary domain specifications.
+- **Reconciled policy alignment:** Operational parameters—including consolidated finance roles, zero discretionary thresholds for refunds, student independence flags, primary guardian dispute holds, disciplinary appeal separation, counselling note isolation, formative vs. summative grading tiers, emergency substitution delegation, and asymmetric operational cancellation autonomy—are explicitly embedded into use-case definitions.
 - **Pragmatic and minimalist:** Includes only the use cases required to operate the school across its three implementation stages. Speculative features, future capabilities, and undocumented approval workflows are deliberately excluded.
 - **Foundation for next phases:** This inventory provides the direct input for subsequent **Activity Decomposition** and **Screen Inventory** specifications.
 
@@ -84,7 +87,7 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **ID** | `UC-STD-02` |
 | **Name** | Submit Re-enrollment Confirmation |
 | **Primary Actor** | Parent / Guardian |
-| **Supporting Actor(s)** | Student (when permitted by school policy) |
+| **Supporting Actor(s)** | Student (when permitted by school policy or flagged `is_independent = true`) |
 | **Goal** | Formally declare the intent for an active student to continue enrollment for the upcoming academic period and provide updated contact or emergency details. |
 | **Expected Outcome** | Re-enrollment submission is lodged for the upcoming academic period and queued for administrative confirmation and fee check. |
 | **Workflow Reference** | `STD-WF-16` |
@@ -126,8 +129,8 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **Name** | Maintain Student Identity |
 | **Primary Actor** | Student Administration Officer |
 | **Supporting Actor(s)** | Parent / Guardian, Student |
-| **Goal** | Update and verify official student legal identity, biographical information, citizenship, residential address, and parent/guardian relationship records. |
-| **Expected Outcome** | Certified biographical and guardian data are updated, maintaining an auditable change history without altering student identity numbers. |
+| **Goal** | Update and verify official student legal identity, biographical data, citizenship, address, designated `Primary Guardian` (`is_primary_contact = true`), secondary guardians, and verified `is_independent` status flag (for students who have reached legal age of majority or independent status). |
+| **Expected Outcome** | Certified biographical and guardian data are updated with clear primary contact designation, independence status is officially flagged, and full administrative change history is preserved. |
 | **Workflow Reference** | `STD-WF-04` |
 
 #### `UC-STD-06`. Change Administrative Placement
@@ -147,8 +150,8 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **ID** | `UC-STD-07` |
 | **Name** | Place Student on Leave |
 | **Primary Actor** | Student Administration Officer |
-| **Supporting Actor(s)** | Parent / Guardian, School Leadership (approves extended leaves) |
-| **Goal** | Temporarily suspend a student's active enrollment for an authorized leave of absence up to one academic year based on approved justification. |
+| **Supporting Actor(s)** | Parent / Guardian (or Student when `is_independent = true`), School Leadership (approves extended leaves or dispute resolutions) |
+| **Goal** | Temporarily suspend a student's active enrollment for an approved leave of absence up to one academic year based on approved justification submitted by the designated Primary Guardian (or independent student). If a secondary guardian lodges a formal written dispute, the action is placed on administrative hold pending School Leadership sign-off. |
 | **Expected Outcome** | Student status transitions to `On Leave` with start and expected return dates; active academic participations are suspended and fee billing adjustments are triggered. |
 | **Workflow Reference** | `STD-WF-06` |
 
@@ -180,8 +183,8 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **ID** | `UC-STD-10` |
 | **Name** | Process Internal Transfer |
 | **Primary Actor** | Student Administration Officer |
-| **Supporting Actor(s)** | School Leadership |
-| **Goal** | Administratively transfer an active student between campuses, educational programs, or tracks within the school organization. |
+| **Supporting Actor(s)** | School Leadership, Parent / Guardian (or Student when `is_independent = true`) |
+| **Goal** | Administratively transfer an active student between campuses, educational programs, or tracks within the school organization, authorized by Primary Guardian (or independent student) and School Leadership. |
 | **Expected Outcome** | Student administrative placement and campus/program affiliation are updated with an effective date, preserving historical identity and financial ledger continuity. |
 | **Workflow Reference** | `STD-WF-09` |
 
@@ -191,8 +194,8 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **ID** | `UC-STD-11` |
 | **Name** | Process External Transfer Out |
 | **Primary Actor** | Student Administration Officer |
-| **Supporting Actor(s)** | Parent / Guardian, School Leadership |
-| **Goal** | Formally conclude enrollment and release a student transferring to another educational institution upon verifying that both Academic and Financial Clearances are Granted. |
+| **Supporting Actor(s)** | Parent / Guardian (or Student when `is_independent = true`), School Leadership |
+| **Goal** | Formally conclude enrollment and release a student transferring to another educational institution upon request of Primary Guardian (or independent student) and upon verifying that both Academic and Financial Clearances are Granted. If conflicting guardian directives arise, place on hold until School Leadership resolves with legal custody documentation. |
 | **Expected Outcome** | Student status transitions to `Transferred`, official transfer release certificate is issued, clearance records are archived, and active participations are closed. |
 | **Workflow Reference** | `STD-WF-10` |
 
@@ -202,8 +205,8 @@ The Students Domain owns student identity, admission intake, enrollment, adminis
 | **ID** | `UC-STD-12` |
 | **Name** | Process Withdrawal |
 | **Primary Actor** | Student Administration Officer |
-| **Supporting Actor(s)** | Parent / Guardian, School Leadership, Discipline Authority (for disciplinary expulsion GAP-02) |
-| **Goal** | Conclude a student's enrollment prior to graduation due to voluntary exit, family relocation, non-return, or an institutional disciplinary decision. |
+| **Supporting Actor(s)** | Parent / Guardian (or Student when `is_independent = true`), School Leadership, Discipline Authority (for disciplinary expulsion GAP-02) |
+| **Goal** | Conclude a student's enrollment prior to graduation due to voluntary exit requested by Primary Guardian (or independent student), relocation, non-return, or an institutional disciplinary expulsion decision confirmed by School Leadership. If conflicting guardian directives arise, hold until resolved by School Leadership. |
 | **Expected Outcome** | Student status transitions to `Withdrawn`, withdrawal category and reason are permanently recorded, active participations are closed, and financial account settlement is initiated. |
 | **Workflow Reference** | `STD-WF-11` |
 
@@ -375,8 +378,8 @@ The Academics Domain owns curriculum structure, learning units, student learning
 | **Name** | Evaluate Student Learning |
 | **Primary Actor** | Teacher |
 | **Supporting Actor(s)** | Academic Coordinator |
-| **Goal** | Score and grade submitted assessment evidence and assignments against established rubrics, recording provisional marks and qualitative feedback. |
-| **Expected Outcome** | Provisional scores, rubric breakdowns, and evaluative feedback are recorded on student evaluations. |
+| **Goal** | Score and grade submitted assessment evidence and assignments against established rubrics, and exercise **autonomous authority** to record and publish routine classroom marks, formative evaluations, and qualitative developmental feedback directly to students and parents. |
+| **Expected Outcome** | Formative scores, rubric breakdowns, and evaluative feedback are published directly to students/parents, and provisional scores are recorded for subsequent summative moderation. |
 | **Workflow Reference** | `ACD-WF-08` |
 
 #### `UC-ACD-07`. Conduct Applicant Entrance Assessment
@@ -493,8 +496,8 @@ The Academics Domain owns curriculum structure, learning units, student learning
 | **Name** | Approve and Publish Academic Results |
 | **Primary Actor** | Academic Authority |
 | **Supporting Actor(s)** | Academic Coordinator, Teacher |
-| **Goal** | Moderate provisional grades across cohorts, grant formal institutional approval, and publish official academic results to students and parents. |
-| **Expected Outcome** | Academic results are officially approved, finalized, locked against unapproved alteration, and published. |
+| **Goal** | Formally moderate and approve formal summative grades, term-end examination results, and official academic standing across cohorts, and authorize official publication to student/parent portals and transcripts. |
+| **Expected Outcome** | Formal summative results are officially approved, locked against alteration, and published. |
 | **Workflow Reference** | `ACD-WF-09` |
 
 #### `UC-ACD-17`. Determine Academic Standing and Progression
@@ -558,6 +561,8 @@ The Academics Domain owns curriculum structure, learning units, student learning
 
 The Finance Domain owns financial policies, fee structures, charge rules, obligation assessments, billing statements, payment receipt, payment allocation, receivables management, financial adjustments, refunds, and financial clearance.
 
+All financial workflows operate under a **Consolidated Finance Officer** actor (Resolution 3.1) with strict **Zero Discretionary Spending** (Resolution 3.2), requiring Finance Authority sign-off for all adjustments, waivers, and refunds.
+
 ### Summary by Actor
 
 | Actor | Use Case ID | Use Case Name | Workflow Reference | Stage |
@@ -604,8 +609,8 @@ The Finance Domain owns financial policies, fee structures, charge rules, obliga
 | **Name** | Assess Financial Obligations |
 | **Primary Actor** | Finance Officer |
 | **Supporting Actor(s)** | Finance Authority |
-| **Goal** | Calculate and generate monetary charges (application, enrollment, tuition, facility fees) against student financial accounts based on approved fee schedules and student placements. |
-| **Expected Outcome** | Obligations are assessed, assigned unique obligation IDs, and posted to student financial accounts with due dates. |
+| **Goal** | Calculate and generate monetary charges (application, enrollment, tuition, facility fees) against student financial accounts based on approved fee schedules and student placements, enforced via immutable audit logging (capturing actor ID, timestamp, and charge payload). |
+| **Expected Outcome** | Obligations are assessed, assigned unique obligation IDs, audit-logged, and posted to student accounts with due dates. |
 | **Workflow Reference** | `FIN-WF-02` |
 
 #### `UC-FIN-03`. Issue Billing Statement
@@ -626,8 +631,8 @@ The Finance Domain owns financial policies, fee structures, charge rules, obliga
 | **Name** | Confirm Payment Receipt |
 | **Primary Actor** | Finance Officer |
 | **Supporting Actor(s)** | Payer, External Payment Provider |
-| **Goal** | Verify incoming payment transactions against bank deposits or gateway settlement reports, confirm receipt, and issue payment receipts. |
-| **Expected Outcome** | Payment is confirmed, official receipt is issued, and unallocated payment value is credited to the student account. |
+| **Goal** | Verify incoming payment transactions against bank deposits or gateway settlement reports, confirm receipt with immutable audit logging, and issue official payment receipts. |
+| **Expected Outcome** | Payment is confirmed, official receipt is issued, immutable audit log entry is recorded, and unallocated payment value is credited to the student account. |
 | **Workflow Reference** | `FIN-WF-05` |
 
 #### `UC-FIN-05`. Allocate Payment to Obligations
@@ -728,9 +733,9 @@ The Finance Domain owns financial policies, fee structures, charge rules, obliga
 | **ID** | `UC-FIN-13` |
 | **Name** | Adjudicate Financial Dispute or Adjustment |
 | **Primary Actor** | Finance Authority |
-| **Supporting Actor(s)** | Finance Officer, Parent / Guardian |
-| **Goal** | Adjudicate contested billing challenges raised by payers and authorize binding financial adjustments, fee reductions, or obligation reversals. |
-| **Expected Outcome** | Binding dispute resolution is recorded; obligation balance is adjusted, reversed, or reaffirmed. |
+| **Supporting Actor(s)** | Finance Officer (prepares and validates adjustment dossier), Parent / Guardian |
+| **Goal** | Review billing disputes and adjustment recommendations prepared by the Finance Officer, and exercise **exclusive decision authority** under zero-discretionary spending rules to authorize binding financial adjustments, fee reductions, charge waivers, write-offs, or cancellations of any amount. |
+| **Expected Outcome** | Binding dispute resolution is officially authorized; obligation balance is adjusted, reversed, or reaffirmed with mandatory audit justification. |
 | **Workflow Reference** | `FIN-WF-08` |
 
 #### `UC-FIN-14`. Approve and Execute Refund
@@ -739,9 +744,9 @@ The Finance Domain owns financial policies, fee structures, charge rules, obliga
 | **ID** | `UC-FIN-14` |
 | **Name** | Approve and Execute Refund |
 | **Primary Actor** | Finance Authority |
-| **Supporting Actor(s)** | Finance Officer, Payer |
-| **Goal** | Authorize and execute monetary refund disbursements of credit balances back to verified payers (due to overpayment or withdrawal). |
-| **Expected Outcome** | Refund is approved, payment disbursement is recorded, student account credit is reduced, and refund transaction is finalized. |
+| **Supporting Actor(s)** | Finance Officer (validates refundable balance and prepares disbursement request), Payer |
+| **Goal** | Review refund dossiers validated by the Finance Officer, and exercise **exclusive authorization authority** under zero-discretionary spending rules to approve and execute monetary refund disbursements of any amount back to verified payers. |
+| **Expected Outcome** | Refund disbursement is formally authorized, payment is disbursed, student account credit is reduced, and refund transaction is finalized. |
 | **Workflow Reference** | `FIN-WF-10` |
 
 #### `UC-FIN-15`. Correct Approved Finance Record
@@ -761,22 +766,25 @@ The Finance Domain owns financial policies, fee structures, charge rules, obliga
 
 The Operations Domain owns the school calendar, academic periods, physical room contexts, scheduling feasibility, timetable occurrences, room allocations, school events, operational announcements, and closure coordination.
 
+Under **Asymmetric Operational Autonomy** (Resolution 3.9), original request initiators autonomously cancel reservations (releasing resources), while rescheduling and reallocating resources requires centralized execution by the Operations Coordinator.
+
 ### Summary by Actor
 
 | Actor | Use Case ID | Use Case Name | Workflow Reference | Stage |
 |---|---|---|---|---|
 | **Requesting Actors** | `UC-OPS-01` | Submit Operational Activity Request | `OPS-WF-02` | Stage 2 |
-| **Operations Coordinator** | `UC-OPS-02` | Review Operational Feasibility | `OPS-WF-03` | Stage 2 |
-| | `UC-OPS-03` | Schedule Activity and Allocate Room | `OPS-WF-04` | Stage 2 |
-| | `UC-OPS-04` | Resolve Operational Resource Conflict | `OPS-WF-05` | Stage 2 |
-| | `UC-OPS-05` | Coordinate School Event Logistics | `OPS-WF-06` | Stage 3 |
-| | `UC-OPS-06` | Publish Operational Announcement | `OPS-WF-07` | Stage 3 |
-| | `UC-OPS-07` | Record Room Restriction | `OPS-WF-08` | Stage 2 |
-| | `UC-OPS-08` | Modify or Cancel Scheduled Occurrence | `OPS-WF-09` | Stage 2 |
-| | `UC-OPS-09` | Close Operational Arrangement | `OPS-WF-11` | Stage 2 |
-| **Operations Authority** | `UC-OPS-10` | Establish School Calendar and Periods | `OPS-WF-01` | Stage 1 |
-| | `UC-OPS-11` | Declare Campus Closure | `OPS-WF-10` | Stage 1 / Stage 2 |
-| | `UC-OPS-12` | Correct Approved Operations Record | `OPS-WF-12` | Stage 2 / Stage 3 |
+| | `UC-OPS-02` | Cancel Approved Activity Reservation | `OPS-WF-09` | Stage 2 |
+| **Operations Coordinator** | `UC-OPS-03` | Review Operational Feasibility | `OPS-WF-03` | Stage 2 |
+| | `UC-OPS-04` | Schedule Activity and Allocate Room | `OPS-WF-04` | Stage 2 |
+| | `UC-OPS-05` | Resolve Operational Resource Conflict | `OPS-WF-05` | Stage 2 |
+| | `UC-OPS-06` | Coordinate School Event Logistics | `OPS-WF-06` | Stage 3 |
+| | `UC-OPS-07` | Publish Operational Announcement | `OPS-WF-07` | Stage 3 |
+| | `UC-OPS-08` | Record Room Restriction | `OPS-WF-08` | Stage 2 |
+| | `UC-OPS-09` | Reschedule or Relocate Scheduled Occurrence | `OPS-WF-09` | Stage 2 |
+| | `UC-OPS-10` | Close Operational Arrangement | `OPS-WF-11` | Stage 2 |
+| **Operations Authority** | `UC-OPS-11` | Establish School Calendar and Periods | `OPS-WF-01` | Stage 1 |
+| | `UC-OPS-12` | Declare Campus Closure | `OPS-WF-10` | Stage 1 / Stage 2 |
+| | `UC-OPS-13` | Correct Approved Operations Record | `OPS-WF-12` | Stage 2 / Stage 3 |
 
 ---
 
@@ -793,14 +801,25 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Operational activity request is logged with attendance, facility requirements, and scheduling preferences, queued for feasibility review. |
 | **Workflow Reference** | `OPS-WF-02` |
 
+#### `UC-OPS-02`. Cancel Approved Activity Reservation
+| Attribute | Value |
+|---|---|
+| **ID** | `UC-OPS-02` |
+| **Name** | Cancel Approved Activity Reservation |
+| **Primary Actor** | Teacher / Academic Coordinator / Student Development Officer (Original Request Initiator) |
+| **Supporting Actor(s)** | Operations Coordinator |
+| **Goal** | Exercise **autonomous cancellation authority** to cancel an approved room reservation or scheduled occurrence initiated by the actor, immediately releasing the room and facilities back to the operational pool. |
+| **Expected Outcome** | Reservation is cancelled, room hold is immediately released, and notification is automatically dispatched to participants and Operations Coordinator. |
+| **Workflow Reference** | `OPS-WF-09` |
+
 ---
 
 ### 4.2 Operations Coordinator
 
-#### `UC-OPS-02`. Review Operational Feasibility
+#### `UC-OPS-03`. Review Operational Feasibility
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-02` |
+| **ID** | `UC-OPS-03` |
 | **Name** | Review Operational Feasibility |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Teaching Coordinator, Requesting Actors |
@@ -808,10 +827,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Request is evaluated as feasible, conflicted, or infeasible, with documented constraints. |
 | **Workflow Reference** | `OPS-WF-03` |
 
-#### `UC-OPS-03`. Schedule Activity and Allocate Room
+#### `UC-OPS-04`. Schedule Activity and Allocate Room
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-03` |
+| **ID** | `UC-OPS-04` |
 | **Name** | Schedule Activity and Allocate Room |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Teacher, Academic Coordinator |
@@ -819,10 +838,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Timetable occurrence is created and published; room allocation is committed; participants are notified. |
 | **Workflow Reference** | `OPS-WF-04` |
 
-#### `UC-OPS-04`. Resolve Operational Resource Conflict
+#### `UC-OPS-05`. Resolve Operational Resource Conflict
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-04` |
+| **ID** | `UC-OPS-05` |
 | **Name** | Resolve Operational Resource Conflict |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Operations Authority, School Leadership, Affected Requestors |
@@ -830,10 +849,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Conflict is resolved via alternative room/time allocation or authoritative executive adjudication. |
 | **Workflow Reference** | `OPS-WF-05` |
 
-#### `UC-OPS-05`. Coordinate School Event Logistics
+#### `UC-OPS-06`. Coordinate School Event Logistics
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-05` |
+| **ID** | `UC-OPS-06` |
 | **Name** | Coordinate School Event Logistics |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Operations Authority, School Leadership, Event Organizer |
@@ -841,10 +860,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | School event is approved, facility reservations locked, logistical arrangements committed, and event published on the school calendar. |
 | **Workflow Reference** | `OPS-WF-06` |
 
-#### `UC-OPS-06`. Publish Operational Announcement
+#### `UC-OPS-07`. Publish Operational Announcement
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-06` |
+| **ID** | `UC-OPS-07` |
 | **Name** | Publish Operational Announcement |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Operations Authority |
@@ -852,10 +871,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Announcement is published to target audiences (parents, students, staff) or formally withdrawn. |
 | **Workflow Reference** | `OPS-WF-07` |
 
-#### `UC-OPS-07`. Record Room Restriction
+#### `UC-OPS-08`. Record Room Restriction
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-07` |
+| **ID** | `UC-OPS-08` |
 | **Name** | Record Room Restriction |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | Operations Authority, Facilities Staff |
@@ -863,21 +882,21 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Room unavailability window is recorded, room blocked from allocation, and impacted schedules identified for rescheduling. |
 | **Workflow Reference** | `OPS-WF-08` |
 
-#### `UC-OPS-08`. Modify or Cancel Scheduled Occurrence
-| Attribute | Value |
-|---|---|
-| **ID** | `UC-OPS-08` |
-| **Name** | Modify or Cancel Scheduled Occurrence |
-| **Primary Actor** | Operations Coordinator |
-| **Supporting Actor(s)** | Teacher, Academic Coordinator, Student |
-| **Goal** | Adjust active scheduled occurrences by changing times, moving to alternative rooms, postponing, or cancelling sessions, and notify all affected parties. |
-| **Expected Outcome** | Occurrence is updated or cancelled, room reservations released/reassigned, and immediate notifications dispatched. |
-| **Workflow Reference** | `OPS-WF-09` |
-
-#### `UC-OPS-09`. Close Operational Arrangement
+#### `UC-OPS-09`. Reschedule or Relocate Scheduled Occurrence
 | Attribute | Value |
 |---|---|
 | **ID** | `UC-OPS-09` |
+| **Name** | Reschedule or Relocate Scheduled Occurrence |
+| **Primary Actor** | Operations Coordinator |
+| **Supporting Actor(s)** | Teacher, Academic Coordinator, Student |
+| **Goal** | Centrally evaluate and execute room changes, timetable slot rescheduling, or session postponements requested by initiators or necessitated by conflicts, preventing timetable collisions and double-bookings. |
+| **Expected Outcome** | Occurrence is updated with validated new room or time slot, room reservations reallocated, and notifications dispatched. |
+| **Workflow Reference** | `OPS-WF-09` |
+
+#### `UC-OPS-10`. Close Operational Arrangement
+| Attribute | Value |
+|---|---|
+| **ID** | `UC-OPS-10` |
 | **Name** | Close Operational Arrangement |
 | **Primary Actor** | Operations Coordinator |
 | **Supporting Actor(s)** | None |
@@ -889,10 +908,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 
 ### 4.3 Operations Authority
 
-#### `UC-OPS-10`. Establish School Calendar and Periods
+#### `UC-OPS-11`. Establish School Calendar and Periods
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-10` |
+| **ID** | `UC-OPS-11` |
 | **Name** | Establish School Calendar and Periods |
 | **Primary Actor** | Operations Authority |
 | **Supporting Actor(s)** | Operations Coordinator |
@@ -900,10 +919,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Official institutional calendar and operational periods are published and made effective for all school domains. |
 | **Workflow Reference** | `OPS-WF-01` |
 
-#### `UC-OPS-11`. Declare Campus Closure
+#### `UC-OPS-12`. Declare Campus Closure
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-11` |
+| **ID** | `UC-OPS-12` |
 | **Name** | Declare Campus Closure |
 | **Primary Actor** | Operations Authority |
 | **Supporting Actor(s)** | School Leadership, Operations Coordinator |
@@ -911,10 +930,10 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 | **Expected Outcome** | Closure is formally declared, calendar amended, affected timetable occurrences suspended/cancelled, and school-wide emergency notice dispatched. |
 | **Workflow Reference** | `OPS-WF-10` |
 
-#### `UC-OPS-12`. Correct Approved Operations Record
+#### `UC-OPS-13`. Correct Approved Operations Record
 | Attribute | Value |
 |---|---|
-| **ID** | `UC-OPS-12` |
+| **ID** | `UC-OPS-13` |
 | **Name** | Correct Approved Operations Record |
 | **Primary Actor** | Operations Authority |
 | **Supporting Actor(s)** | Operations Coordinator |
@@ -927,6 +946,8 @@ The Operations Domain owns the school calendar, academic periods, physical room 
 ## 5. Teaching Domain Use Cases
 
 The Teaching Domain owns teacher professional profiles, qualification evidence, teaching authorizations, teacher availability, teaching demand intake, eligibility evaluation, teaching assignments (including homeroom advisory), workload management, and substitutions.
+
+Under **Pre-Authorized Pool Delegation** (Resolution 3.8), the Teaching Coordinator unilaterally assigns emergency substitutes from active authorized faculty within workload thresholds; Teaching Authority approval is required only for exceptions.
 
 ### Summary by Actor
 
@@ -1014,9 +1035,9 @@ The Teaching Domain owns teacher professional profiles, qualification evidence, 
 | **ID** | `UC-TCH-06` |
 | **Name** | Arrange Substitute Teacher |
 | **Primary Actor** | Teaching Coordinator |
-| **Supporting Actor(s)** | Teaching Authority, Teacher, Operations Coordinator |
-| **Goal** | Appoint a qualified, authorized temporary substitute teacher to cover instructional sessions for an absent faculty member without altering historical assignment records. |
-| **Expected Outcome** | A temporary substitution record is established, substitute authorized to conduct the activity, and timetable updated. |
+| **Supporting Actor(s)** | Teaching Authority (for exception escalations only: unauthorized faculty, external instructors, or workload breaches), Teacher, Operations Coordinator |
+| **Goal** | Exercise **unilateral authority** to immediately assign and commit an emergency substitute teacher from the pool of faculty holding an Active Teaching Authorization for that subject/grade, provided workload caps are not breached. If an exception is required (unauthorized faculty, external hire, or workload overload), escalate to Teaching Authority for approval. |
+| **Expected Outcome** | Temporary substitution record is established, substitute is authorized to conduct the session, and timetable is updated. |
 | **Workflow Reference** | `TCH-WF-09` |
 
 #### `UC-TCH-07`. Monitor Faculty Workload
@@ -1095,6 +1116,8 @@ The Teaching Domain owns teacher professional profiles, qualification evidence, 
 
 The Development Domain owns non-academic student growth, behaviour observations, positive recognitions, incident triage, formal discipline cases, pastoral referrals, confidential counselling cases, wellbeing support plans, non-academic interventions, extracurricular programs, non-academic achievements, and cross-domain support recommendations.
 
+Counselling workflows strictly enforce **Triage Autonomy, Policy-Driven Consent & Total Clinical Note Isolation** (Resolution 3.6). Disciplinary appeals are structurally separated and adjudicated by **School Leadership** (Resolution 3.5).
+
 ### Summary by Actor
 
 | Actor | Use Case ID | Use Case Name | Workflow Reference | Stage |
@@ -1127,7 +1150,7 @@ The Development Domain owns non-academic student growth, behaviour observations,
 | **Name** | Submit Development Referral |
 | **Primary Actor** | Student / Parent / Guardian |
 | **Supporting Actor(s)** | Student Development Officer, Counselor |
-| **Goal** | Request non-academic pastoral support, mental wellbeing assistance, or developmental guidance for a student (self-referral or parental request). |
+| **Goal** | Request non-academic pastoral support, mental wellbeing assistance, or developmental guidance for a student (self-referral or parental request). Initial intake and crisis triage do not require prior parental consent. |
 | **Expected Outcome** | Support referral is logged, timestamped, and submitted for triage while maintaining requested privacy. |
 | **Workflow Reference** | `DEV-WF-04` |
 
@@ -1190,7 +1213,7 @@ The Development Domain owns non-academic student growth, behaviour observations,
 | **Name** | Route Development Referral |
 | **Primary Actor** | Student Development Officer |
 | **Supporting Actor(s)** | Counselor, Requesting Actor |
-| **Goal** | Evaluate an incoming student support referral, determine clinical urgency and support type, and assign the referral to confidential counselling or pastoral staff. |
+| **Goal** | Evaluate an incoming student support referral, determine clinical urgency and support type without requiring prior parental consent for initial triage, and assign the referral to confidential counselling or pastoral staff. |
 | **Expected Outcome** | Referral is assigned, urgency classified, and intake session initiated. |
 | **Workflow Reference** | `DEV-WF-04` |
 
@@ -1270,9 +1293,9 @@ The Development Domain owns non-academic student growth, behaviour observations,
 | **ID** | `UC-DEV-13` |
 | **Name** | Manage Confidential Counselling Case |
 | **Primary Actor** | Counselor |
-| **Supporting Actor(s)** | Student, Parent / Guardian |
-| **Goal** | Deliver confidential psychological and emotional counselling support, maintain restricted clinical case notes (GAP-04), set support goals, and coordinate external mental health referrals. |
-| **Expected Outcome** | Confidential counselling case is managed with strict privacy controls, session logs recorded, and sanitized non-confidential recommendations issued when needed. |
+| **Supporting Actor(s)** | Student, Parent / Guardian (provides consent for ongoing care plan when policy requires), School Leadership (mandatory reporting / safeguarding escalation) |
+| **Goal** | Deliver confidential psychological and emotional counselling; conduct initial intake without prior parental consent; manage ongoing care plans recording explicit `parental_consent_status` (`not_required`, `requested`, `granted`, `waived_for_safety`); maintain clinical case notes under **total note isolation** (exclusively restricted to Counselor, never exposed to portals); and escalate imminent risk/child protection concerns immediately to School Leadership under mandatory reporting mandates. |
+| **Expected Outcome** | Counselling case is managed securely, clinical notes remain isolated, consent status is tracked, and sanitized non-confidential recommendations are issued. |
 | **Workflow Reference** | `DEV-WF-05` |
 
 ---
@@ -1285,9 +1308,9 @@ The Development Domain owns non-academic student growth, behaviour observations,
 | **ID** | `UC-DEV-14` |
 | **Name** | Investigate and Determine Discipline Case |
 | **Primary Actor** | Discipline Authority |
-| **Supporting Actor(s)** | School Leadership, Student, Parent / Guardian |
-| **Goal** | Conduct a formal, fair process investigation into alleged student misconduct, evaluate evidence and hearing statements, establish factual findings, and determine appropriate disciplinary sanctions. |
-| **Expected Outcome** | Formal discipline determination is recorded, findings documented, sanctions imposed within policy limits, and notifications dispatched. |
+| **Supporting Actor(s)** | School Leadership (adjudicates all formal disciplinary appeals), Student, Parent / Guardian |
+| **Goal** | Conduct a formal, fair process investigation into alleged student misconduct, evaluate evidence and hearing statements, establish factual findings, and determine initial disciplinary sanctions within policy limits. If a student/parent lodges an appeal, escalate to School Leadership for independent appeal adjudication. |
+| **Expected Outcome** | Formal discipline determination is recorded, findings documented, sanctions imposed, and notifications dispatched; any formal appeal is escalated to School Leadership. |
 | **Workflow Reference** | `DEV-WF-03` |
 
 #### `UC-DEV-15`. Recommend Disciplinary Administrative Sanction
@@ -1320,7 +1343,7 @@ The Development Domain owns non-academic student growth, behaviour observations,
 
 ## 7. Cross-Domain Traceability Matrix
 
-The table below traces every source workflow from `operational-workflow-discovery.md` to its implementing use case(s) and development stage:
+The table below traces every source workflow from `operational-workflow-discovery.md` to its implementing use case(s), domain, roadmap stage, and primary actor:
 
 | Workflow Code | Workflow Name | Domain | Stage | Implementing Use Case(s) | Primary Actor(s) |
 |---|---|---|---|---|---|
@@ -1374,18 +1397,18 @@ The table below traces every source workflow from `operational-workflow-discover
 | `FIN-WF-11` | Determine Financial Clearance | Finance | Stage 3 | `UC-FIN-08` | Finance Officer |
 | `FIN-WF-12` | Correct Approved Finance Record | Finance | Stage 2 | `UC-FIN-15` | Finance Authority |
 | `FIN-WF-13` | Confirm Enrollment Payment Status | Finance | Stage 1 | `UC-FIN-09` | Finance Officer |
-| `OPS-WF-01` | Establish or Amend Academic Year and School Calendar | Operations | Stage 1 | `UC-OPS-10` | Operations Authority |
+| `OPS-WF-01` | Establish or Amend Academic Year and School Calendar | Operations | Stage 1 | `UC-OPS-11` | Operations Authority |
 | `OPS-WF-02` | Submit and Clarify Operational Activity Request | Operations | Stage 2 | `UC-OPS-01` | Requesting Actors (Teacher/Coord) |
-| `OPS-WF-03` | Review Operational Feasibility | Operations | Stage 2 | `UC-OPS-02` | Operations Coordinator |
-| `OPS-WF-04` | Schedule an Activity and Allocate a Room | Operations | Stage 2 | `UC-OPS-03` | Operations Coordinator |
-| `OPS-WF-05` | Resolve Operational Conflict or Exception | Operations | Stage 2 | `UC-OPS-04` | Operations Coordinator |
-| `OPS-WF-06` | Plan and Approve School Event | Operations | Stage 3 | `UC-OPS-05` | Operations Coordinator |
-| `OPS-WF-07` | Publish or Withdraw Operational Announcement | Operations | Stage 3 | `UC-OPS-06` | Operations Coordinator |
-| `OPS-WF-08` | Record Room Restriction or Unavailability | Operations | Stage 2 | `UC-OPS-07` | Operations Coordinator |
-| `OPS-WF-09` | Reschedule, Relocate, Postpone, or Cancel | Operations | Stage 2 | `UC-OPS-08` | Operations Coordinator |
-| `OPS-WF-10` | Coordinate School or Campus Closure | Operations | Stage 1 / Stage 2 | `UC-OPS-11` | Operations Authority |
-| `OPS-WF-11` | Close Completed Operational Arrangement | Operations | Stage 2 | `UC-OPS-09` | Operations Coordinator |
-| `OPS-WF-12` | Correct Approved Operations Record | Operations | Stage 2 / Stage 3 | `UC-OPS-12` | Operations Authority |
+| `OPS-WF-03` | Review Operational Feasibility | Operations | Stage 2 | `UC-OPS-03` | Operations Coordinator |
+| `OPS-WF-04` | Schedule an Activity and Allocate a Room | Operations | Stage 2 | `UC-OPS-04` | Operations Coordinator |
+| `OPS-WF-05` | Resolve Operational Conflict or Exception | Operations | Stage 2 | `UC-OPS-05` | Operations Coordinator |
+| `OPS-WF-06` | Plan and Approve School Event | Operations | Stage 3 | `UC-OPS-06` | Operations Coordinator |
+| `OPS-WF-07` | Publish or Withdraw Operational Announcement | Operations | Stage 3 | `UC-OPS-07` | Operations Coordinator |
+| `OPS-WF-08` | Record Room Restriction or Unavailability | Operations | Stage 2 | `UC-OPS-08` | Operations Coordinator |
+| `OPS-WF-09` | Reschedule, Relocate, Postpone, or Cancel | Operations | Stage 2 | `UC-OPS-02`, `UC-OPS-09` | Requesting Initiator; Operations Coordinator |
+| `OPS-WF-10` | Coordinate School or Campus Closure | Operations | Stage 1 / Stage 2 | `UC-OPS-12` | Operations Authority |
+| `OPS-WF-11` | Close Completed Operational Arrangement | Operations | Stage 2 | `UC-OPS-10` | Operations Coordinator |
+| `OPS-WF-12` | Correct Approved Operations Record | Operations | Stage 2 / Stage 3 | `UC-OPS-13` | Operations Authority |
 | `TCH-WF-01` | Establish or Change Teaching Profile | Teaching | Stage 2 | `UC-TCH-02` | Teaching Coordinator |
 | `TCH-WF-02` | Submit and Verify Qualification Evidence | Teaching | Stage 2 | `UC-TCH-03` | Teaching Coordinator |
 | `TCH-WF-03` | Grant, Restrict, Suspend, or Revoke Teaching Authorization | Teaching | Stage 2 | `UC-TCH-09` | Teaching Authority |
@@ -1413,37 +1436,69 @@ The table below traces every source workflow from `operational-workflow-discover
 
 ---
 
-## 8. Open Questions and Operational Policy Dependencies
+## 8. Resolved Architectural Questions and Operational Policy Alignment
 
-The following open policy questions from `actors.md` directly impact the implementation details and permission boundaries of specific use cases. They are formally recorded below to prevent speculative assumptions:
+The inventory incorporates the formal resolutions established in Section 3 of `actors.md`. All previous open questions are resolved and reflected across the use cases:
 
-1. **Segregation of Duties in Operational Finance (`UC-FIN-02`, `UC-FIN-04`, `UC-FIN-05`):**
-   - *Question:* Does institutional financial policy require strict segregation of duties between billing assessment and cashiering/payment confirmation? If required by audit standards, the consolidated `Finance Officer` role must be partitioned into mutually exclusive `Billing Officer` and `Cashier` roles.
-2. **Discretionary Monetary Thresholds for Adjustments and Refunds (`UC-FIN-13`, `UC-FIN-14`):**
-   - *Question:* What specific monetary thresholds govern whether a `Finance Officer` can independently execute routine fee adjustments or small refunds versus requiring mandatory prior sign-off from the `Finance Authority`?
-3. **Student Self-Service Decision Authority vs. Parental Governance (`UC-STD-07`, `UC-STD-10`, `UC-STD-12`):**
-   - *Question:* Under what legal or program age thresholds (e.g. legal age of majority) can an enrolled `Student` independently request leaves of absence, internal transfers, or voluntary withdrawals without parental signature?
-4. **Multi-Guardian Authority and Conflicting Directives (`UC-STD-05`, `UC-STD-11`, `UC-STD-12`):**
-   - *Question:* When multiple legal guardians issue conflicting administrative directives (e.g., one requests transfer-out while another objects), what legal documentation rules govern which directive is binding?
-5. **Structural Independence of Disciplinary Appeals (`UC-DEV-14`):**
-   - *Question:* Who holds authoritative jurisdiction to decide formal disciplinary appeals, and how is that role structurally separated from the original investigating `Discipline Authority`?
-6. **Parental Consent and Mandatory Reporting in Counselling (`UC-DEV-13`):**
-   - *Question:* Under what student age thresholds and clinical risk criteria is explicit parental consent mandatory before a `Counselor` may maintain restricted counseling cases, versus cases where student confidentiality legally overrides parental disclosure?
-7. **Teacher Grade Publication Autonomy vs. Central Moderation (`UC-ACD-06`, `UC-ACD-16`):**
-   - *Question:* Can a `Teacher` publish routine formative classroom assignment marks directly to students/parents, or does all evaluative feedback require moderation and release approval by the `Academic Authority`?
-8. **Emergency Substitution Authorization Threshold (`UC-TCH-06`):**
-   - *Question:* Can a `Teaching Coordinator` unilaterally assign an emergency substitute teacher for short absences, or does institutional policy require formal `Teaching Authority` sign-off for all substitutions?
-9. **Operational Activity Rescheduling Autonomy (`UC-OPS-01`, `UC-OPS-08`):**
-   - *Question:* Can an activity initiator independently reschedule or cancel an approved room reservation, or does all operational modification require formal processing by the `Operations Coordinator`?
+### 8.1 Segregation of Duties in Operational Finance
+* **Authoritative Resolution:** **Consolidated Finance Officer**.
+* **Policy Rule:** The SIS maintains a single consolidated `Finance Officer` actor responsible for billing assessments, fee generation, payment confirmations, and receipt recording. No separate `Billing Officer` or `Cashier` actors are introduced.
+* **Operational Impact:** Preserves architectural minimalism while enforcing data integrity through immutable audit logging (`actor_id`, timestamp, and action payload) on `UC-FIN-02` (Assess Financial Obligations) and `UC-FIN-04` (Confirm Payment Receipt).
+
+### 8.2 Discretionary Monetary Thresholds for Financial Adjustments and Refunds
+* **Authoritative Resolution:** **Zero Discretionary Spending**.
+* **Policy Rule:** The `Finance Officer` only prepares, validates, and submits adjustments, charge cancellations, write-offs, and refund disbursement requests. The `Finance Authority` must explicitly review and authorize **all** financial adjustments, charge waivers, and monetary refunds, regardless of amount.
+* **Operational Impact:** Reflected in `UC-FIN-13` (Adjudicate Financial Dispute or Adjustment) and `UC-FIN-14` (Approve and Execute Refund), establishing a mandatory two-step approval flow: `Finance Officer prepares/validates -> Finance Authority authorizes -> Execution`.
+
+### 8.3 Student Self-Service Decision Authority vs. Parental Governance
+* **Authoritative Resolution:** **Explicit `is_independent` Status Flag**.
+* **Policy Rule:** By default, all lifecycle transitions (Leave of Absence, Internal Transfer, Withdrawal) require explicit `Parent / Guardian` authorization. Independent student self-service is permitted only when a student is explicitly flagged with `is_independent = true` on their official student record (e.g., verified legal age of majority, emancipated minor, or independent adult learner), verified and recorded by the `Student Administration Officer`.
+* **Operational Impact:** Reflected in `UC-STD-05` (Maintain Student Identity), `UC-STD-07` (Place Student on Leave), `UC-STD-10` (Process Internal Transfer), `UC-STD-11` (Process External Transfer Out), and `UC-STD-12` (Process Withdrawal).
+
+### 8.4 Multi-Guardian Authority and Conflicting Directives
+* **Authoritative Resolution:** **Primary Guardian Rule + Dispute Hold**.
+* **Policy Rule:** The designated `Primary Guardian` (`is_primary_contact = true`) holds presumptive operational authority for day-to-day administrative requests. If any secondary registered legal guardian lodges a formal written dispute or conflicting directive, the `Student Administration Officer` must place the pending lifecycle action into an administrative **Pending Dispute / On Hold** state. The action cannot be executed until mutual written guardian consent or legally certified custody documentation is reviewed and signed off by `School Leadership`.
+* **Operational Impact:** Reflected in `UC-STD-05` (Maintain Student Identity), `UC-STD-07` (Place Student on Leave), `UC-STD-11` (Process External Transfer Out), and `UC-STD-12` (Process Withdrawal).
+
+### 8.5 Structural Independence of Disciplinary Decision vs. Appeal Authorities
+* **Authoritative Resolution:** **School Leadership Adjudicates Appeals**.
+* **Policy Rule:** The original misconduct investigation, hearing, factual findings, and initial sanctions are conducted and determined by the `Discipline Authority`. All formal disciplinary appeals are escalated to and adjudicated by `School Leadership` (Head of School, Principal, or Executive Board).
+* **Operational Impact:** Reflected in `UC-DEV-14` (Investigate and Determine Discipline Case), guaranteeing structural separation of powers and procedural due process without creating redundant standing committees.
+
+### 8.6 Parental Consent and Mandatory Reporting Boundaries in Counselling
+* **Authoritative Resolution:** **Triage Autonomy, Policy-Driven Consent & Total Note Isolation**.
+* **Policy Rule:**
+  1. *Intake & Crisis:* Initial counselling intake, urgent triage, and immediate crisis stabilization never require prior parental consent (`UC-DEV-01`, `UC-DEV-06`).
+  2. *Ongoing Care Plan:* Ongoing therapeutic support plans record an explicit `parental_consent_status` (`not_required`, `requested`, `granted`, `waived_for_safety`) based on school policy and student independence status (`UC-DEV-13`).
+  3. *Strict Confidentiality:* Clinical case notes and session records are **exclusively restricted** to the `Counselor` (and authorized safeguarding leads). Session notes are never exposed in student or parent portals (`UC-DEV-13`).
+  4. *Mandatory Reporting / Safety Override:* If severe imminent risk of harm or child protection concerns are identified, confidentiality disclosure exceptions and statutory reporting immediately escalate to `School Leadership` and designated safeguarding officers per legal mandate (`UC-DEV-13`).
+
+### 8.7 Teacher Grade Publication Authority vs. Central Academic Moderation
+* **Authoritative Resolution:** **Autonomous Formative vs. Moderated Summative**.
+* **Policy Rule:**
+  1. *Routine Classroom / Formative:* `Teachers` possess autonomous authority to record and publish routine assignment scores, formative assessments, and developmental feedback directly to students and parents (`UC-ACD-06`).
+  2. *Summative & Official Records:* Formal term-end grades, summative examinations, academic standing determinations, report cards, and official transcripts strictly require formal moderation and approval by the `Academic Authority` (or delegated Academic Coordinator) prior to publication (`UC-ACD-16`).
+
+### 8.8 Authorization Threshold for Emergency Faculty Substitution
+* **Authoritative Resolution:** **Pre-Authorized Pool Delegation**.
+* **Policy Rule:** The `Teaching Coordinator` has unilateral authority to immediately assign and commit an emergency substitute teacher, provided the substitute is drawn from the pool of faculty holding an **Active Teaching Authorization** for that subject/grade level and the assignment does not breach workload thresholds. Case-by-case approval from the `Teaching Authority` is strictly required only for exceptions: assigning a substitute who lacks active subject authorization, assigning an external/unvetted instructor, or granting an exception to maximum workload caps.
+* **Operational Impact:** Reflected in `UC-TCH-06` (Arrange Substitute Teacher).
+
+### 8.9 Operational Activity Cancellation and Rescheduling Autonomy
+* **Authoritative Resolution:** **Asymmetric Autonomy (Autonomous Cancellation, Centralized Rescheduling)**.
+* **Policy Rule:**
+  1. *Cancellation (Releasing Resources):* The original request initiator (Teacher, Academic Coordinator, Student Development Officer, etc.) possesses autonomous authority to cancel their own approved reservation/occurrence, immediately releasing the room and facilities back to the operational pool and notifying participants (`UC-OPS-02`).
+  2. *Rescheduling / Relocating (Re-allocating Resources):* Moving dates, times, or room assignments requires submission to and execution by the `Operations Coordinator` to prevent timetable collisions, room double-bookings, and downstream operational conflicts (`UC-OPS-09`).
 
 ---
 
 ## 9. Final Validation Verification
 
-Prior to finalizing this document, the inventory was verified against all validation criteria:
+The reconciled inventory was re-verified against all architectural and governance criteria:
 
+- [x] **Fully reconciled with `actors.md`:** All nine resolved architectural questions from Section 3 of `actors.md` are directly integrated into use-case actors, goals, expected outcomes, and operational rules.
 - [x] **Supported by identified workflows:** Every use case traces directly to an identified business workflow from `operational-workflow-discovery.md`.
-- [x] **No violation of actor responsibility or authority:** Primary and supporting actors strictly reflect the definitions and decision authorities established in `actors.md`.
-- [x] **No CRUD operations:** All use cases represent purposeful business workflows with distinct goals and outcomes (e.g., `Enroll Accepted Applicant`, `Change Administrative Placement`, `Issue Coursework Assignment`, `Evaluate Financial Clearance`), not generic database manipulation screens.
-- [x] **No speculative requirements:** No unverified features, future automation, or speculative integrations were introduced.
-- [x] **No unnecessary use cases:** Workflows representing the same cohesive business goal were unified under single use cases, splitting only where distinct actors perform independent work (e.g., issuing an assignment vs. submitting an assignment).
+- [x] **No violation of actor responsibility or authority:** Primary and supporting actors strictly reflect the decision authorities and separation of powers established in `actors.md`.
+- [x] **No CRUD operations:** All use cases represent purposeful business workflows with distinct goals and outcomes (e.g., `Enroll Accepted Applicant`, `Arrange Substitute Teacher`, `Evaluate Student Learning`, `Evaluate Financial Clearance`), not generic database manipulation screens.
+- [x] **No speculative requirements:** No unverified features, speculative workflows, or future automation were introduced.
+- [x] **No unnecessary use cases:** Workflows representing the same cohesive business goal remain unified, splitting only where distinct actors perform independent work (e.g., autonomous cancellation by request initiator vs. centralized rescheduling by coordinator).
