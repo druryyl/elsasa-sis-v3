@@ -1629,8 +1629,8 @@ The following questions remain unresolved and must be clarified before detailed 
 
 ### Admission
 
-* Is admission required for every student, including transferred students?
-* Can one applicant apply to multiple campuses, programs, or levels simultaneously?
+* ~~Is admission required for every student, including transferred students?~~ **Closed.** Yes. All incoming students (new or transfer-in) pass through Admission (ApplicationType: New | Transfer-In) to maintain a single identity verification and acceptance pipeline.
+* ~~Can one applicant apply to multiple campuses, programs, or levels simultaneously?~~ **Closed.** Single active application per admission period. Preference updates are done on the application or by withdrawing and reapplying.
 * Is waitlisting required in the first implementation?
 * Who has final authority to accept or reject an application?
 * Are entrance assessments part of Students or provided by Academics?
@@ -1638,9 +1638,9 @@ The following questions remain unresolved and must be clarified before detailed 
 ### Enrollment
 
 * What conditions must be satisfied before enrollment is complete?
-* Is payment confirmation required before enrollment?
+* ~~Is payment confirmation required before enrollment?~~ **Closed.** Policy-driven. Governed by a school policy flag. When required, Enrollment checks for a valid payment confirmation reference from Finance or an authorized waiver/scholarship flag.
 * When is the student number assigned?
-* Can an accepted applicant defer enrollment?
+* ~~Can an accepted applicant defer enrollment?~~ **Closed.** Yes. An accepted applicant can defer enrollment up to 1 academic year via Target Period Update (decision status set to Deferred with new target period reference), without creating extra entities.
 * Is yearly re-enrollment part of Students or Academics?
 
 ### Student Identity
@@ -1653,7 +1653,7 @@ The following questions remain unresolved and must be clarified before detailed 
 
 ### Administrative Placement
 
-* What is the minimum administrative placement model?
+* ~~What is the minimum administrative placement model?~~ **Closed.** Core mandatory fields: Campus, School Level, Grade Level, Academic Year, and Effective Date. Optional/nullable fields: Homeroom/Administrative Group and Program/Stream.
 * Is homeroom placement owned by Students, Teaching, or Operations?
 * Can students belong to multiple administrative groups?
 * How should mid-period placement changes be handled?
@@ -1670,15 +1670,15 @@ The following questions remain unresolved and must be clarified before detailed 
 * ~~Who determines Academic Clearance for external transfer-out?~~ **Closed.** Academics owns Academic Clearance as a dedicated capability. Students requests for purpose Transfer Out; Academics determines; Students consumes. Transfer-out execution requires result Granted only.
 * ~~Who determines Financial Clearance for external transfer-out and graduation?~~ **Closed.** Finance owns Financial Clearance. Students requests purpose Transfer Out or Graduation; Finance determines; Students consumes. Enrollment clearance remains Phase-0 and is not reused. Transfer-out and required graduation execution consume Granted only. Conditional is not executable.
 * How is multi-campus transfer handled?
-* Does a campus transfer preserve the same student number?
+* ~~Does a campus transfer preserve the same student number?~~ **Closed.** Yes. Student identity and Student Number are organization-wide (global). A campus transfer is an Internal Transfer of placement, preserving the student number and history.
 * Is transfer between school levels considered internal transfer or new enrollment?
 
 ### Withdrawal
 
 * Who may authorize withdrawal?
 * Which withdrawal reasons must be standardized?
-* Does expulsion use the withdrawal workflow or a separate administrative process?
-* Can a withdrawn student later re-enroll using the same identity?
+* ~~Does expulsion use the withdrawal workflow or a separate administrative process?~~ **Closed.** Expulsion uses the standard Withdrawal Record workflow with reason category Disciplinary / Expulsion, requiring school leadership authorization and referencing the Development domain's disciplinary decision.
+* ~~Can a withdrawn student later re-enroll using the same identity?~~ **Closed.** Yes. The returning student reuses their existing Student identity and Student Number. They complete re-admission review to confirm placement/eligibility, and a new Enrollment record re-activates status.
 
 ### Graduation and Alumni
 
@@ -1686,9 +1686,9 @@ The following questions remain unresolved and must be clarified before detailed 
 
 ### Multi-Campus
 
-* Is student identity global across all campuses or local to one campus?
-* Is the student number unique across the school organization or per campus?
-* Can a student be active in more than one campus?
+* ~~Is student identity global across all campuses or local to one campus?~~ **Closed.** Student identity and Student Number are organization-wide (global).
+* ~~Is the student number unique across the school organization or per campus?~~ **Closed.** Unique across the entire school organization (global).
+* ~~Can a student be active in more than one campus?~~ **Closed.** Exactly one active placement at any given time. Concurrent active placements across campuses are not permitted.
 * Which decisions are controlled centrally and which are controlled by campus?
 
 ---
