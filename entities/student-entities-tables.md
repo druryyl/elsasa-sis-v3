@@ -71,6 +71,7 @@
 | `application_number` | VARCHAR | UQ, NOT NULL | Human-readable traceable reference (e.g., ADM-2026-0042) |
 | `applicant_id` | UUID | FK → `applicants.id`, NOT NULL | The applicant submitting this application |
 | `admission_period_id` | UUID | FK → external (Operations), NOT NULL | Target admission period |
+| `application_type` | VARCHAR | NOT NULL, default 'new' | Intake pipeline type: `new`, `transfer_in` |
 | `requested_entry_level` | VARCHAR | NOT NULL | Intended grade or level (e.g., "Grade 1") |
 | `requested_campus` | VARCHAR | nullable | Intended campus |
 | `requested_program` | VARCHAR | nullable | Intended program (e.g., "Reguler", "Bilingual") |
@@ -80,9 +81,13 @@
 
 **Example:**
 
-| application_number | applicant_id | admission_period_id | requested_entry_level | requested_campus | registration_date | status |
-|---|---|---|---|---|---|---|
-| ADM-2026-0042 | `a1b2...` | `per-001...` | Grade 1 | Campus Utara | 2026-02-15 | decided |
+| application_number | applicant_id | admission_period_id | application_type | requested_entry_level | requested_campus | registration_date | status |
+|---|---|---|---|---|---|---|---|
+| ADM-2026-0042 | `a1b2...` | `per-001...` | new | Grade 1 | Campus Utara | 2026-02-15 | decided |
+
+> [!NOTE]
+> - **Single Intake Pipeline:** All incoming students (new or external transfer-in) pass through this admission pipeline (`application_type: 'new' | 'transfer_in'`), ensuring unified identity verification and review prior to enrollment.
+> - **Single Active Application Constraint:** An applicant can have only one active application per admission period (enforced via partial unique index on `(applicant_id, admission_period_id)` WHERE `status NOT IN ('withdrawn', 'decided')`). If preferences change, the applicant must update requested placement or withdraw and reapply.
 
 ---
 
@@ -99,18 +104,22 @@
 |---|---|---|---|
 | `id` | UUID | PK | Unique decision identifier |
 | `application_id` | UUID | FK → `admission_applications.id`, UQ, NOT NULL | The application this decision applies to (one-to-one) |
-| `decision_type` | VARCHAR | NOT NULL | Outcome: `accepted`, `rejected`, `waitlisted`, `withdrawn`, `expired` |
+| `decision_type` | VARCHAR | NOT NULL | Outcome: `accepted`, `rejected`, `waitlisted`, `withdrawn`, `expired`, `deferred` |
 | `decision_date` | DATE | NOT NULL | Date the decision was made |
 | `effective_date` | DATE | NOT NULL | Date the decision takes effect |
 | `decided_by` | VARCHAR | NOT NULL | Person or committee that made the decision |
 | `reason` | TEXT | nullable | Reason or notes supporting the decision |
 | `supporting_reference` | VARCHAR | nullable | Reference to supporting document or process |
+| `deferred_admission_period_id` | UUID | FK → external (Operations), nullable | Target admission period if enrollment is deferred (up to 1 academic year) |
 
 **Example:**
 
 | application_id | decision_type | decision_date | effective_date | decided_by |
 |---|---|---|---|---|
 | `app-042...` | accepted | 2026-03-20 | 2026-03-20 | Admission Committee |
+
+> [!NOTE]
+> Deferral of enrollment (up to 1 academic year) is handled minimally by setting `decision_type = 'deferred'` and recording or updating the target period via `deferred_admission_period_id` (and updating the target admission period on the application) without creating redundant entities.
 
 ---
 
@@ -255,7 +264,9 @@ erDiagram
 > `current_status` is a denormalized current-state field for operational convenience. The authoritative status history is in `student_statuses`. Any status change must update both the history table and this field atomically.
 
 > [!NOTE]
-> `student_number` is modeled as an attribute of `students` with dedicated uniqueness constraint, per entity doc assumption 1. The domain's emphasis on unique assignment rules and cross-domain reference role is satisfied by the UQ constraint and application-level assignment logic.
+> - **Global Organization-Wide Identity:** Student identity and `student_number` are organization-wide across all campuses (never local or campus-scoped). Moving between campuses is an Internal Transfer of placement, preserving complete academic and administrative history.
+> - **Student Re-enrollment After Withdrawal:** A withdrawn student who returns to the school keeps their original Student identity and `student_number` (preserving past records and transcripts). They complete re-admission review, and a new `enrollments` record re-activates their status.
+> - `student_number` is modeled as an attribute of `students` with a dedicated uniqueness constraint, satisfying the unique assignment and cross-domain reference requirements.
 
 ---
 
@@ -263,7 +274,7 @@ erDiagram
 
 | Aspect | Description |
 |---|---|
-| **Purpose** | Records the administrative act that transforms an accepted applicant into a student. Each record represents one enrollment event. |
+| **Purpose** | Records the administrative act that transforms an accepted applicant into an official student, or re-activates a returning student after withdrawal. Each record represents one enrollment event. |
 | **Type** | Core |
 
 **Key Columns:**
@@ -271,22 +282,31 @@ erDiagram
 | Column | Type | Constraint | Description |
 |---|---|---|---|
 | `id` | UUID | PK | Unique enrollment identifier |
-| `student_id` | UUID | FK → `students.id`, NOT NULL | The student created by this enrollment |
+| `student_id` | UUID | FK → `students.id`, NOT NULL | The student linked to this enrollment (a student may have multiple enrollments over time upon re-admission) |
 | `application_id` | UUID | FK → `admission_applications.id`, NOT NULL | Source admission application |
+| `enrollment_type` | VARCHAR | NOT NULL, default 'initial' | Type of enrollment: `initial`, `re_admission` |
 | `enrollment_date` | DATE | NOT NULL | Date enrollment was completed |
 | `initial_campus` | VARCHAR | NOT NULL | Campus assigned at enrollment |
 | `initial_level` | VARCHAR | NOT NULL | Level/grade assigned at enrollment (e.g., "Grade 1") |
+| `initial_academic_year` | VARCHAR | NOT NULL | Academic year assigned at enrollment (e.g., "2026/2027") |
 | `initial_program` | VARCHAR | nullable | Program assigned at enrollment (e.g., "Reguler") |
 | `initial_cohort` | VARCHAR | nullable | Cohort assigned at enrollment (e.g., "1A") |
 | `approved_by` | VARCHAR | NOT NULL | Person who approved enrollment |
 | `enrollment_payment_confirmed` | BOOLEAN | nullable | Whether enrollment payment was confirmed (when policy requires it) |
+| `payment_reference` | VARCHAR | nullable | Reference to payment receipt/transaction from Finance or external source |
+| `payment_waived` | BOOLEAN | NOT NULL, default false | Whether enrollment payment requirement was waived |
+| `waiver_reference` | VARCHAR | nullable | Reference to scholarship or authorized fee waiver decision |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | application_id | enrollment_date | initial_campus | initial_level | approved_by |
-|---|---|---|---|---|---|
-| `std-108...` | `app-042...` | 2026-07-01 | Campus Utara | Grade 1 | Pak Budi |
+| student_id | application_id | enrollment_type | enrollment_date | initial_campus | initial_level | initial_academic_year | approved_by | enrollment_payment_confirmed |
+|---|---|---|---|---|---|---|---|---|
+| `std-108...` | `app-042...` | initial | 2026-07-01 | Campus Utara | Grade 1 | 2026/2027 | Pak Budi | true |
+
+> [!NOTE]
+> - **Policy-Driven Payment Confirmation:** Governed by school policy flag. When required, enrollment requires either a confirmed payment reference (`enrollment_payment_confirmed = true` and `payment_reference IS NOT NULL`) or an authorized waiver/scholarship flag (`payment_waived = true` and `waiver_reference IS NOT NULL`). In Stage 1, this is recorded manually; in automated stages, it is verified against Finance.
+> - **Re-admission of Withdrawn Students:** A returning student keeps their original `students` record and `student_number`. A new record with `enrollment_type = 're_admission'` is created to re-activate the student.
 
 ---
 
@@ -386,8 +406,8 @@ erDiagram
 ```mermaid
 erDiagram
     applicants ||--o| students : "becomes (via enrollment)"
-    admission_applications ||--|| enrollments : "source"
-    enrollments ||--|| students : "creates"
+    admission_applications ||--o| enrollments : "source"
+    students ||--o{ enrollments : "has"
     students ||--o{ student_guardian_relationships : "has"
     guardians ||--o{ student_guardian_relationships : "holds"
     students ||--o{ student_documents : "has"
@@ -410,24 +430,30 @@ erDiagram
 |---|---|---|---|
 | `id` | UUID | PK | Unique placement record identifier |
 | `student_id` | UUID | FK → `students.id`, NOT NULL | The student |
-| `campus` | VARCHAR | NOT NULL | Campus name or identifier |
-| `school_level` | VARCHAR | NOT NULL | School level (e.g., "SD", "SMP", "SMA") |
-| `grade` | VARCHAR | NOT NULL | Grade or year level (e.g., "Grade 1", "Grade 2") |
-| `program` | VARCHAR | nullable | Program (e.g., "Reguler", "Bilingual") |
-| `stream` | VARCHAR | nullable | Stream, if applicable |
-| `cohort` | VARCHAR | nullable | Cohort (e.g., "1A") |
-| `homeroom` | VARCHAR | nullable | Homeroom or administrative group (e.g., "Kelas 1A") |
-| `effective_date` | DATE | NOT NULL | Date this placement becomes effective |
+| `campus` | VARCHAR | NOT NULL | Campus name or identifier (mandatory) |
+| `school_level` | VARCHAR | NOT NULL | School level (e.g., "SD", "SMP", "SMA") (mandatory) |
+| `grade` | VARCHAR | NOT NULL | Grade or year level (e.g., "Grade 1", "Grade 2") (mandatory) |
+| `academic_year` | VARCHAR | NOT NULL | Academic year (e.g., "2026/2027") (mandatory) |
+| `effective_date` | DATE | NOT NULL | Date this placement becomes effective (mandatory) |
+| `program` | VARCHAR | nullable | Program (e.g., "Reguler", "Bilingual") (optional) |
+| `stream` | VARCHAR | nullable | Stream, if applicable (optional) |
+| `cohort` | VARCHAR | nullable | Cohort (e.g., "1A") (optional) |
+| `homeroom` | VARCHAR | nullable | Homeroom or administrative group (e.g., "Kelas 1A") (optional) |
 | `end_date` | DATE | nullable | Date this placement ended (null = current) |
 | `is_current` | BOOLEAN | NOT NULL, default true | Whether this is the active placement |
 | `reason` | VARCHAR | nullable | Reason for this placement (e.g., "Initial enrollment", "Promotion", "Transfer") |
 
 **Example:**
 
-| student_id | campus | school_level | grade | cohort | homeroom | effective_date | end_date | is_current |
-|---|---|---|---|---|---|---|---|---|
-| `std-108...` | Campus Utara | SD | Grade 1 | 1A | Kelas 1A | 2026-07-15 | 2027-06-30 | false |
-| `std-108...` | Campus Utara | SD | Grade 2 | 2A | Kelas 2A | 2027-07-01 | *(null)* | true |
+| student_id | campus | school_level | grade | academic_year | cohort | homeroom | effective_date | end_date | is_current |
+|---|---|---|---|---|---|---|---|---|---|
+| `std-108...` | Campus Utara | SD | Grade 1 | 2026/2027 | 1A | Kelas 1A | 2026-07-15 | 2027-06-30 | false |
+| `std-108...` | Campus Utara | SD | Grade 2 | 2027/2028 | 2A | Kelas 2A | 2027-07-01 | *(null)* | true |
+
+> [!IMPORTANT]
+> **Single Active Campus Placement Constraint:** A student has at most one active Administrative Placement across all campuses at any point in time (enforced via partial unique index on `(student_id) WHERE is_current = true`). Concurrent active placements across campuses are strictly prohibited.
+>
+> **Placement Minimal Model:** Follows the core mandatory (`campus`, `school_level`, `grade`, `academic_year`, `effective_date`) plus optional extension model (`homeroom`, `cohort`, `program`, `stream`), enabling placement upon enrollment before homeroom assignments are finalized.
 
 ---
 
@@ -458,6 +484,9 @@ erDiagram
 | `std-108...` | enrolled | 2026-07-01 | 2026-07-15 | false |
 | `std-108...` | active | 2026-07-15 | *(null)* | true |
 
+> [!NOTE]
+> A student has at most one current status record at any point in time, enforced via partial unique index on `(student_id) WHERE is_current = true`.
+
 ---
 
 ### 3.3 `lifecycle_transitions` — Main Table
@@ -473,7 +502,7 @@ erDiagram
 |---|---|---|---|
 | `id` | UUID | PK | Unique transition identifier |
 | `student_id` | UUID | FK → `students.id`, NOT NULL | The student |
-| `transition_type` | VARCHAR | NOT NULL | Type: `activation`, `leave_start`, `leave_return`, `leave_expiry`, `promotion`, `retention`, `internal_transfer`, `external_transfer_out`, `external_transfer_in`, `withdrawal`, `graduation`, `alumni_activation`, `placement_change`, `re_enrollment` |
+| `transition_type` | VARCHAR | NOT NULL | Type: `enrollment`, `re_admission`, `activation`, `leave_start`, `leave_return`, `leave_expiry`, `promotion`, `retention`, `internal_transfer`, `external_transfer_out`, `external_transfer_in`, `withdrawal`, `graduation`, `alumni_activation`, `placement_change`, `re_enrollment` |
 | `previous_status` | VARCHAR | nullable | Status before transition |
 | `new_status` | VARCHAR | nullable | Status after transition |
 | `previous_placement_id` | UUID | FK → `administrative_placements.id`, nullable | Placement before (if placement changed) |
@@ -502,7 +531,7 @@ erDiagram
 | Column | Type | Constraint | Description |
 |---|---|---|---|
 | `id` | UUID | PK | Unique decision identifier |
-| `decision_type` | VARCHAR | NOT NULL | Type: `enrollment_approval`, `activation`, `leave_approval`, `leave_return_approval`, `promotion_approval`, `retention_approval`, `transfer_approval`, `withdrawal_approval`, `graduation_approval` |
+| `decision_type` | VARCHAR | NOT NULL | Type: `enrollment_approval`, `re_admission_approval`, `activation`, `leave_approval`, `leave_return_approval`, `promotion_approval`, `retention_approval`, `transfer_approval`, `withdrawal_approval`, `graduation_approval` |
 | `decision_date` | DATE | NOT NULL | Date decision was made |
 | `effective_date` | DATE | NOT NULL | Date decision takes effect |
 | `decided_by` | VARCHAR | NOT NULL | Person or authority who made the decision |
@@ -590,6 +619,7 @@ erDiagram
 | `id` | UUID | PK | Unique transfer record identifier |
 | `student_id` | UUID | FK → `students.id`, NOT NULL | The student |
 | `transfer_type` | VARCHAR | NOT NULL | Type: `internal`, `external_out`, `external_in` |
+| `admission_application_id` | UUID | FK → `admission_applications.id`, nullable | Associated admission application for external transfer-in (single intake pipeline) |
 | `effective_date` | DATE | NOT NULL | Date the transfer takes effect |
 | `previous_campus` | VARCHAR | nullable | Previous campus |
 | `previous_program` | VARCHAR | nullable | Previous program |
@@ -611,6 +641,9 @@ erDiagram
 |---|---|---|---|---|---|---|
 | `std-108...` | internal | 2028-01-15 | Campus Utara | Campus Selatan | Family moved to South Jakarta | Kepala Sekolah |
 
+> [!NOTE]
+> **Single Intake Pipeline for External Transfers:** All incoming students (including external transfer-in) pass through Admission (`admission_applications` with `application_type = 'transfer_in'`). When enrolled, `transfer_records` captures the external transfer details (e.g., `source_institution`) and links to `admission_application_id`.
+
 ---
 
 ### 3.8 `withdrawal_records` — Main Table
@@ -627,17 +660,21 @@ erDiagram
 | `id` | UUID | PK | Unique withdrawal record identifier |
 | `student_id` | UUID | FK → `students.id`, NOT NULL | The student |
 | `effective_date` | DATE | NOT NULL | Date withdrawal takes effect |
-| `reason` | TEXT | NOT NULL | Reason: `voluntary`, `relocation`, `prolonged_absence`, `disciplinary`, `financial`, `medical_personal`, `other` — or free-text |
-| `authorized_by` | VARCHAR | NOT NULL | Person who authorized the withdrawal |
-| `supporting_reference` | VARCHAR | nullable | Reference to supporting document, request, or recommendation |
+| `reason_category` | VARCHAR | NOT NULL | Category: `voluntary`, `relocation`, `prolonged_absence`, `disciplinary_expulsion`, `financial`, `medical_personal`, `other` |
+| `reason` | TEXT | NOT NULL | Detailed explanation or narrative reason for withdrawal |
+| `authorized_by` | VARCHAR | NOT NULL | Person or authority who authorized the withdrawal (school leadership for expulsion) |
+| `supporting_reference` | VARCHAR | nullable | Reference to supporting document, parent request, or disciplinary decision from Development domain |
 | `notes` | TEXT | nullable | Additional notes |
 | `transition_id` | UUID | FK → `lifecycle_transitions.id`, nullable | Associated lifecycle transition |
 
 **Example:**
 
-| student_id | effective_date | reason | authorized_by | supporting_reference |
-|---|---|---|---|---|
-| `std-faisal...` | 2028-03-01 | Family relocation abroad | Kepala Sekolah Ibu Ratna | Parent request letter 2028-02-20 |
+| student_id | effective_date | reason_category | reason | authorized_by | supporting_reference |
+|---|---|---|---|---|---|
+| `std-faisal...` | 2028-03-01 | relocation | Family relocation abroad | Kepala Sekolah Ibu Ratna | Parent request letter 2028-02-20 |
+
+> [!NOTE]
+> **Expulsion via Withdrawal Workflow:** Expulsion is executed using this standard `withdrawal_records` table with `reason_category = 'disciplinary_expulsion'`. It requires school leadership authorization in `authorized_by` and references the Development domain's disciplinary decision in `supporting_reference`. No redundant expulsion entity or table is created.
 
 ---
 
@@ -715,7 +752,7 @@ erDiagram
 |---|---|---|---|
 | `id` | UUID | PK | Unique history entry identifier |
 | `student_id` | UUID | FK → `students.id`, NOT NULL | The student |
-| `event_type` | VARCHAR | NOT NULL | Event: `application_submitted`, `application_accepted`, `application_rejected`, `enrollment_completed`, `student_activated`, `placement_changed`, `leave_started`, `leave_returned`, `leave_expired`, `re_enrollment_confirmed`, `student_promoted`, `student_retained`, `internal_transfer`, `external_transfer_out`, `external_transfer_in`, `student_withdrawn`, `student_graduated`, `alumni_activated`, `identity_corrected` |
+| `event_type` | VARCHAR | NOT NULL | Event: `application_submitted`, `application_accepted`, `application_rejected`, `application_deferred`, `enrollment_completed`, `re_admission_completed`, `student_activated`, `placement_changed`, `leave_started`, `leave_returned`, `leave_expired`, `re_enrollment_confirmed`, `student_promoted`, `student_retained`, `internal_transfer`, `external_transfer_out`, `external_transfer_in`, `student_withdrawn`, `student_expelled`, `student_graduated`, `alumni_activated`, `identity_corrected` |
 | `event_date` | DATE | NOT NULL | Date the event occurred |
 | `detail` | TEXT | nullable | Human-readable detail (e.g., "Grade 1 → Grade 2") |
 | `authorized_by` | VARCHAR | nullable | Person who authorized the event |
@@ -832,24 +869,24 @@ erDiagram
 | # | Table | Type | Submodule | Notes |
 |---|---|---|---|---|
 | 1.1 | `applicants` | Main | Admission | Applicant identity; precursor to `students` |
-| 1.2 | `admission_applications` | Main | Admission | One per application per period |
-| 1.3 | `admission_decisions` | Main | Admission | One per application (one-to-one) |
+| 1.2 | `admission_applications` | Main | Admission | One active application per applicant per period; single intake pipeline |
+| 1.3 | `admission_decisions` | Main | Admission | One per application (one-to-one); supports deferral |
 | 1.4 | `applicant_documents` | Supporting | Admission | Documents for admission review |
 | 1.5 | `entrance_assessment_evidence` | Supporting | Admission | Assessment results from external sources |
 | 1.6 | `admission_application_contacts` | Supporting | Admission | Contact persons during admission |
-| 2.1 | `students` | Main | Enrollment & Identity | Authoritative student identity |
-| 2.2 | `enrollments` | Main | Enrollment & Identity | Enrollment act linking admission → student |
+| 2.1 | `students` | Main | Enrollment & Identity | Authoritative global student identity |
+| 2.2 | `enrollments` | Main | Enrollment & Identity | Enrollment act linking admission → student; supports initial and re-admission |
 | 2.3 | `guardians` | Main | Enrollment & Identity | Parent/guardian identity |
 | 2.4 | `student_guardian_relationships` | Supporting | Enrollment & Identity | Student ↔ Guardian link with roles |
 | 2.5 | `student_documents` | Supporting | Enrollment & Identity | Student-linked official documents |
-| 3.1 | `administrative_placements` | Main | Placement & Status | Historical placement records |
+| 3.1 | `administrative_placements` | Main | Placement & Status | Historical placement records with mandatory academic year |
 | 3.2 | `student_statuses` | Main | Placement & Status | Historical status records |
 | 3.3 | `lifecycle_transitions` | Main | Placement & Status | All state/placement changes |
 | 3.4 | `administrative_decisions` | Supporting | Placement & Status | Decisions authorizing transitions |
 | 3.5 | `leaves_of_absence` | Main | Placement & Status | Leave lifecycle records |
 | 3.6 | `re_enrollments` | Main | Placement & Status | Annual re-enrollment confirmations |
-| 3.7 | `transfer_records` | Main | Placement & Status | Internal + external transfers |
-| 3.8 | `withdrawal_records` | Main | Placement & Status | Pre-graduation enrollment endings |
+| 3.7 | `transfer_records` | Main | Placement & Status | Internal + external transfers (links to admission intake) |
+| 3.8 | `withdrawal_records` | Main | Placement & Status | Pre-graduation enrollment endings (including disciplinary expulsion) |
 | 3.9 | `graduation_records` | Main | Placement & Status | Official graduation records |
 | 3.10 | `alumni_records` | Main | Placement & Status | Post-graduation identity |
 | 3.11 | `administrative_history_entries` | Main | Placement & Status | Immutable audit trail |
@@ -923,29 +960,26 @@ flowchart TD
 
     APP -->|"becomes (via enrollment)"| STD
     AA -->|"source"| ENR
-    ENR -->|"creates"| STD
+    ENR -->|"creates / re-activates"| STD
 ```
 
 ---
 
-## Open Questions
+## Resolved Questions & Technical Realization (Closed)
 
-These questions from the domain and entity documents may affect final table design:
+The architectural open questions from the domain and entity definitions have been formally resolved and implemented across the database tables as follows:
 
-| # | Question | Affected Table(s) |
-|---|---|---|
-| 1 | Is admission required for every student, including transferred students? | `applicants`, `admission_applications`, `enrollments` — external-transfer-in students may bypass admission |
-| 2 | Can one applicant apply to multiple campuses/programs/levels simultaneously? | `admission_applications` — cardinality constraint |
-| 3 | Is payment confirmation required before enrollment? | `enrollments.enrollment_payment_confirmed` — nullable vs required |
-| 4 | Can an accepted applicant defer enrollment? | May require a deferred state on `admission_decisions` or a separate tracking mechanism |
-| 5 | Is student identity global across all campuses or local to one campus? | `students.student_number` — scope of uniqueness constraint |
-| 6 | Can a student be active in more than one campus? | `administrative_placements` — whether multiple `is_current = true` rows are allowed |
-| 7 | Does expulsion use the withdrawal workflow or a separate process? | `withdrawal_records` — whether `reason` covers expulsion or a distinct table is needed |
-| 8 | Can a withdrawn student later re-enroll using the same identity? | `students`, `enrollments` — re-enrollment flow for withdrawn students |
-| 9 | What is the minimum administrative placement model? | `administrative_placements` — which columns are truly required vs nullable |
-
-> [!CAUTION]
-> These open questions must be resolved with school stakeholders before implementation. Table designs above use the most pragmatic interpretation where the source documents are ambiguous. No speculative tables or columns have been added.
+| # | Question | Business Decision & Resolution | Database Realization & Technical Implementation | Status |
+|---|---|---|---|---|
+| 1 | Is admission required for every student, including transferred students? | **Yes — Single Intake Pipeline.** All incoming students (new or external transfer-in) pass through Admission. Ensures a single, explicit intake pipeline for identity verification and acceptance before enrollment. | Added `application_type VARCHAR NOT NULL` (values: `new`, `transfer_in`, default `new`) to `admission_applications`. In `transfer_records`, added nullable `admission_application_id` linking external transfer-in records to their intake application. | **Closed** |
+| 2 | Can one applicant apply to multiple campuses/programs/levels simultaneously? | **Single Active Application.** An applicant can have only one active application per admission period. If preference changes, they update requested placement or withdraw and reapply. Avoids duplicate review states and complex multi-offer handling. | Documented and enforced via partial unique index on `admission_applications (applicant_id, admission_period_id) WHERE status NOT IN ('withdrawn', 'decided')`. | **Closed** |
+| 3 | Is payment confirmation required before enrollment? | **Policy-Driven with Explicit Clearance/Waiver.** Governed by school policy flag. When required, Enrollment requires a valid payment confirmation reference or an authorized waiver/scholarship flag. | Added `payment_reference VARCHAR nullable`, `payment_waived BOOLEAN NOT NULL default false`, and `waiver_reference VARCHAR nullable` alongside `enrollment_payment_confirmed` in `enrollments`. | **Closed** |
+| 4 | Can an accepted applicant defer enrollment? | **Yes, via Target Period Update.** An accepted applicant can defer enrollment up to 1 academic year. Modeled minimally by setting status to `Deferred` on the Admission Decision and updating the target Admission Period, without creating redundant entities. | Added `deferred` to `admission_decisions.decision_type` and added `deferred_admission_period_id UUID nullable` to track the updated target period without adding redundant tables. | **Closed** |
+| 5 | Is student identity global across all campuses or local to one campus? | **Global Identity & Global Student Number.** Student identity and Student Number are organization-wide. A person has exactly one persistent Student record and identifier. Moving between campuses is an Internal Transfer of placement, preserving complete history. | Preserved global unique constraint (`UQ`) on `students.student_number` organization-wide. Inter-campus movements are modeled as `administrative_placements` changes and `transfer_records` (type `internal`), retaining the same student identity. | **Closed** |
+| 6 | Can a student be active in more than one campus? | **Exactly One Active Campus Placement.** A student has at most one active Administrative Placement (one campus, grade, homeroom) at any point in time. Concurrent active placements across campuses are not permitted. | Enforced via partial unique index on `administrative_placements (student_id) WHERE is_current = true`, guaranteeing a student can never have more than one active placement across all campuses concurrently. | **Closed** |
+| 7 | Does expulsion use the withdrawal workflow or a separate process? | **Uses Withdrawal Workflow.** Expulsion is executed via standard Withdrawal Record with reason category `Disciplinary / Expulsion`, requiring school leadership authorization and referencing the Development domain's disciplinary decision. Avoids redundant entities. | Added `reason_category VARCHAR NOT NULL` (including `disciplinary_expulsion`) to `withdrawal_records`. Expulsion uses `authorized_by` for school leadership and `supporting_reference` for the Development domain's disciplinary reference. | **Closed** |
+| 8 | Can a withdrawn student later re-enroll using the same identity? | **Yes, Reuses Existing Identity & Student Number.** The returning student keeps their original Student identity and Student Number (preserving past transcripts and history). They complete re-admission review to confirm placement/eligibility, and a new Enrollment record re-activates status. | Configured `enrollments` with non-unique `student_id` (enabling multiple enrollments over time), added `enrollment_type VARCHAR NOT NULL` (`initial`, `re_admission`), and updated table cardinality to `students ||--o{ enrollments`. | **Closed** |
+| 9 | What is the minimum administrative placement model? | **Core Mandatory + Optional Extensions.** Mandatory: Campus, School Level, Grade Level, Academic Year, and Effective Date. Optional/Nullable: Homeroom/Administrative Group and Program/Stream. Enables enrollment placement before class/homeroom divisions are finalized. | Added mandatory `academic_year VARCHAR NOT NULL` to `administrative_placements` and `initial_academic_year VARCHAR NOT NULL` to `enrollments`. Maintained `campus`, `school_level`, `grade`, `academic_year`, `effective_date` as NOT NULL while keeping `homeroom`, `cohort`, `program`, `stream` nullable. | **Closed** |
 
 ---
 

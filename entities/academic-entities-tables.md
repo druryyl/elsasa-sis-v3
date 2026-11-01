@@ -73,7 +73,7 @@
 | `parent_unit_id` | UUID | FK → `learning_units.id`, nullable | Parent learning unit for hierarchical composition (e.g., course → modules) |
 | `code` | VARCHAR | UQ (within structure), NOT NULL | Unit code (e.g., "MAT-4-S1") |
 | `name` | VARCHAR | NOT NULL | Human-readable name (e.g., "Matematika Kelas 4 Semester 1") |
-| `unit_type` | VARCHAR | NOT NULL | Curriculum expression: `subject`, `course`, `module`, `pace`, `project`, `unit`, `other` |
+| `unit_type` | VARCHAR | NOT NULL | Curriculum expression: `subject`, `course`, `module`, `pace`, `project`, `competency`, `unit`, `other` |
 | `level` | VARCHAR | nullable | Grade or level context (e.g., "Grade 4") |
 | `description` | TEXT | nullable | Description of what this unit covers |
 | `credit_weight` | DECIMAL | nullable | Credit or weight as defined by school policy |
@@ -89,7 +89,7 @@
 | MAT-4-S1-M1 | Pecahan Biasa | module | Grade 4 | `ls-merdeka-sd-2024...` | *(null)* | active |
 
 > [!IMPORTANT]
-> Subject, course, module, PACE, and project are **not** separate tables — they are `unit_type` values on this single table. The domain explicitly prohibits introducing separate root concepts for curriculum variants. Hierarchical composition is supported through `parent_unit_id`.
+> Subject, course, module, PACE, project, and fine-grained competencies are **not** separate tables — they are `unit_type` values on this single table. The domain explicitly prohibits introducing separate root concepts for curriculum variants. Hierarchical composition is supported through `parent_unit_id` (e.g., `unit_type = 'competency'` child under a parent subject, per Resolved Question 1).
 
 ---
 
@@ -167,25 +167,37 @@ erDiagram
 | `learning_unit_id` | UUID | FK → `learning_units.id`, NOT NULL | The learning unit being undertaken |
 | `academic_period_id` | UUID | FK → external (Operations), NOT NULL | Academic period |
 | `academic_period_label` | VARCHAR | NOT NULL | Human-readable period label |
-| `status` | VARCHAR | NOT NULL | Participation lifecycle: `assigned`, `in_progress`, `paused`, `withdrawn`, `completed` |
+| `participation_type` | VARCHAR | NOT NULL, default 'standard' | Type: `standard`, `repeat`, `transferred_in`, `recognized_prior` |
+| `attempt_number` | INTEGER | NOT NULL, default 1 | Attempt counter for repeated learning (increments on retakes) |
+| `source` | VARCHAR | NOT NULL, default 'assigned' | Origin: `assigned`, `student_selected`, `learning_plan` |
+| `section_label` | VARCHAR | nullable | Human-readable section or cohort partition (e.g., "4A") |
+| `status` | VARCHAR | NOT NULL | Lifecycle: `in_progress`, `paused`, `withdrawn`, `completed` |
 | `start_date` | DATE | NOT NULL | Date participation began |
 | `end_date` | DATE | nullable | Date participation ended (null = ongoing) |
 | `completion_date` | DATE | nullable | Date learning was completed (null if not completed) |
-| `recognition_type` | VARCHAR | nullable | For prior/transferred learning: `prior_learning`, `transfer_credit`, `exemption` (null = normal participation) |
-| `recognition_source` | VARCHAR | nullable | Source of recognized learning (e.g., previous school name) |
+| `source_institution` | VARCHAR | nullable | Originating institution for transferred/prior recognized learning |
+| `external_grade_or_credit` | VARCHAR | nullable | External grade, score, or credits recognized from source institution |
+| `recognition_basis` | TEXT | nullable | Documented basis or rationale for credit recognition |
+| `approved_by` | VARCHAR | nullable | Academic Authority who approved transfer or prior credit recognition |
 | `student_learning_plan_id` | UUID | FK → `student_learning_plans.id`, nullable | SLP governing this participation, if any |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | learning_unit_id | academic_period_label | status | start_date | recognition_type |
-|---|---|---|---|---|---|
-| `std-108...` | `lu-mat-4-s1...` | Semester 1 TP 2029/2030 | in_progress | 2029-07-15 | *(null)* |
-| `std-205...` | `lu-mat-3-s1...` | Semester 1 TP 2029/2030 | in_progress | 2029-07-15 | *(null)* |
-| `std-108...` | `lu-ipa-transfer...` | Semester 1 TP 2029/2030 | completed | 2029-07-15 | transfer_credit |
+| student_id | learning_unit_id | academic_period_label | participation_type | attempt_number | source | status | source_institution |
+|---|---|---|---|---|---|---|---|
+| `std-108...` | `lu-mat-4-s1...` | Semester 1 TP 2029/2030 | standard | 1 | assigned | in_progress | *(null)* |
+| `std-205...` | `lu-mat-3-s1...` | Semester 1 TP 2029/2030 | repeat | 2 | learning_plan | in_progress | *(null)* |
+| `std-108...` | `lu-ipa-transfer...` | Semester 1 TP 2029/2030 | transferred_in | 1 | assigned | completed | SD Harapan Bangsa |
 
 > [!IMPORTANT]
 > Administrative enrollment does **not** automatically create an `academic_participations` row. Participation must be established through Academics workflows. A student may be enrolled in Students but have no active participation records here.
+> 
+> Per Resolved Questions:
+> - **Selection vs. Assignment (Q4):** Captured via `source` (`assigned`, `student_selected`, `learning_plan`).
+> - **Repeated & Paused Learning (Q5):** Repeated learning creates a new record with `participation_type = 'repeat'` and incremented `attempt_number`. Paused learning uses `status = 'paused'`, returning to `'in_progress'` upon resumption.
+> - **Cohort / Class Grouping (Q6):** Optional `section_label` partitions cohorts without requiring a standalone class table.
+> - **Transferred & Prior Learning (Q14):** Recorded with `participation_type = 'transferred_in'` or `'recognized_prior'`, immediately completed with `source_institution`, `external_grade_or_credit`, `recognition_basis`, and `approved_by`. No synthetic activities or attendance rows are generated.
 
 ---
 
@@ -202,9 +214,10 @@ erDiagram
 |---|---|---|---|
 | `id` | UUID | PK | Unique identifier |
 | `learning_unit_id` | UUID | FK → `learning_units.id`, NOT NULL | The learning unit this activity belongs to |
-| `activity_type` | VARCHAR | NOT NULL | Type: `lesson`, `tutorial`, `laboratory`, `independent_work`, `project`, `discussion`, `practice`, `examination`, `remediation`, `other` |
+| `activity_type` | VARCHAR | NOT NULL | Type: `lesson`, `tutorial`, `laboratory`, `independent_work`, `project`, `discussion`, `practice`, `examination`, `remediation`, `homeroom_session`, `other` |
 | `title` | VARCHAR | NOT NULL | Human-readable title (e.g., "Lesson — Pecahan Biasa") |
 | `description` | TEXT | nullable | Description of the activity |
+| `section_label` | VARCHAR | nullable | Human-readable section or cohort partition (e.g., "4A") |
 | `activity_date` | DATE | NOT NULL | Date the activity occurs or occurred |
 | `start_time` | TIME | nullable | Start time (if applicable) |
 | `end_time` | TIME | nullable | End time (if applicable) |
@@ -215,14 +228,20 @@ erDiagram
 
 **Example:**
 
-| learning_unit_id | activity_type | title | activity_date | status | is_attendance_required |
-|---|---|---|---|---|---|
-| `lu-mat-4-s1...` | lesson | Lesson — Pecahan Biasa | 2029-08-12 | conducted | true |
-| `lu-mat-4-s1...` | examination | Ulangan Harian Pecahan | 2029-09-10 | conducted | true |
-| `lu-mat-4-s1...` | independent_work | Latihan Mandiri Pecahan | 2029-08-15 | conducted | false |
+| learning_unit_id | activity_type | title | section_label | activity_date | status | is_attendance_required |
+|---|---|---|---|---|---|---|
+| `lu-mat-4-s1...` | lesson | Lesson — Pecahan Biasa | 4A | 2029-08-12 | conducted | true |
+| `lu-mat-4-s1...` | examination | Ulangan Harian Pecahan | 4A | 2029-09-10 | conducted | true |
+| `lu-mat-4-s1...` | independent_work | Latihan Mandiri Pecahan | *(null)* | 2029-08-15 | conducted | false |
+| `lu-hr-4...` | homeroom_session | Daily Homeroom Roll Call | 4A | 2029-08-12 | conducted | true |
 
 > [!NOTE]
 > Academics owns the educational purpose, expected outcomes, student participation, and academic result of an activity. Teaching owns the teacher assignment (referenced by `teacher_assignment_id`). Operations owns scheduling and room allocation (not stored in this table). The activity may be individual, asynchronous, or group-based.
+> 
+> Per Resolved Questions:
+> - **Class / Cohort Partitioning (Q6):** Dynamic reference to administrative homerooms via `section_label` without requiring a standalone class table.
+> - **Attendance Mandate (Q7):** Controlled via `is_attendance_required`. Defaults to `true` for synchronous activities and `false` for self-paced/asynchronous activities.
+> - **Daily Statutory Attendance (Q19):** Daily homeroom roll call is conducted as a scheduled `Learning Activity` with `activity_type = 'homeroom_session'` and `is_attendance_required = true` to produce statutory report card day totals. General physical gate presence belongs to Operations.
 
 ---
 
@@ -387,6 +406,9 @@ erDiagram
 | `title` | VARCHAR | NOT NULL | Assessment title (e.g., "Ulangan Harian Pecahan — Matematika Kelas 4") |
 | `assessment_type` | VARCHAR | NOT NULL | Type: `formative`, `summative`, `diagnostic`, `portfolio`, `project`, `other` |
 | `assessment_method` | VARCHAR | NOT NULL | Method: `written_test`, `oral`, `practical`, `project`, `portfolio`, `observation`, `other` |
+| `max_score` | DECIMAL | nullable | Maximum possible score (e.g., 100.0) |
+| `passing_score` | DECIMAL | nullable | Minimum passing score / mastery threshold (KKM), used for completion and capped reassessment |
+| `reassessment_policy` | VARCHAR | NOT NULL, default 'highest_score' | Reassessment selection strategy: `capped_at_passing`, `highest_score`, `latest_attempt`, `average`, `none` |
 | `criteria` | TEXT | nullable | Assessment criteria or rubric description |
 | `assessment_date` | DATE | nullable | Date assessment is conducted |
 | `assessor_reference` | VARCHAR | nullable | Teacher or assessor reference (from Teaching domain) |
@@ -395,10 +417,15 @@ erDiagram
 
 **Example:**
 
-| learning_unit_id | title | assessment_type | assessment_method | assessment_date | status |
-|---|---|---|---|---|---|
-| `lu-mat-4-s1...` | Ulangan Harian Pecahan — Matematika Kelas 4 | summative | written_test | 2029-09-10 | conducted |
-| `lu-mat-4-s1...` | Pengamatan Diskusi Kelompok | formative | observation | 2029-08-20 | conducted |
+| learning_unit_id | title | assessment_type | assessment_method | max_score | passing_score | reassessment_policy | status |
+|---|---|---|---|---|---|---|---|
+| `lu-mat-4-s1...` | Ulangan Harian Pecahan — Matematika Kelas 4 | summative | written_test | 100 | 75 | capped_at_passing | conducted |
+| `lu-mat-4-s1...` | Pengamatan Diskusi Kelompok | formative | observation | *(null)* | *(null)* | none | conducted |
+
+> [!NOTE]
+> Per Resolved Questions:
+> - **Core Assessment Models (Q10):** Supports `numeric`, `letter_grade`, `pass_fail` / `completion`, and `narrative` feedback. Rubrics record qualitative narrative feedback and overall scores.
+> - **Reassessment Strategy (Q12):** Governed by `reassessment_policy`. When a student retakes an assessment, the policy dictates whether the operative result is capped at `passing_score`, takes the highest score, uses the latest attempt, or averages attempts.
 
 ---
 
@@ -448,6 +475,9 @@ erDiagram
 | `id` | UUID | PK | Unique identifier |
 | `assessment_id` | UUID | FK → `assessments.id`, NOT NULL | The assessment this result evaluates |
 | `student_id` | UUID | FK → external (Students), NOT NULL | The student |
+| `attempt_number` | INTEGER | NOT NULL, default 1 | Reassessment attempt number (1, 2, 3...) |
+| `replaces_result_id` | UUID | FK → `academic_results.id`, nullable | Prior result record replaced/superseded by this retake attempt |
+| `is_final` | BOOLEAN | NOT NULL, default true | Whether this is the operative/final result determined by the assessment's reassessment policy |
 | `score_numeric` | DECIMAL | nullable | Numeric score (when applicable) |
 | `score_max` | DECIMAL | nullable | Maximum possible score (for context) |
 | `grade_letter` | VARCHAR | nullable | Letter grade (when applicable, e.g., "A", "B+") |
@@ -457,20 +487,26 @@ erDiagram
 | `evaluated_by` | VARCHAR | NOT NULL | Teacher or assessor who evaluated |
 | `evaluated_date` | DATE | NOT NULL | Date of evaluation |
 | `result_status` | VARCHAR | NOT NULL | Lifecycle: `provisional`, `approved`, `published` |
-| `approved_by` | VARCHAR | nullable | Person who approved (null if still provisional) |
+| `approved_by` | VARCHAR | nullable | Academic Authority (or delegated Coordinator) who approved result |
 | `approved_date` | DATE | nullable | Date approved |
 | `published_date` | DATE | nullable | Date published to authorized audiences |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| assessment_id | student_id | score_numeric | score_max | grade_letter | evaluation_model | result_status | evaluated_by |
-|---|---|---|---|---|---|---|---|
-| `asm-ulangan...` | `std-108...` | 85 | 100 | A | numeric | published | Ibu Dewi |
-| `asm-diskusi...` | `std-108...` | *(null)* | *(null)* | *(null)* | competency | approved | Ibu Dewi |
+| assessment_id | student_id | attempt_number | is_final | score_numeric | score_max | grade_letter | evaluation_model | result_status | evaluated_by |
+|---|---|---|---|---|---|---|---|---|---|
+| `asm-ulangan...` | `std-108...` | 1 | true | 85 | 100 | A | numeric | published | Ibu Dewi |
+| `asm-ulangan...` | `std-205...` | 1 | false | 55 | 100 | D | numeric | approved | Ibu Dewi |
+| `asm-ulangan...` | `std-205...` | 2 | true | 75 | 100 | C | numeric | approved | Ibu Dewi |
+| `asm-diskusi...` | `std-108...` | 1 | true | *(null)* | *(null)* | *(null)* | competency | approved | Ibu Dewi |
 
 > [!IMPORTANT]
 > Provisional, approved, and published states have different meanings and must remain distinguishable. A provisional result must **not** be consumed by progression or reporting workflows as if it were approved. Approved results may change only through the correction workflow recorded in `academic_record_corrections`.
+> 
+> Per Resolved Questions:
+> - **Governance Lifecycle (Q11):** Assigned Teacher records provisional evaluations (`provisional`). Academic Coordinator reviews assessments across classes. Academic Authority (or delegated Coordinator for routine formative work) approves results (`approved`). Only approved results feed progression, standing, and report cards. Post-approval edits are prohibited in place and require formal `academic_record_corrections` authorized by Academic Authority. Academic Authority or authorized Coordinator releases results (`published`).
+> - **Reassessment Attempts (Q12):** Every retake produces a distinct immutable `academic_results` record (`attempt_number = 2, 3...`, referencing `replaces_result_id`). The operative result is flagged `is_final = true` in accordance with the parent assessment's `reassessment_policy`. Preserves 100% of remediation audit history.
 
 ---
 
@@ -524,19 +560,25 @@ erDiagram
 | `student_id` | UUID | FK → external (Students), NOT NULL | The student |
 | `academic_period_id` | UUID | FK → external (Operations), NOT NULL | Reporting period |
 | `academic_period_label` | VARCHAR | NOT NULL | Human-readable period label |
-| `report_definition` | VARCHAR | NOT NULL | Report format/template identifier |
+| `report_type` | VARCHAR | NOT NULL | Periodic report type: `mid_term`, `end_of_term` |
+| `template_name` | VARCHAR | NOT NULL | Layout and curriculum template (e.g., "Buku Rapor Merdeka", "PACE Modular") |
 | `status` | VARCHAR | NOT NULL | Status: `draft`, `approved`, `published` |
 | `approved_by` | VARCHAR | nullable | Person who approved |
 | `approved_date` | DATE | nullable | Date approved |
 | `published_date` | DATE | nullable | Date published |
 | `narrative_comments` | TEXT | nullable | Teacher or coordinator narrative comments |
+| `content_snapshot` | TEXT | nullable | Immutable frozen snapshot (JSON payload / rendered archive) guaranteeing historical reproducibility |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | academic_period_label | report_definition | status | published_date |
-|---|---|---|---|---|
-| `std-108...` | Semester 1 TP 2029/2030 | Rapor SD Merdeka v2029 | published | 2029-12-22 |
+| student_id | academic_period_label | report_type | template_name | status | published_date |
+|---|---|---|---|---|---|
+| `std-108...` | Semester 1 TP 2029/2030 | end_of_term | Buku Rapor Merdeka | published | 2029-12-22 |
+| `std-108...` | Mid-Term TP 2029/2030 | mid_term | Mid-Term Progress Report | published | 2029-10-05 |
+
+> [!NOTE]
+> Per Resolved Question 18, the system supports periodic report suites: Mid-Term Progress Reports (`mid_term`) and End-of-Semester Report Cards (`end_of_term` — *Buku Rapor*). Upon approval/publication, an immutable document payload is frozen into `content_snapshot` to guarantee exact historical reproducibility without relying on live queries against mutable operational tables.
 
 ---
 
@@ -580,24 +622,28 @@ erDiagram
 |---|---|---|---|
 | `id` | UUID | PK | Unique identifier |
 | `student_id` | UUID | FK → external (Students), NOT NULL | The student |
-| `transcript_type` | VARCHAR | NOT NULL | Type: `cumulative`, `partial`, `graduation` |
+| `transcript_type` | VARCHAR | NOT NULL | Type: `official`, `unofficial` |
 | `period_start` | DATE | NOT NULL | Start of covered period |
 | `period_end` | DATE | NOT NULL | End of covered period |
 | `status` | VARCHAR | NOT NULL | Status: `draft`, `approved`, `issued` |
 | `approved_by` | VARCHAR | nullable | Person who approved |
 | `approved_date` | DATE | nullable | Date approved |
 | `issued_date` | DATE | nullable | Date issued |
-| `purpose` | VARCHAR | nullable | Purpose of issuance (e.g., "Transfer", "Graduation", "Parent Request") |
+| `purpose` | VARCHAR | nullable | Purpose of issuance (e.g., "Graduation", "Transfer Out", "Advising") |
+| `content_snapshot` | TEXT | nullable | Immutable frozen snapshot (JSON payload / rendered archive) guaranteeing historical reproducibility |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | transcript_type | period_start | period_end | status | issued_date |
-|---|---|---|---|---|---|
-| `std-108...` | cumulative | 2026-07-15 | 2030-06-20 | issued | 2030-06-25 |
+| student_id | transcript_type | period_start | period_end | status | issued_date | purpose |
+|---|---|---|---|---|---|---|
+| `std-108...` | official | 2026-07-15 | 2030-06-20 | issued | 2030-06-25 | Graduation |
+| `std-205...` | unofficial | 2028-07-15 | 2029-12-20 | issued | 2029-12-22 | Advising |
 
 > [!NOTE]
-> Transcript content is derived from approved `academic_results` and `learning_units` at generation time. The transcript record captures metadata and authorization. The actual content is generated from operational academic records and must remain reproducible under historical rules.
+> Per Resolved Questions 14 and 18:
+> - **Transcript Scope & Snapshots (Q18):** Supports Official Cumulative Transcripts (`official` — certified for graduation or transfer-out) and Unofficial Advising Transcripts (`unofficial`). Official issuances archive an immutable snapshot in `content_snapshot`.
+> - **Transferred Learning (Q14):** Transferred and recognized prior learning units are distinguished with a transfer tag `[T]` on official transcripts.
 
 ---
 
@@ -612,6 +658,7 @@ erDiagram
     assessment_evidence ||--o| submissions : "may originate from"
     assessments ||--o{ academic_results : "produces"
     academic_results ||--|| STUDENT_EXT : "for"
+    academic_results ||--o| academic_results : "replaces (reassessment)"
     academic_results ||--o{ academic_record_corrections : "corrected by"
     STUDENT_EXT ||--o{ report_cards : "receives"
     report_cards ||--o{ report_card_entries : "contains"
@@ -641,20 +688,25 @@ erDiagram
 | `academic_period_id` | UUID | FK → external (Operations), NOT NULL | Academic period |
 | `status` | VARCHAR | NOT NULL | Progress status: `not_started`, `in_progress`, `completed`, `needs_remediation`, `exempted` |
 | `basis` | VARCHAR | NOT NULL | What this progress is based on: `assessment_evidence`, `learning_work`, `authorized_decision` |
+| `completion_date` | DATE | nullable | Date learning requirements were completed (null if not completed; may occur outside period boundaries) |
 | `last_updated` | DATE | NOT NULL | Date progress was last determined |
 | `determined_by` | VARCHAR | NOT NULL | Person who determined or updated progress |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | learning_unit_id | status | basis | last_updated |
-|---|---|---|---|---|
-| `std-108...` | `lu-mat-4-s1...` | in_progress | assessment_evidence | 2029-10-15 |
-| `std-108...` | `lu-bi-4-s1...` | completed | assessment_evidence | 2029-12-18 |
-| `std-205...` | `lu-mat-3-s1...` | needs_remediation | assessment_evidence | 2029-10-20 |
+| student_id | learning_unit_id | status | basis | completion_date | last_updated |
+|---|---|---|---|---|---|
+| `std-108...` | `lu-mat-4-s1...` | in_progress | assessment_evidence | *(null)* | 2029-10-15 |
+| `std-108...` | `lu-bi-4-s1...` | completed | assessment_evidence | 2029-12-18 | 2029-12-18 |
+| `std-205...` | `lu-mat-3-s1...` | needs_remediation | assessment_evidence | *(null)* | 2029-10-20 |
 
 > [!NOTE]
-> Progress states are the Phase-2 minimal model. No percentage-based progress tracking. The domain prohibits inferring completion merely from the end of a calendar period, administrative placement, attendance alone, or absence of outstanding work. The `basis` column ensures progress is traceable.
+> Progress states follow the Phase-2 minimal model without percentage-based tracking. The domain prohibits inferring completion merely from calendar period boundaries, administrative placement, or attendance alone.
+> 
+> Per Resolved Questions:
+> - **Completion Outside Period Boundaries (Q13):** Completion is evidence-driven and stamped with an explicit `completion_date`. A student may finish a Learning Unit mid-term (e.g. PACE packet in October), during holidays, or post-term during remediation.
+> - **Transferred / Recognized Learning (Q14):** Created directly with `status = 'completed'` and `basis = 'authorized_decision'`.
 
 ---
 
@@ -674,17 +726,24 @@ erDiagram
 | `academic_period_id` | UUID | FK → external (Operations), NOT NULL | Academic period this standing applies to |
 | `academic_period_label` | VARCHAR | NOT NULL | Human-readable period label |
 | `standing` | VARCHAR | NOT NULL | Standing: `good_standing`, `conditional_standing`, `not_in_good_standing` |
-| `policy_reference` | VARCHAR | NOT NULL | Policy and evidence used to determine standing |
-| `determined_by` | VARCHAR | NOT NULL | Person who determined standing |
+| `policy_reference` | VARCHAR | NOT NULL | Policy and evidence criteria used to determine standing |
+| `conditions` | TEXT | nullable | Mandatory stipulations when standing is `conditional_standing` |
+| `is_exception` | BOOLEAN | NOT NULL, default false | Whether this standing determination is an authorized exception |
+| `exception_reason` | TEXT | nullable | Mandatory rationale when `is_exception` is true |
+| `committee_reference` | VARCHAR | nullable | Formal decree or meeting minutes reference (e.g., SK Dewan Guru) |
+| `authorized_by` | VARCHAR | NOT NULL | Academic Authority who approved standing |
 | `determined_date` | DATE | NOT NULL | Date standing was determined |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | academic_period_label | standing | determined_by | determined_date |
-|---|---|---|---|---|
-| `std-108...` | TP 2029/2030 | good_standing | Academic Coordinator | 2030-06-10 |
-| `std-205...` | TP 2029/2030 | conditional_standing | Academic Coordinator | 2030-06-10 |
+| student_id | academic_period_label | standing | is_exception | committee_reference | authorized_by | determined_date |
+|---|---|---|---|---|---|---|
+| `std-108...` | TP 2029/2030 | good_standing | false | *(null)* | Academic Coordinator | 2030-06-10 |
+| `std-205...` | TP 2029/2030 | conditional_standing | true | SK-DG/2030/06-12 | Academic Authority | 2030-06-10 |
+
+> [!NOTE]
+> Per Resolved Question 16, governance fields (`is_exception`, `exception_reason`, `conditions`, `committee_reference`, `authorized_by`) are embedded directly on decision tables, avoiding unnecessary committee subsystem overhead.
 
 ---
 
@@ -707,18 +766,24 @@ erDiagram
 | `from_level` | VARCHAR | NOT NULL | Current grade/level |
 | `recommended_to_level` | VARCHAR | nullable | Recommended next grade/level (null for retention) |
 | `conditions` | TEXT | nullable | Conditions for conditional promotion |
+| `is_exception` | BOOLEAN | NOT NULL, default false | Whether this recommendation is an authorized exception |
+| `exception_reason` | TEXT | nullable | Mandatory justification when `is_exception` is true |
+| `committee_reference` | VARCHAR | nullable | Formal decree or meeting minutes reference (e.g., SK Dewan Guru) |
 | `academic_standing_id` | UUID | FK → `academic_standings.id`, nullable | Supporting academic standing |
 | `supporting_evidence` | TEXT | NOT NULL | Summary of evidence supporting this recommendation |
-| `determined_by` | VARCHAR | NOT NULL | Person or committee who determined |
+| `authorized_by` | VARCHAR | NOT NULL | Academic Authority who approved recommendation |
 | `determined_date` | DATE | NOT NULL | Date determined |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | academic_period_label | recommendation | from_level | recommended_to_level | determined_by |
-|---|---|---|---|---|---|
-| `std-108...` | TP 2029/2030 | promotion_eligible | Grade 4 | Grade 5 | Academic Authority |
-| `std-205...` | TP 2029/2030 | conditional_promotion | Grade 4 | Grade 5 | Academic Authority |
+| student_id | academic_period_label | recommendation | from_level | recommended_to_level | is_exception | authorized_by |
+|---|---|---|---|---|---|---|
+| `std-108...` | TP 2029/2030 | promotion_eligible | Grade 4 | Grade 5 | false | Academic Authority |
+| `std-205...` | TP 2029/2030 | conditional_promotion | Grade 4 | Grade 5 | true | Academic Authority |
+
+> [!NOTE]
+> Per Resolved Question 16, exceptions and conditional promotion stipulations embed governance attributes directly (`is_exception`, `exception_reason`, `conditions`, `committee_reference`, `authorized_by`).
 
 ---
 
@@ -736,19 +801,27 @@ erDiagram
 | `id` | UUID | PK | Unique identifier |
 | `student_id` | UUID | FK → external (Students), NOT NULL | The student |
 | `determination` | VARCHAR | NOT NULL | Determination: `graduation_eligible`, `graduation_not_eligible`, `conditional_graduation` |
-| `requirement_reference` | VARCHAR | NOT NULL | Applicable graduation requirements (e.g., "SD Graduation Requirements v2032.1") |
+| `academic_requirement_id` | UUID | FK → `academic_requirements.id`, nullable | Reference to versioned graduation requirement entity |
+| `requirement_reference` | VARCHAR | NOT NULL | Applicable graduation requirements label (e.g., "SD Graduation Requirements v2032.1") |
 | `conditions` | TEXT | nullable | Conditions for conditional graduation |
-| `supporting_evidence` | TEXT | NOT NULL | Summary of evidence: completed requirements, credits, standing |
-| `approved_exceptions` | TEXT | nullable | Any approved exceptions applied |
-| `determined_by` | VARCHAR | NOT NULL | Academic Authority or Authorized Academic Committee |
+| `supporting_evidence` | TEXT | NOT NULL | Summary of evidence: completed requirements, credits, cumulative standing |
+| `is_exception` | BOOLEAN | NOT NULL, default false | Whether this determination is an authorized exception |
+| `exception_reason` | TEXT | nullable | Mandatory rationale when `is_exception` is true |
+| `committee_reference` | VARCHAR | nullable | Formal decree or meeting minutes reference (e.g., SK Dewan Guru / Academic Committee) |
+| `authorized_by` | VARCHAR | NOT NULL | Academic Authority or Authorized Academic Committee |
 | `determined_date` | DATE | NOT NULL | Date determined |
 | `notes` | TEXT | nullable | Notes |
 
 **Example:**
 
-| student_id | determination | requirement_reference | determined_by | determined_date |
-|---|---|---|---|---|
-| `std-108...` | graduation_eligible | SD Graduation Requirements v2032.1 | Academic Authority / Academic Committee | 2032-05-20 |
+| student_id | determination | requirement_reference | is_exception | authorized_by | determined_date |
+|---|---|---|---|---|---|
+| `std-108...` | graduation_eligible | SD Graduation Requirements v2032.1 | false | Academic Authority / Academic Committee | 2032-05-20 |
+
+> [!NOTE]
+> Per Resolved Questions 16 and 17:
+> - **Exclusively Academic Evaluation (Q17):** Academics determines eligibility against versioned `academic_requirements` (units completed, cumulative standing, culminating assessments). Non-academic clearances (finance, conduct) are assembled independently by the Students domain.
+> - **Embedded Governance (Q16):** Exceptions embed `is_exception`, `exception_reason`, and `committee_reference` directly.
 
 ---
 
@@ -801,7 +874,8 @@ erDiagram
 | `student_id` | UUID | FK → external (Students), NOT NULL | The student |
 | `learning_unit_id` | UUID | FK → `learning_units.id`, NOT NULL | The learning unit requiring intervention |
 | `intervention_type` | VARCHAR | NOT NULL | Type: `remediation`, `reassessment`, `tutoring_recommendation`, `extension_work`, `recovery_plan`, `learning_plan_adjustment`, `academic_warning` |
-| `trigger_description` | TEXT | NOT NULL | What triggered the intervention (e.g., assessment result below threshold) |
+| `trigger_type` | VARCHAR | NOT NULL | Dual-trigger category: `assessment_below_threshold`, `missing_work`, `attendance_concern`, `standing_concern`, `teacher_referral` |
+| `trigger_description` | TEXT | NOT NULL | Detailed narrative of what triggered the intervention |
 | `plan` | TEXT | NOT NULL | Description of the intervention plan |
 | `status` | VARCHAR | NOT NULL | Status: `planned`, `in_progress`, `completed`, `cancelled` |
 | `initiated_by` | VARCHAR | NOT NULL | Person who initiated the intervention |
@@ -812,12 +886,16 @@ erDiagram
 
 **Example:**
 
-| student_id | learning_unit_id | intervention_type | trigger_description | status | initiated_by |
-|---|---|---|---|---|---|
-| `std-205...` | `lu-mat-4-s1...` | remediation | Assessment result below minimum threshold (45/100) | in_progress | Academic Coordinator |
+| student_id | learning_unit_id | intervention_type | trigger_type | trigger_description | status | initiated_by |
+|---|---|---|---|---|---|---|
+| `std-205...` | `lu-mat-4-s1...` | remediation | assessment_below_threshold | Assessment score below minimum threshold (45/100) | in_progress | Academic Coordinator |
+| `std-108...` | `lu-mat-4-s1...` | extension_work | teacher_referral | Student demonstrates mastery ahead of cohort | planned | Ibu Dewi |
 
 > [!NOTE]
-> Academics owns intervention related to **learning performance** only. Behaviour, wellbeing, counselling, and non-academic intervention belong to Development. An intervention must not independently change official student status.
+> Per Resolved Question 15, academic interventions follow a **dual-trigger model**:
+> - **System Early-Warning Alerts:** Triggered by objective criteria: `assessment_below_threshold`, `missing_work` (accumulated missing submissions), `attendance_concern` (attendance below policy threshold), or `standing_concern`.
+> - **Educator Referrals:** Staff-initiated via `teacher_referral` based on qualitative classroom observation, special learning support, or extension/gifted needs.
+> Behavioural, wellbeing, counselling, and non-academic interventions belong strictly to the Development domain.
 
 ---
 
@@ -865,6 +943,7 @@ erDiagram
     STUDENT_EXT ||--o{ promotion_recommendations : "receives"
     promotion_recommendations ||--o| academic_standings : "informed by"
     STUDENT_EXT ||--o{ graduation_eligibilities : "receives"
+    academic_requirements ||--o{ graduation_eligibilities : "evaluated against"
     STUDENT_EXT ||--o{ academic_clearances : "determined for"
     STUDENT_EXT ||--o{ academic_interventions : "receives"
     academic_interventions ||--|| learning_units : "for"
@@ -1117,8 +1196,10 @@ flowchart TD
 
     LU --> ASM
     LU --> AP
+    AR -.->|evaluated against| GE
     SUB -.->|evidence| AE
     RES --> LP
+    RES -->|replaces| RES
     SLP -.->|governs exceptional| AP
     AI -.->|may adjust| AP
     RES -.-> AA
@@ -1146,34 +1227,34 @@ This domain references but does **not** own the following external concepts:
 
 ---
 
-## Open Questions
+## Resolved Business Decisions & Database Realization
 
-These questions from the domain and entity documents may affect final table design:
+All 19 architectural open questions from the domain document have been formally resolved in [academic-entities.md](file:///d:/Project.Private/elsasa-sis-v3/entities/academic-entities.md) and are realized in the database table definitions as follows:
 
-| # | Question | Affected Table(s) |
-|---|---|---|
-| 1 | How should competency and outcome relate to Learning Units? | `learning_units` — may need additional columns or a related table |
-| 2 | Which learning structures are required for the first school implementation? | `learning_structures`, `learning_units` — initial data configuration |
-| 3 | How are requirements and curriculum versions approved and activated? | `academic_requirements`, `learning_structures` — workflow rules |
-| 4 | Can students select learning, or is it always assigned? | `academic_participations` — may need a `participation_source` column |
-| 5 | How are repeated, paused, transferred, and recognized learning represented? | `academic_participations` — current `status` and `recognition_type` may need extension |
-| 6 | Is a class a learning group, an administrative group, or a scheduled offering? | May require a new `learning_groups` table — currently omitted as unresolved |
-| 7 | Which activities require attendance? | `learning_activities.is_attendance_required` — school policy configuration |
-| 8 | What attendance categories and correction rules apply? | `attendance_records.status` — additional statuses may be needed |
-| 9 | How is asynchronous or individual-progress participation evidenced? | `attendance_records`, `learning_activities` — may need different evidence models |
-| 10 | Which assessment models are required initially? | `assessments.assessment_type` — initial type set |
-| 11 | Who may assess, moderate, approve, correct, and publish results? | `academic_results` — role-based authorization rules |
-| 12 | How are reassessment attempts combined or selected? | `assessments`, `academic_results` — may need attempt tracking |
-| 13 | Can completion occur outside academic-period boundaries? | `learning_progress` — period boundary rules |
-| 14 | How is transferred or prior learning recognized? | `academic_participations.recognition_type` — may need expansion |
-| 15 | What triggers an academic intervention? | `academic_interventions` — trigger policy configuration |
-| 16 | How are exceptions and committee decisions recorded? | `academic_standings`, `promotion_recommendations`, `graduation_eligibilities` — may need committee/exception fields |
-| 17 | What academic requirements determine graduation eligibility? | `graduation_eligibilities`, `academic_requirements` — requirement configuration |
-| 18 | Which report cards and transcripts are required? | `report_cards`, `transcripts` — template/format configuration |
-| 19 | General daily school attendance ownership is unresolved. | May require a separate daily-attendance table or extension to `attendance_records` |
+| # | Question & Decision | Realization in Database Schema | Affected Table(s) | Status |
+|---|---|---|---|---|
+| 1 | **Competencies and outcomes as descriptive metadata and hierarchy.** Fine-grained competencies use parent-child unit composition. | `learning_units.unit_type = 'competency'` with `parent_unit_id` hierarchy; criteria text on `academic_requirements`. No separate competency tables. | `learning_units`, `academic_requirements` | **Closed & Aligned** |
+| 2 | **Dual-track learning structures (standard subjects + modular/PACE).** System validates both conventional grade-level subjects and self-paced modular units. | `learning_units.unit_type` supports `subject`, `module`, `pace`, `course`, etc., within the same unified schema. | `learning_structures`, `learning_units` | **Closed & Aligned** |
+| 3 | **Explicit state transition for requirements and curriculum versions.** Academic Coordinator drafts; Academic Authority approves and activates. | Lifecycle columns `status` (`draft`, `active`, `superseded`), `approved_by`, `approved_date`, `effective_date`, `end_date`, `supersedes_id` inline on both tables. | `learning_structures`, `academic_requirements` | **Closed & Aligned** |
+| 4 | **Learning assignment by default with student self-selection for electives/PACE.** | `academic_participations.source` (`assigned`, `student_selected`, `learning_plan`). | `academic_participations` | **Closed & Aligned** |
+| 5 | **Unified lifecycle for repeated, paused, transferred, and recognized learning.** | `academic_participations.participation_type` (`standard`, `repeat`, `transferred_in`, `recognized_prior`), `attempt_number` counter, and `status` (`in_progress`, `paused`, `withdrawn`, `completed`). | `academic_participations`, `learning_progress` | **Closed & Aligned** |
+| 6 | **Decomposed class concept across domains — no standalone class entity.** | Dynamic references to administrative homerooms via optional `section_label` on activities and participations. Administrative groups stay in Students, rooms/schedules in Operations. | `academic_participations`, `learning_activities` | **Closed & Aligned** |
+| 7 | **Activity-level attendance mandate flag.** Synchronous activities default to true; asynchronous/self-directed default to false. | `learning_activities.is_attendance_required` (BOOLEAN NOT NULL, default true). | `learning_activities` | **Closed & Aligned** |
+| 8 | **Standard 5 attendance categories + grace window + coordinator correction.** | `attendance_records.status` (`present`, `absent`, `late`, `excused_absence`, `partial`); post-grace corrections logged immutably in `attendance_corrections`. | `attendance_records`, `attendance_corrections` | **Closed & Aligned** |
+| 9 | **Deliverable & milestone evidence for asynchronous participation.** | `is_attendance_required = false` on asynchronous activities; participation evidenced through `submissions` and milestone completions without synthetic attendance rows. | `learning_activities`, `submissions`, `attendance_records` | **Closed & Aligned** |
+| 10 | **Core 4 assessment models supported initially.** Numeric, letter grade, pass/fail, and narrative feedback. | `assessments.max_score`, `passing_score`; `academic_results.evaluation_model` (`numeric`, `letter_grade`, `pass_fail`, `narrative`, etc.). | `assessments`, `academic_results` | **Closed & Aligned** |
+| 11 | **Role-separated governance lifecycle for assessment results.** Teacher records provisional; Coordinator reviews; Authority approves; Authority/Coordinator publishes; post-approval edits require formal correction. | `academic_results.result_status` (`provisional`, `approved`, `published`), `approved_by`, `approved_date`, `published_date`; audited via `academic_record_corrections`. | `academic_results`, `academic_record_corrections` | **Closed & Aligned** |
+| 12 | **Immutable reassessment attempts governed by assessment policy strategy.** | `assessments.reassessment_policy` (`capped_at_passing`, `highest_score`, `latest_attempt`, `average`, `none`); `academic_results.attempt_number`, `replaces_result_id`, `is_final`. | `assessments`, `academic_results` | **Closed & Aligned** |
+| 13 | **Evidence/milestone-driven completion outside academic-period boundaries.** | Explicit `completion_date` on `learning_progress` and `academic_participations`, independent of period calendar boundaries. | `learning_progress`, `academic_participations` | **Closed & Aligned** |
+| 14 | **Authorized recognition decision with external attribution.** Academic Authority approves transfer/prior learning without dummy lessons or grades. | `academic_participations.participation_type` (`transferred_in`, `recognized_prior`), `source_institution`, `external_grade_or_credit`, `recognition_basis`, `approved_by`; `learning_progress.status = 'completed'`; `[T]` display tag on official transcripts. | `academic_participations`, `learning_progress`, `transcripts` | **Closed & Aligned** |
+| 15 | **Dual-trigger model for academic interventions.** Early-warning system alerts + educator manual referrals. | `academic_interventions.trigger_type` (`assessment_below_threshold`, `missing_work`, `attendance_concern`, `standing_concern`, `teacher_referral`) and `trigger_description`. | `academic_interventions` | **Closed & Aligned** |
+| 16 | **Embedded governance attributes on decision entities.** Avoids dedicated committee subsystem. | `is_exception`, `exception_reason`, `conditions`, `committee_reference`, `authorized_by` embedded directly on decision tables. | `academic_standings`, `promotion_recommendations`, `graduation_eligibilities` | **Closed & Aligned** |
+| 17 | **Versioned academic requirements determine graduation eligibility.** Evaluated exclusively against academic criteria. | `graduation_eligibilities.academic_requirement_id` FK → `academic_requirements.id`; non-academic clearances assembled externally by Students. | `graduation_eligibilities`, `academic_requirements` | **Closed & Aligned** |
+| 18 | **Periodic report suite + cumulative transcripts with frozen snapshots.** | `report_cards.report_type` (`mid_term`, `end_of_term`), `template_name`; `transcripts.transcript_type` (`official`, `unofficial`); immutable `content_snapshot` on both. | `report_cards`, `transcripts` | **Closed & Aligned** |
+| 19 | **Academics owns learning-activity attendance; daily homeroom roll call conducted via homeroom session.** Gate presence belongs to Operations. | `learning_activities.activity_type = 'homeroom_session'` with `is_attendance_required = true` for statutory daily attendance roll call. | `learning_activities`, `attendance_records` | **Closed & Aligned** |
 
-> [!CAUTION]
-> These open questions must be resolved with school stakeholders before implementation. Table designs above use the most pragmatic interpretation where the source documents are ambiguous. No speculative tables or columns have been added.
+> [!NOTE]
+> All 19 architectural questions are formally resolved and fully represented in the technical table definitions. No unresolved open questions remain between `academic-entities.md` and `academic-entities-tables.md`.
 
 ---
 
@@ -1184,7 +1265,7 @@ These questions from the domain and entity documents may affect final table desi
 3. **Report Card Entries as Junction Table** — Introduced as a supporting table to properly link report cards to their constituent academic results. Without this, the report card would have no structured content reference. The domain requires that reports be generated from operational academic records and remain reproducible.
 4. **SLP Learning Units as Junction Table** — Introduced to represent the many-to-many relationship between Student Learning Plans and Learning Units with sequence and requirement attributes. The entity document defines "Learning Units" as a component of SLP minimum scope.
 5. **Unified Academic Record Corrections** — One correction table with a `record_type` discriminator covers all correctable record types, per entity document assumption 4. Application logic determines which correction rules apply.
-6. **No Learning Group / Class Table** — The domain warns against requiring class membership for all learning models. The open question about class identity remains unresolved. A `learning_groups` table may be needed once resolved, but introducing it now would be speculative.
+6. **Decomposed Class / No Standalone Learning Group Table** — Per the resolution of Question 6, "class" is decomposed across domains: administrative homeroom in Students, scheduling and room allocations in Operations, teacher authorization in Teaching, and academic learning anchored to `learning_units` and `academic_participations` with optional `section_label` on activities and participations. No standalone `learning_groups` table is introduced in Phase 2.
 7. **No Grading Policy / Rubric Table** — The domain treats these as configuration within assessments and requirements. A separate table may emerge if complex policy management is needed, but it exceeds Phase-2 scope.
 8. **No Submission Evaluation Table** — The domain mentions "submission evaluation" in correction workflows, but it is effectively the same as an `academic_result` linked to an assessment whose evidence traces to a submission. A separate table would duplicate the result lifecycle without clear benefit.
 9. **UUID Primary Keys** — Consistent with the Student domain convention for future multi-campus/multi-tenant scenarios.
