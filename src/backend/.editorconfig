@@ -1,0 +1,108 @@
+# EditorConfig for the Elsasa SIS V3 backend (slice P1-S01).
+#
+# This file is self-contained (root = true) and governs every file under
+# src/backend/. It mirrors the conventions approved in
+# docs/architecture/coding-conventions.md and is enforced during command-line
+# builds through <EnforceCodeStyleInBuild> + <TreatWarningsAsErrors> in
+# Directory.Build.props.
+
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.{json,jsonc}]
+indent_size = 2
+
+[*.cs]
+# --- Formatting -----------------------------------------------------------
+indent_size = 4
+tab_width = 4
+
+# --- Language conventions (C# 12) ----------------------------------------
+# File-scoped namespaces are mandatory (coding-conventions.md §1).
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Usings are placed inside the file-scoped namespace, matching the approved
+# sample code. This is advisory only and never breaks a build.
+csharp_using_directive_placement = inside_namespace:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# Idiomatic C# 12 preferences.
+csharp_prefer_braces = true:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+dotnet_style_readonly_field = true:suggestion
+
+# --- Naming conventions (coding-conventions.md §2) -----------------------
+# Interfaces: I + PascalCase (IEndpoint, ISqlConnectionFactory).
+dotnet_naming_rule.interfaces_start_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_start_with_i.style = i_prefixed_pascal_case
+dotnet_naming_rule.interfaces_start_with_i.severity = warning
+
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.i_prefixed_pascal_case.required_prefix = I
+dotnet_naming_style.i_prefixed_pascal_case.capitalization = pascal_case
+
+# Types: PascalCase (handlers, records, endpoints, validators).
+dotnet_naming_rule.types_pascal_case.symbols = type_symbols
+dotnet_naming_rule.types_pascal_case.style = pascal_case
+dotnet_naming_rule.types_pascal_case.severity = warning
+
+dotnet_naming_symbols.type_symbols.applicable_kinds = class,struct,interface,enum,delegate
+dotnet_naming_symbols.type_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# Private fields: _ + camelCase (only when a primary constructor is not used).
+dotnet_naming_rule.private_fields_underscore_prefix.symbols = private_field_symbols
+dotnet_naming_rule.private_fields_underscore_prefix.style = underscore_camel_case
+dotnet_naming_rule.private_fields_underscore_prefix.severity = warning
+
+dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+# Parameters and local variables: camelCase.
+dotnet_naming_rule.parameters_camel_case.symbols = parameter_symbols
+dotnet_naming_rule.parameters_camel_case.style = camel_case
+dotnet_naming_rule.parameters_camel_case.severity = suggestion
+
+dotnet_naming_symbols.parameter_symbols.applicable_kinds = parameter
+dotnet_naming_symbols.parameter_symbols.applicable_accessibilities = *
+
+dotnet_naming_rule.local_variables_camel_case.symbols = local_variable_symbols
+dotnet_naming_rule.local_variables_camel_case.style = camel_case
+dotnet_naming_rule.local_variables_camel_case.severity = suggestion
+
+dotnet_naming_symbols.local_variable_symbols.applicable_kinds = local
+dotnet_naming_symbols.local_variable_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+# --- Diagnostic severities ----------------------------------------------
+# IDE0161: convert to file-scoped namespace. IDE1006: naming rule violation.
+dotnet_diagnostic.IDE0161.severity = warning
+dotnet_diagnostic.IDE1006.severity = warning
+dotnet_diagnostic.IDE0005.severity = suggestion

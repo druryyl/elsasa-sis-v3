@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Database migration runner and T-SQL scripts (ADR-006).
+    No domain references and no SIS project references: the migrator is invoked
+    by the web host (and by the integration test harness) and must stay
+    independent of every domain assembly.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DbUp-SqlServer executes the forward-only embedded T-SQL scripts (ADR-006). -->
+    <PackageReference Include="dbup-sqlserver" Version="7.2.0" />
+    <!--
+      Logging abstractions only: the migrator accepts an optional ILogger without
+      taking a dependency on any SIS project or on a concrete logging sink.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Migration scripts are embedded so the migrator runs the exact scripts that
+      were compiled with the assembly. The default resource name is
+      <RootNamespace>.Scripts.<FileName>, which keeps the "Scripts" folder filter
+      in DatabaseMigrator valid and the YYYYMMDD_NNNN_ ordering deterministic.
+    -->
+    <EmbeddedResource Include="Scripts\*.sql" />
+  </ItemGroup>
+
+</Project>

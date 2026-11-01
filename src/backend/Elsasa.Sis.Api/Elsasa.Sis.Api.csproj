@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Web API host (ADR-001, ADR-010). The host is the only project allowed to
+    reference every backend assembly, exclusively for DI wiring and endpoint
+    mapping. No domain assembly may reference this project.
+    Package references (Serilog, JWT, Swagger, health checks, MediatR) are added
+    by the P5 host-runtime slices, not here.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Database/Elsasa.Sis.Database.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Operations/Elsasa.Sis.Operations.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Students/Elsasa.Sis.Students.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.13" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+</Project>

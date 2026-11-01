@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Integration tests (ADR-008, delivered by P6-S11/P7-S12).
+    References the web host plus the shared, database, and contract assemblies
+    required to boot the API and run migrations against a real SQL Server.
+    Testcontainers, Respawn, Microsoft.AspNetCore.Mvc.Testing, and
+    FluentAssertions are added by P6-S11.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- CA1707 flags underscores in test method names (mandated by coding-conventions.md). -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Api/Elsasa.Sis.Api.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Database/Elsasa.Sis.Database.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Operations/Elsasa.Sis.Operations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.13" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Respawn" Version="6.2.1" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.16.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.85" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

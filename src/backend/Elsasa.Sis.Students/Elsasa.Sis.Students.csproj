@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Stage 1 Students domain assembly (ADR-001, ADR-010).
+    May reference only Shared and Contracts; must never reference Operations or
+    Finance. Compile-time isolation is verified by the architecture tests.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

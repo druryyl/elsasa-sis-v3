@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cross-domain contracts (ADR-001, ADR-003). May be referenced by every
+    domain assembly and by the web host; may itself reference only Shared.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

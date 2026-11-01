@@ -1,0 +1,15 @@
+<Project>
+
+  <!--
+    Repository-level MSBuild entry point (slice P1-S01).
+
+    MSBuild evaluates only the nearest Directory.Build.props when walking up
+    from a project. Projects under src/backend/ therefore pick up
+    src/backend/Directory.Build.props directly, while projects elsewhere in the
+    repository (for example tests/backend/) pick up this file. Importing the
+    authoritative backend configuration keeps the C# 12 / .NET 8 baseline
+    identical for every project in the solution.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)src/backend/Directory.Build.props" />
+
+</Project>

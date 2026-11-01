@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cross-cutting foundational library (ADR-001, ADR-010).
+    Contains no SIS project references: Shared is the root of the dependency graph.
+    TargetFramework / LangVersion / Nullable / ImplicitUsings / TreatWarningsAsErrors
+    are inherited from src/backend/Directory.Build.props.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!--
+      CA1716 flags the 'Shared' namespace segment as a reserved keyword in other
+      .NET languages. The namespace is mandated by ADR-001 and
+      backend-architecture.md, so the rule is disabled for this project only;
+      every other analyzer rule stays enforced.
+    -->
+    <NoWarn>$(NoWarn);CA1716</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Explicit data access foundation (ADR-004, slice P2-S04):
+    Microsoft.Data.SqlClient backs SqlConnectionFactory; Dapper executes the
+    inline T-SQL written by feature slices.
+
+    Automatic request validation (ADR-005, slice P2-S05):
+    FluentValidation powers ValidationFilter<TRequest>.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="FluentValidation" Version="12.2.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+  </ItemGroup>
+
+  <!--
+    RFC 7807 outcome modelling (ADR-007, slice P2-S03): ResultsExtensions maps
+    DomainError to IResult/ProblemDetails, which are part of the ASP.NET Core
+    shared framework. This is a framework reference, not a NuGet dependency, and
+    it adds no SIS project reference (Shared remains the root of the graph).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

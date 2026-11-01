@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Architecture tests (ADR-001 enforcement, delivered by P6-S10).
+    The isolation rules are validated against the compiled assemblies. The SIS
+    project references below exist so those assemblies are built, loaded and
+    their dependency metadata inspected. This supersedes the P1-S02 scaffolding
+    note that declared this project reference-free: the reference-free state was
+    only valid until the architecture suite was implemented.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Database/Elsasa.Sis.Database.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Operations/Elsasa.Sis.Operations.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Students/Elsasa.Sis.Students.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Api/Elsasa.Sis.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
