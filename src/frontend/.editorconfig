@@ -1,0 +1,15 @@
+# EditorConfig for Elsasa SIS V3 Frontend (slice P1-S04)
+# Aligns with repository conventions (2 spaces, UTF-8, LF).
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false

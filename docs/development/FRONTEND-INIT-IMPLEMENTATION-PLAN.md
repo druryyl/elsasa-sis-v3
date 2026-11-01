@@ -4,7 +4,7 @@ Code: FRONTEND-INIT
 Artifact: IMPLEMENTATION-PLAN
 Version: 1.0
 LastUpdated: 2026-11-02
-Status: NOT-STARTED
+Status: COMPLETED
 Execution Approval: APPROVED
 ---
 
@@ -89,11 +89,11 @@ flowchart TD
 
 | Phase | Implementation Status | Review Status | Progress |
 |---|---|---|---|
-| P1 - Workspace Scaffolding & Tooling Foundation | NOT-STARTED | NOT-REVIEWED | 0/4 |
-| P2 - Core Infrastructure & HTTP Client Integration | NOT-STARTED | NOT-REVIEWED | 0/2 |
-| P3 - State Management & Application Infrastructure | NOT-STARTED | NOT-REVIEWED | 0/3 |
-| P4 - Shared UI Primitives & Application Layout Shells | NOT-STARTED | NOT-REVIEWED | 0/2 |
-| P5 - Minimal Application Shell & Integration Verification | NOT-STARTED | NOT-REVIEWED | 0/2 |
+| P1 - Workspace Scaffolding & Tooling Foundation | IMPLEMENTED | GO | 4/4 |
+| P2 - Core Infrastructure & HTTP Client Integration | IMPLEMENTED | GO | 2/2 |
+| P3 - State Management & Application Infrastructure | IMPLEMENTED | GO | 3/3 |
+| P4 - Shared UI Primitives & Application Layout Shells | IMPLEMENTED | GO | 2/2 |
+| P5 - Minimal Application Shell & Integration Verification | IMPLEMENTED | GO | 2/2 |
 
 ---
 
@@ -101,15 +101,15 @@ flowchart TD
 
 ## P1 - Workspace Scaffolding & Tooling Foundation
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 ### P1-S01
 
 Title: Frontend Workspace Scaffolding, Package Manifest, and Dependency Installation
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Establish the standalone frontend project under `src/frontend/`, configure `package.json` with all required production and development dependencies conforming to the technology stack baseline in `docs/architecture/frontend-architecture.md`, generate `pnpm-lock.yaml`, and provide index HTML and public asset entry points.
@@ -129,6 +129,7 @@ Completion Criteria:
 
 Notes:
 - Establishes the foundational Node.js / pnpm package workspace for all frontend code.
+- Package manifest configured with required runtime and dev dependencies; deterministic pnpm-lock.yaml generated via frozen-compatible pnpm install; responsive index.html and public/favicon.svg created.
 
 ---
 
@@ -136,8 +137,8 @@ Notes:
 
 Title: TypeScript Composite Configuration and Vite 6 Build Pipeline Setup
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Configure TypeScript composite projects (`tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`) with strict compiler enforcement and path aliases, configure `vite.config.ts` with Vue SFC, Tailwind CSS v4, manual chunk splitting, path aliases (`@` resolving to `src/`), and dev server API proxy forwarding `/api` to `http://localhost:5000`.
@@ -163,6 +164,9 @@ Completion Criteria:
 
 Notes:
 - Dev server proxy eliminates CORS constraints during local frontend development without modifying the ASP.NET Core backend.
+- TypeScript composite configuration established (`tsconfig.json` referencing `tsconfig.app.json` and `tsconfig.node.json`) with strict compiler enforcement and `@/*` alias resolution.
+- Vite 6 build pipeline configured in `vite.config.ts` with `@vitejs/plugin-vue`, `@tailwindcss/vite`, `@` path alias, `/api` proxy targeting `http://localhost:5000`, and vendor chunk splitting (`vendor-core`, `vendor-query`, `vendor-primevue`, `vendor-utils`).
+- Type checking (`vue-tsc --noEmit`) and project build (`vue-tsc -b && vite build`) validated with zero configuration errors.
 
 ---
 
@@ -170,8 +174,8 @@ Notes:
 
 Title: Tailwind CSS v4 Styling Engine and PrimeVue Aura Design System Setup
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Configure the Tailwind CSS v4 modern engine with institutional design tokens and configure PrimeVue v4 with the Aura preset and CSS layer ordering (`@layer primevue, custom;`).
@@ -197,6 +201,9 @@ Completion Criteria:
 
 Notes:
 - Conforms to Section 10 of `docs/architecture/frontend-architecture.md`.
+- Implemented Tailwind CSS v4 base stylesheet at `src/frontend/src/shared/styles/main.css` defining CSS layer precedence (`@layer primevue, custom;`) and institutional `@theme` tokens (Primary Navy, Brand Teal, Surface & Border neutrals, Status colors, and font-sans).
+- Configured PrimeVue v4 Aura preset and CSS layer ordering in `src/frontend/src/app/config/primevue.ts`.
+- Verified Vite build and dev compilation with zero CSS parse errors.
 
 ---
 
@@ -204,8 +211,8 @@ Notes:
 
 Title: Code Quality, Linting, Formatting, and Architectural Boundary Rules
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Establish deterministic code formatting and static analysis rules using ESLint (Flat Config), Prettier, and `.editorconfig`, enforcing strict TypeScript checks, Vue 3 SFC best practices, and architectural layer boundaries (preventing direct cross-feature coupling).
@@ -227,20 +234,26 @@ Completion Criteria:
 
 Notes:
 - Enforces ADR-FE-001 compile-time architectural integrity across all developer contributions.
+- Configured ESLint v9 Flat Config in `src/frontend/eslint.config.js` with `@eslint/js`, `typescript-eslint`, and `eslint-plugin-vue` recommended configs.
+- Configured Vue SFC `<script setup lang="ts">` enforcement rules (`vue/block-order`, `vue/component-api-style`, `vue/define-macros-order`, `vue/component-name-in-template-casing`).
+- Implemented `no-restricted-imports` architectural boundary rules covering 6 domains and 20 functional modules, preventing `shared/` from importing upwards into `features/` or `app/`, preventing `features/` from importing upwards into `app/`, and preventing cross-imports across distinct feature submodules and domains.
+- Configured deterministic Prettier settings in `src/frontend/.prettierrc` (`singleQuote: true`, `semi: true`, `trailingComma: "all"`, `printWidth: 100`, `tabWidth: 2`) with `.prettierignore`.
+- Configured `.editorconfig` aligned with repository conventions (2 spaces, UTF-8, LF) and `.gitignore` ignoring `node_modules`, `dist`, `.env.local`, coverage reports.
+- Verified both `pnpm --dir src/frontend lint` and `pnpm --dir src/frontend format:check` execute with exit code 0.
 
 ---
 
 ## P2 - Core Infrastructure & HTTP Client Integration
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 ### P2-S05
 
 Title: Domain Outcome Types, RFC 7807 ProblemDetails Modeling, and Shared Utilities
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the shared domain outcome types (`Result<T>`, `ProblemDetails`, `ApiError`), navigation/breadcrumb models, date formatting utilities matching backend `DateOnly`/`TimeOnly` representations, and currency formatters under `src/frontend/src/shared/`.
@@ -270,6 +283,13 @@ Completion Criteria:
 
 Notes:
 - Completely aligns frontend error and outcome modeling with backend `ResultsExtensions.ToProblemDetails()` and C# Dapper `DateOnly`/`TimeOnly` handlers.
+- Created `src/frontend/src/shared/types/common.ts` exporting `DomainErrorType`, `ProblemDetails`, `ApiError`, `Result<T>`, and `PaginatedResponse<T>`.
+- Created `src/frontend/src/shared/types/navigation.ts` exporting `BreadcrumbItem`, `NavigationItem`, and `AppRouteMeta` with Vue Router module augmentation.
+- Created `src/frontend/src/shared/utils/dateUtils.ts` exporting `formatDisplayDate`, `formatDisplayDateTime`, `formatDateOnly`, `formatTimeOnly`, and `parseIsoDate`.
+- Created `src/frontend/src/shared/utils/currencyUtils.ts` exporting `formatIDR`.
+- Created `src/frontend/src/shared/services/storage.ts` providing namespaced JSON storage (`elsasa:v3:`).
+- Created `src/frontend/src/shared/services/logger.ts` providing structured logging respecting environment log levels.
+- Added comprehensive unit test suites in `dateUtils.spec.ts`, `currencyUtils.spec.ts`, `common.spec.ts`, `storage.spec.ts`, and `logger.spec.ts`, passing all tests with Vitest. Fully verified with `typecheck`, `lint`, `format:check`, and production `build`.
 
 ---
 
@@ -277,8 +297,8 @@ Notes:
 
 Title: Centralized HTTP Client, Request Tracing Interceptors, and Environment Configuration
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the centralized Axios client `http.ts` with request interceptors injecting JWT Bearer tokens and `X-Correlation-ID` tracing headers, and response interceptors parsing backend RFC 7807 `ProblemDetails` into typed `ApiError` instances with 401 session expiration handling, supported by environment configuration files.
@@ -306,20 +326,27 @@ Completion Criteria:
 
 Notes:
 - Establishes the authoritative communication backbone between Vue composables and ASP.NET Core endpoints.
+- Created environment configuration files: `.env.development`, `.env.staging`, and `.env.production` with appropriate `VITE_API_BASE_URL`, `VITE_APP_TITLE`, `VITE_ENABLE_MSW`, and `VITE_LOG_LEVEL` variables.
+- Extended `src/frontend/src/vite-env.d.ts` with strongly-typed `ImportMetaEnv` and `ImportMeta` declarations.
+- Implemented `src/frontend/src/shared/services/http.ts` exporting centralized `apiClient` instance and `createHttpClient` factory configuring default headers (`Content-Type: application/json`, `Accept: application/json`), 15000ms timeout, and base URL fallback.
+- Added request interceptor injecting `Authorization: Bearer <token>` (resolving dynamically via registered token provider or namespaced `storage.ts` fallback) and generating unique `X-Correlation-ID` (UUID v4) when missing.
+- Added response interceptor unwrapping HTTP 2xx `response.data`, invoking session expiration handler and dispatching `elsasa:auth:session-expired` event on 401 Unauthorized, transforming RFC 7807 `ProblemDetails` payloads (400, 403, 404, 409, 422, 500) into typed `ApiError` instances, and capturing network drop/offline failures as status 0 `ApiError`.
+- Authored 26 comprehensive unit tests in `src/frontend/src/shared/services/__tests__/http.spec.ts` covering header injection, token resolution, correlation ID generation, 2xx response unwrapping, 401 session expiration, RFC 7807 validation error mapping, and offline handling. All 26 unit tests pass with 100% success.
+- Verified TypeScript type checking (`vue-tsc --noEmit`), ESLint linting (0 errors), and Prettier formatting compliance across the workspace.
 
 ---
 
 ## P3 - State Management & Application Infrastructure
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 ### P3-S07
 
 Title: TanStack Query Provider and Cache Infrastructure Setup
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Configure `@tanstack/vue-query` QueryClient with deterministic caching, garbage collection, and stale time policies categorized according to Section 8.1 of `docs/architecture/frontend-architecture.md`, and establish root Vue plugin composition providers.
@@ -344,6 +371,10 @@ Completion Criteria:
 
 Notes:
 - ADR-FE-002: Server state belongs exclusively in TanStack Query. Pinia is never used for server cache.
+- Configured `QueryClient` with default query options (staleTime 30s, gcTime 5m, retry 1, refetchOnWindowFocus true) and mutation options (retry 0) in `src/frontend/src/app/providers/queryClient.ts`.
+- Encoded architecture cache staleness tiers (`CACHE_TIERS.STATIC`, `OPERATIONAL`, `ACTIVE_QUEUE`, `TRANSACTIONAL`) and provided `createQueryClient` factory for isolated instances.
+- Implemented `registerAppProviders(app: App)` in `src/frontend/src/app/providers/index.ts` registering Pinia, VueQueryPlugin, PrimeVue with Aura preset (`primevueConfig`), PrimeVue `ToastService`, and PrimeVue `ConfirmationService`.
+- Verified QueryClient default options, caching, invalidation, cache clearance, and provider registrations via comprehensive unit test suites in `src/frontend/src/app/providers/__tests__/queryClient.spec.ts` and `providers.spec.ts` (11 tests passing, 0 lint warnings, 0 type errors).
 
 ---
 
@@ -351,8 +382,8 @@ Notes:
 
 Title: Pinia Stores for Client Session and Application Context
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement Pinia stores strictly scoped to browser-only and authenticated user context: `useAuthStore` for session identity and permissions, `useAppContextStore` for active campus and academic period, and `useUIStore` for sidebar collapse and theme preferences.
@@ -377,6 +408,11 @@ Completion Criteria:
 
 Notes:
 - Enforces strict state ownership: No backend database entities or lists are stored in Pinia.
+- Created `src/frontend/src/app/stores/auth.store.ts` exporting `useAuthStore` managing session identity (`UserSession`), token, permissions, and roles, with getters (`isAuthenticated`, `hasPermission` supporting wildcards and SuperAdmin bypass, `hasAnyRole`, `hasRole`), actions (`setSession`, `logout`, `handleSessionExpired`, `restoreSession`, `persistSession`), and configurable persistence via `storage`.
+- Created `src/frontend/src/app/stores/appContext.store.ts` exporting `useAppContextStore` managing `activeCampusId` and `activeAcademicPeriodId` with persistence and getters (`hasActiveCampus`, `hasActiveAcademicPeriod`, `isContextComplete`).
+- Created `src/frontend/src/app/stores/ui.store.ts` exporting `useUIStore` managing `isSidebarCollapsed`, `activeTheme`, and `breadcrumbs` with storage synchronization.
+- Created barrel export in `src/frontend/src/app/stores/index.ts`.
+- Implemented comprehensive unit test suites in `auth.store.spec.ts`, `appContext.store.spec.ts`, and `ui.store.spec.ts` (25 passing tests in Vitest). Verified with `vue-tsc --noEmit` and ESLint.
 
 ---
 
@@ -384,8 +420,8 @@ Notes:
 
 Title: Vue Router Configuration, Hierarchical Routes, and Permission Navigation Guards
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Configure Vue Router with HTML5 web history, lazy-loaded route records organized hierarchically by stage and domain context, and global navigation guards (`beforeEach`) enforcing authentication and actor permissions.
@@ -413,20 +449,25 @@ Completion Criteria:
 
 Notes:
 - Enforces ADR-FE-007 UX defense while backend Minimal APIs remain the authoritative security boundary.
+- Configured hierarchical route records in `src/frontend/src/app/router/routes.ts` covering root redirect (`/` -> `/dashboard`), unauthenticated auth layout (`/auth/login`), authenticated shell (`AppLayout` with `requiresAuth: true`), dashboard, operations calendar workspace with permission `Permissions.Operations.Calendar.Manage`, domain route groups for Students (`/students/admission`, `/students/enrollment`) and Finance (`/finance/obligations`, `/finance/payments`), and standard error handlers (`/403` and `/:pathMatch(.*)*`).
+- Created placeholder layout shells (`AppLayout.vue`, `AuthLayout.vue`) and minimal view stubs across all routed contexts to support lazy loading with clean TypeScript and Vite bundling.
+- Implemented global navigation guards in `src/frontend/src/app/router/guards.ts` enforcing unauthenticated redirection to `/auth/login?redirect=${encodeURIComponent(to.fullPath)}`, permission enforcement redirecting to `/403`, and dynamic document title formatting (`${to.meta.title} — Elsasa SIS`).
+- Created and exported the router instance in `src/frontend/src/app/router/index.ts` with HTML5 web history, scroll behavior restoration, and global guards applied.
+- Implemented 19 unit test cases in `src/frontend/src/app/router/__tests__/guards.spec.ts` covering unauthenticated redirection, query param preservation, permission checking, SuperAdmin/wildcard bypass, hierarchical route resolution, catch-all routing, and document title formatting. Passing all tests cleanly with Vitest.
 
 ---
 
 ## P4 - Shared UI Primitives & Application Layout Shells
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 ### P4-S10
 
 Title: Shared UI Primitives and Form Feedback Components
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement reusable, domain-agnostic UI presentation primitives under `src/frontend/src/shared/components/` utilizing PrimeVue primitives styled with Tailwind CSS v4 design tokens.
@@ -448,6 +489,14 @@ Completion Criteria:
 
 Notes:
 - Provides the uniform UI building blocks required for consistent administrative screens across all SIS domains.
+- Implemented accessible form feedback wrapper `FormField.vue` supporting label, required indicator (`*`), optional indicator (`(Optional)`), help text, and red validation error messages with WAI-ARIA alert and describedby attributes.
+- Implemented `LoadingSpinner.vue` with `sm`, `md`, and `lg` sizing, brand color variants (`teal`, `primary`, `white`, `slate`), and screen-reader accessible attributes.
+- Implemented `EmptyState.vue` supporting custom icon component, title, description, and actions slot with optional dashed border styling.
+- Implemented `PageHeader.vue` providing view title, subtitle, semantic breadcrumb navigation hierarchy, and header action button slot.
+- Implemented `ContentCard.vue` providing container styling with slate borders, white background, and optional header, title, header-actions, and footer slots.
+- Implemented `StatusPill.vue` mapping domain status strings (`active`, `pending`, `accepted`, `rejected`, `closed`) to Emerald, Amber, Rose, and Slate institutional badge styles with optional dot indicators and casing normalization.
+- Created centralized export index in `src/frontend/src/shared/components/index.ts`.
+- Created comprehensive Vitest and Vue Test Utils unit test suites (`FormField.spec.ts`, `StatusPill.spec.ts`, `LoadingSpinner.spec.ts`, `EmptyState.spec.ts`, `PageHeader.spec.ts`, `ContentCard.spec.ts`) passing all 38 component unit tests (and 134 total frontend tests). Verified with `vue-tsc -b`, `vite build`, `lint`, and `prettier`.
 
 ---
 
@@ -455,8 +504,8 @@ Notes:
 
 Title: Persistent Layout Shells and Root Application Shell Component
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the primary authenticated shell `AppLayout.vue`, distraction-free `AuthLayout.vue`, and the root application shell `App.vue` hosting global PrimeVue `Toast` and `ConfirmDialog` providers.
@@ -479,21 +528,29 @@ Completion Criteria:
 - Component tests verify `AppLayout.vue` sidebar toggle and menu rendering.
 
 Notes:
-- Prevents layout reflow across route transitions and provides responsive framing for desktop and tablet administrative workstations.
+- Implemented root application shell `src/frontend/src/App.vue` hosting PrimeVue `<Toast position="top-right" />`, `<ConfirmDialog />`, and routed view `<router-view />`.
+- Implemented centered, distraction-free authentication layout `src/frontend/src/app/layouts/AuthLayout.vue` with institutional branding, card container, and footer.
+- Implemented primary administrative layout `src/frontend/src/app/layouts/AppLayout.vue` with:
+  - Sticky Top Navigation Bar: institutional branding, academic period indicator badge, campus selector dropdown, user profile menu with logout action, and responsive sidebar toggle.
+  - Collapsible Sidebar: full-height navigation with expanded (`w-64`) and collapsed mini-sidebar (`w-20`) modes, accordion grouping for Operations, Students, and Finance modules, and dynamic permission filtering driven by `authStore.hasPermission()`.
+  - Dynamic Breadcrumbs & Page Header region: driven by `uiStore.breadcrumbs` or route metadata hierarchy.
+  - Main content region: `<router-view>` wrapped in `<transition name="page" mode="out-in">` with subtle fade/slide animation.
+- Created comprehensive component test suite `src/frontend/src/app/layouts/__tests__/AppLayout.spec.ts` (17 unit tests) covering sidebar toggling, topbar controls, permission-based link filtering, accordion group toggle, router view rendering, `AuthLayout.vue`, and `App.vue`.
+- Verified all quality gates pass: `vitest` (170 tests passing across 19 files), `vue-tsc` (clean), `eslint` (0 errors), `prettier` (clean), and `vite build` (production assets generated cleanly).
 
 ---
 
 ## P5 - Minimal Application Shell & Integration Verification
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 ### P5-S12
 
 Title: Application Bootstrap Entry Point and Minimal Route Views
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Wire the Single Page Application entry point `main.ts`, register all providers, stores, and router, and implement minimal route views (`DashboardView.vue`, `LoginView.vue`, `ForbiddenView.vue`, `NotFoundView.vue`) establishing the runnable application shell.
@@ -518,7 +575,25 @@ Completion Criteria:
 - Development server `pnpm --dir src/frontend dev` boots cleanly and serves the interactive application shell at `http://localhost:5173`.
 
 Notes:
-- Establishes the full runnable client shell ready for feature view implementation.
+- Wired the Single Page Application bootstrap entry point in `src/frontend/src/main.ts`:
+  - Implements complete lifecycle: `createApp(App)`, registers composition providers (Pinia, VueQuery, PrimeVue, ToastService, ConfirmationService), hydrates client authentication session (`authStore.restoreSession(true)`), configures and registers Vue Router, binds global error handling boundary to `logger.error`, and mounts root application component to `#app`.
+- Implemented `src/features/dashboard/views/DashboardView.vue`:
+  - Displays administrative dashboard with session greeting (user name, roles, user ID), active operational scope indicator (campus and academic period status), system health card (Operational, Minimal APIs & Dapper connected, version v0.1.0), and navigation shortcut cards to Operations (`/operations/calendar`) and Stage 1 core domain workspaces (Admission, Enrollment, Obligations, Payments).
+- Implemented `src/features/auth/views/LoginView.vue` and `src/features/auth/schemas/login.schema.ts`:
+  - Implemented schema-first form using Zod validation and VeeValidate `useForm` / `defineField` bindings.
+  - Handles authentication submit for local session context / dev mock, stores session in `useAuthStore`, and redirects to requested target path (`route.query.redirect`) or defaults to `/dashboard`.
+- Implemented `src/shared/views/ForbiddenView.vue`:
+  - HTTP 403 authorization barrier page with `StatusPill`, clear access policy guidance, and Return to Dashboard / Go Back actions.
+- Implemented `src/shared/views/NotFoundView.vue`:
+  - HTTP 404 page not found view with `StatusPill`, resource missing explanation, and Return to Dashboard / Go Back navigation actions.
+- Created comprehensive unit and component test suites:
+  - `src/__tests__/main.spec.ts` (bootstrap lifecycle, plugin registration, session hydration, error telemetry)
+  - `src/features/auth/schemas/__tests__/login.schema.spec.ts` (Zod schema credentials validation)
+  - `src/features/auth/views/__tests__/LoginView.spec.ts` (rendering, VeeValidate form validation, session creation, redirection)
+  - `src/features/dashboard/views/__tests__/DashboardView.spec.ts` (greeting, active context, system status, operations shortcuts)
+  - `src/shared/views/__tests__/ForbiddenView.spec.ts` (HTTP 403 view and return navigation)
+  - `src/shared/views/__tests__/NotFoundView.spec.ts` (HTTP 404 view and return navigation)
+- Verified quality gates pass: `test:unit` (196 tests passing across 25 files), `typecheck` (clean), `lint` (0 errors), `format:check` (clean), `build` (production bundle built cleanly), and Vite dev server (`http://localhost:5173` boots cleanly and serves interactive SPA shell).
 
 ---
 
@@ -526,8 +601,8 @@ Notes:
 
 Title: Backend Integration Verification Vertical Slice and Build Verification
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement an integration verification vertical slice in `features/operations/calendar/` to verify live end-to-end communication with the running ASP.NET Core backend API (`/health` and `POST /api/operations/academic-years`), verifying HTTP proxying, correlation ID header propagation, 201 Created response handling, and 422 `ProblemDetails` validation error mapping.
@@ -564,7 +639,27 @@ Completion Criteria:
   - `pnpm --dir src/frontend build` produces optimized production bundle in `src/frontend/dist/`.
 
 Notes:
-- Proves end-to-end frontend-backend architecture integration without modifying backend contracts or creating throwaway dummy code.
+- Implemented backend API contract service in `src/frontend/src/features/operations/calendar/api/academicYear.api.ts`:
+  - `checkBackendHealth()`: probes `GET /health` with correlation ID tracing header propagation and unboxes plain text or object status payload.
+  - `createAcademicYear()`: dispatches typed `CreateAcademicYearPayload` to `POST /api/operations/academic-years`, propagating `X-Correlation-ID` UUID v4 header and unboxing `AcademicYearDto` on HTTP 201 Created.
+- Implemented validation schema in `src/frontend/src/features/operations/calendar/schemas/createAcademicYear.schema.ts`:
+  - Aligns client-side Zod constraints with backend `CreateAcademicYearValidator.cs` (`code` 3..50 chars, `name` 3..100 chars, `startDate` ISO YYYY-MM-DD, `endDate` ISO YYYY-MM-DD strictly greater than `startDate`).
+- Implemented interactive operational view in `src/frontend/src/features/operations/calendar/views/CalendarWorkspaceView.vue`:
+  - Displays live backend connectivity status card backed by `checkBackendHealth` with manual refresh trigger and `StatusPill` indicators.
+  - Interactive `Create Academic Year` form integrated with VeeValidate `useForm` and Zod `toTypedSchema`.
+  - Maps successful HTTP 201 Created responses to success toasts and session history records.
+  - Intercepts RFC 7807 HTTP 422 ProblemDetails, translates `ApiError` field validation dictionaries onto form fields, and displays error toast and problem banner.
+- Configured dev server proxy route in `vite.config.ts` to proxy both `/api` and `/health` to `http://localhost:5000`.
+- Added automated Vitest suites:
+  - `src/features/operations/calendar/__tests__/academicYear.api.spec.ts` (API transmission, response unboxing, correlation header propagation, 422 ProblemDetails unbundling).
+  - `src/features/operations/calendar/schemas/__tests__/createAcademicYear.schema.spec.ts` (Zod schema boundary constraints and date range checks).
+  - `src/features/operations/calendar/views/__tests__/CalendarWorkspaceView.spec.ts` (component rendering, health probe lifecycle, VeeValidate client validation, 201 success handling, 422 server error mapping).
+- Verified full quality gates pass:
+  - `pnpm --dir src/frontend typecheck`: 0 errors.
+  - `pnpm --dir src/frontend lint`: 0 warnings, 0 errors.
+  - `pnpm --dir src/frontend format:check`: 100% clean formatting.
+  - `pnpm --dir src/frontend test:unit`: 222 tests passing across 28 test files (100%).
+  - `pnpm --dir src/frontend build`: production bundle generated in `src/frontend/dist/` with vendor chunk splitting.
 
 ---
 
