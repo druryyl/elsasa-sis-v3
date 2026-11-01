@@ -674,22 +674,77 @@ timeline
 
 ---
 
-## F. Gaps, Ambiguities, and Open Questions
+## F. Resolved Architectural Gaps and Policy Decisions
 
-The discovery identified eight notable findings across domain boundaries, governance rules, and operational policies. None of these findings block the foundational architecture, but they require timely clarification as specified below.
+All eight findings identified across domain boundaries, governance rules, and operational policies have been formally adjudicated and resolved using a **pragmatic**, **explicit**, and **minimalist** approach. No blockers remain for Stage 1, Stage 2, or Stage 3.
 
-### F.1 Inventory of Findings
+### F.1 Inventory of Resolutions
 
-| ID | Affected Domain(s) / Workflow | Issue Description | Operational & Architectural Impact | Reference Source | Blocker Status | Recommended Next Action |
-|---|---|---|---|---|---|---|
-| `GAP-01` | **Finance / Students**<br>`FIN-WF-13` / `STD-WF-03` | **Enforcement Level of Enrollment Payment Gate:** Source documents indicate payment confirmation is required "when policy requires it." It is unconfirmed whether Stage 1 requires a strict system block or an administrative override. | If strict, payment receipt/allocation must be synchronously available during enrollment. If override is allowed, status may be set with a pending financial flag. | `sub-modul-and-development-phases.md` line 190 | **Stage 1 Blocker** (must resolve before Stage 1 intake implementation) | Convene school leadership to establish initial enrollment payment policy: hard block vs. conditional enrollment approval. |
-| `GAP-02` | **Development / Students**<br>`DEV-WF-03`, `DEV-WF-11` / `STD-WF-11` | **Discipline Decision Authority vs. Execution:** While `student-domain.md` closed expulsion as using standard Withdrawal Record, roadmap line 193 queries whether expulsion is a direct Development decision or a recommendation to Students. | Preserves domain ownership. If recommendation, Students retains sole authority to transition student status to Withdrawn. If direct, Development can terminate status. | `sub-modul-and-development-phases.md` line 193; `student-domain.md` line 1680 | **Stage 3 Blocker** (can be deferred during Stages 1–2) | Adopt standard pattern: Development issues formal recommendation for expulsion; Students leadership reviews and executes administrative withdrawal. |
-| `GAP-03` | **Academics / Development**<br>`ACD-WF-05` | **General School-Gate Daily Attendance Ownership:** Academics owns learning-activity attendance. Ownership of general daily homeroom/school-gate attendance remains an open question in Development. | Does not impact Stage 2 class attendance. A separate daily attendance model may be needed in Stage 3 if school tracks gate presence independently. | `sub-modul-and-development-phases.md` line 182; `development-domain.md` line 1445 | **Deferred to Stage 3** (non-blocking for Stages 1–2) | Defer to Stage 3. Learning-activity attendance in Academics is completely sufficient for Stage 2 operations. |
-| `GAP-04` | **Development**<br>`DEV-WF-06` | **Safeguarding and Child Protection Scope:** Explicitly deferred in domain documentation pending legal compliance and institutional safeguarding review. | Dedicated safeguarding workflows (mandatory reporting, external social services referral) are excluded from base SIS scope. | `sub-modul-and-development-phases.md` line 194; `development-domain.md` Section "Open Questions" | **Deferred** (does not block Stages 1, 2, or base Stage 3) | Form legal/safeguarding committee during Stage 2 to draft school-specific child protection protocols before implementing sensitive cases. |
-| `GAP-05` | **Students**<br>`STD-WF-09` | **Multi-Campus Transfer Prerequisites:** Unresolved whether moving between physical campuses requires formal clearance or simple administrative reallocation. | Affects whether internal transfer requires financial/academic review or solely student administration approval. | `student-domain.md` line 1672 | **Stage 2 Blocker** (resolve before internal transfer is built) | Define campus transfer policy: internal transfers within the same legal entity require administrative approval; academic/financial re-allocations are handled automatically. |
-| `GAP-06` | **Finance**<br>`FIN-WF-01`, `FIN-WF-02` | **Initial Charge Types Configuration:** Financial policy engine supports arbitrary charge rules, but the minimum required fee schedule for Stage 1 MVP is unlisted. | Engineering requires initial fee master data (e.g., Application Fee, Registration Fee, Tuition Installments). | `sub-modul-and-development-phases.md` line 192 | **Non-blocking Configuration** (resolve during Stage 1 sprint planning) | Obtain the current school fee catalogue and installment schedule from the bursar during Stage 1 configuration. |
-| `GAP-07` | **Academics / Students**<br>`ACD-WF-20` / `STD-WF-01` | **Applicant Reference Identifier in Academics:** Academics typically links activities to enrolled `Student` IDs. For entrance assessment, an applicant reference identifier must be consumed. | Data model must ensure `ACD-WF-20` and assessment tables accept an `applicant_id` foreign key as an alternative to `student_id`. | `academic-domain.md` Open Questions; Roadmap Criterion 15 | **Stage 2 Blocker** (resolve during Stage 2 database modeling) | Confirm assessment entity schema supports polymorphic reference or explicit nullable foreign keys: `applicant_id` for entrance tests, `student_id` for standard tests. |
-| `GAP-08` | **Academics / Students**<br>`STD-WF-17` | **Prior Coursework Credit Evaluation Procedure:** For external transfer-in (`STD-WF-17`), the process by which Academics evaluates and converts external school transcripts into recognized credits is undocumented. | Students can admit transfer-in students, but their transcript will be blank unless Academics provides a prior-learning recognition workflow. | `student-domain.md` line 261; `academic-domain.md` line 343 | **Stage 3 Blocker** (resolve before external transfer-in is built) | Define a formal "Recognize Prior Learning / Transfer Credits" procedure within Academics Standing & Progression during Stage 3 architecture. |
+| ID | Affected Domain(s) / Workflow | Original Issue | Agreed Resolution & Technical Mechanism | Status |
+|---|---|---|---|---|
+| `GAP-01` | **Finance / Students**<br>`FIN-WF-13` / `STD-WF-03` | Enforcement Level of Enrollment Payment Gate | **Hard block by default with explicit administrative override:** Enrolling an accepted applicant requires confirmed payment allocation; an authorized role (Principal / Bursar) can execute an override with a mandatory logged reason to enroll with pending fees. | **Resolved** |
+| `GAP-02` | **Development / Students**<br>`DEV-WF-03`, `DEV-WF-11` / `STD-WF-11` | Discipline Decision Authority vs. Execution | **Two-step workflow (Development recommends, Students executes):** Development investigates and determines disciplinary sanctions; authorized Student Leadership / Admin executes the status change (Suspension or Disciplinary Withdrawal) in Students domain. | **Resolved** |
+| `GAP-03` | **Academics / Development / Operations**<br>`ACD-WF-05` | General School-Gate Daily Attendance Ownership | **Homeroom session in Academics for statutory daily totals; Operations owns physical gate scans:** Daily roll-call runs as a scheduled homeroom learning activity (`activity_type = 'homeroom_session'`). Stage 3 campus gate/turnstile logs belong to Operations. Development queries truancy flags without an independent attendance ledger. | **Resolved** |
+| `GAP-04` | **Development**<br>`DEV-WF-06` | Safeguarding and Child Protection Scope | **Exclude statutory safeguarding from SIS; manage off-system:** Core SIS manages routine pastoral/wellbeing support (`DEV-WF-06`) and confidential counselling notes (`DEV-WF-05`). Statutory child protection and mandatory external reporting are handled strictly via manual/legal institutional protocols outside the SIS. | **Resolved** |
+| `GAP-05` | **Students**<br>`STD-WF-09` | Multi-Campus Transfer Prerequisites | **Administrative reallocation with central account continuity:** Internal transfer between campuses requires only Student Admin/Principal approval. No exit clearances are required because student identity, central financial account, and transcripts are organization-wide. | **Resolved** |
+| `GAP-06` | **Finance**<br>`FIN-WF-01`, `FIN-WF-02` | Initial Charge Types Configuration | **Minimalist 3 core types:** Seed `APPLICATION_FEE` (one-off during admission), `ENROLLMENT_FEE` (one-off before enrollment), and `TUITION_FEE` (recurring/termly); all additional fee types are defined dynamically via the policy engine without code changes. | **Resolved** |
+| `GAP-07` | **Academics / Students**<br>`ACD-WF-20` / `STD-WF-01` | Applicant Reference Identifier in Academics | **Explicit nullable foreign keys with CHECK constraint:** Assessment tables maintain nullable `student_id` and nullable `applicant_id` with constraint `CHECK ((student_id IS NOT NULL AND applicant_id IS NULL) OR (student_id IS NULL AND applicant_id IS NOT NULL))`. Preserves native RDBMS referential integrity. | **Resolved** |
+| `GAP-08` | **Academics / Students**<br>`STD-WF-17` | Prior Coursework Credit Evaluation Procedure | **Direct Learning Unit Recognition:** Academic Authority records recognized prior/transferred learning by creating completed `academic_participations` rows (`participation_type = 'transferred_in'`), capturing `source_institution`, external grade/credit, and approval basis. Transcripts display `[T]` tag without synthetic attendance or lessons. | **Resolved** |
+
+---
+
+### F.2 Detailed Resolution Specifications
+
+#### 1. Resolution of GAP-01: Enrollment Payment Gate Enforcement (`FIN-WF-13` / `STD-WF-03`)
+* **Policy Rule:** When enrollment fee policy is active, the system strictly enforces payment receipt and full allocation before `STD-WF-03: Enroll Accepted Applicant` can be executed.
+* **Administrative Override:** If an accepted applicant is permitted to enroll with deferred payment, financial assistance, or special leadership approval, an authorized user (`Principal` or `Bursar` role) may trigger an explicit administrative override.
+* **Auditability:** The override requires entering an explicit, mandatory justification string (`override_reason`), which is permanently logged in the enrollment audit trail and flagged on the student's initial financial account.
+
+#### 2. Resolution of GAP-02: Disciplinary Sanction Authority vs. Administrative Execution (`DEV-WF-03`, `DEV-WF-11` / `STD-WF-11`)
+* **Strict Domain Boundary:** Development retains exclusive authority to investigate misconduct and adjudicate disciplinary sanctions. However, Development **never** directly alters a student's administrative lifecycle status.
+* **Workflow Handshake:** Upon determining a sanction of suspension or expulsion, Development issues a formal cross-domain recommendation (`DEV-WF-11`).
+* **Execution in Students Domain:** Authorized School Leadership / Student Administration consumes the recommendation and executes `STD-WF-11: Process Withdrawal` (with reason category `Disciplinary / Expulsion`) or updates placement/status to `Suspended`, linking the formal Development case ID.
+
+#### 3. Resolution of GAP-03: School Attendance Architecture (`ACD-WF-05`)
+* **Single Instructional Ledger:** Academics owns all classroom and daily statutory attendance. Statutory daily presence totals on report cards are derived from a scheduled daily homeroom roll-call activity (`learning_activities.activity_type = 'homeroom_session'`).
+* **Physical Gate Tracking in Operations:** In Stage 3, automated campus gate / turnstile RFID badge logs are owned strictly by Operations as facilities presence logs. They do not overwrite academic attendance.
+* **Pastoral Interventions in Development:** Development queries academic attendance data for truancy thresholds and behavioural patterns; it does not maintain a duplicate attendance ledger.
+
+#### 4. Resolution of GAP-04: Safeguarding and Child Protection Boundaries (`DEV-WF-06`)
+* **Boundary Decision:** Formal statutory child protection workflows (e.g., criminal investigations, statutory social welfare reports) are excluded from the core SIS to prevent security risks, sensitive data breaches, and legal liabilities.
+* **SIS Scope:** Development provides standard pastoral wellbeing support plans (`DEV-WF-06`) and confidential counselling session tracking (`DEV-WF-05`) restricted strictly to authorized counselors.
+* **Escalation Protocol:** Any concern categorized as statutory safeguarding triggers an immediate system notification directing the designated officer to handle the case off-system under physical institutional safeguarding protocols.
+
+#### 5. Resolution of GAP-05: Multi-Campus Transfer Protocol (`STD-WF-09`)
+* **Organization-Wide Scope:** Student identity, student numbering, official academic transcripts, and financial ledgers are centralized across all campuses.
+* **Zero Exit Clearances:** Moving a student from one campus to another within Elsasa School is an internal administrative reallocation (`STD-WF-09`). It requires Student Administration and Principal approval.
+* **Automated Continuity:** Outstanding balances and prior course credits remain attached to the unified student account; no formal exit clearances (`ACD-WF-16`, `FIN-WF-11`) are required.
+
+#### 6. Resolution of GAP-06: Initial Fee Catalog Configuration (`FIN-WF-01`, `FIN-WF-02`)
+* **Seed Configuration:** Stage 1 MVP seeds three standard charge types:
+  1. `APPLICATION_FEE` (one-off charge assessed upon application registration)
+  2. `ENROLLMENT_FEE` (one-off registration fee assessed upon acceptance)
+  3. `TUITION_FEE` (regular termly or periodic instructional charge)
+* **Dynamic Extension:** Additional charges (e.g., uniforms, books, facility fees) are created as needed through the financial policy configuration engine without software schema alterations.
+
+#### 7. Resolution of GAP-07: Dual Candidate Reference in Academics (`ACD-WF-20` / `STD-WF-01`)
+* **Database Design:** Academics assessment tables (`assessment_evidence`, `assessment_evaluations`, etc.) utilize explicit nullable foreign keys:
+  - `student_id UUID NULL REFERENCES students(id)`
+  - `applicant_id UUID NULL REFERENCES admission_applications(id)`
+* **Integrity Constraint:** Enforce table-level check constraint:
+  `CHECK ((student_id IS NOT NULL AND applicant_id IS NULL) OR (student_id IS NULL AND applicant_id IS NOT NULL))`
+* **Pragmatic Value:** Guarantees strict foreign key referential integrity at the database engine level, prevents orphan test results, and enables entrance assessments (`ACD-WF-20`) to execute cleanly prior to student enrollment.
+
+#### 8. Resolution of GAP-08: Prior Learning and Transfer Credit Recognition (`STD-WF-17`)
+* **Academic Ownership:** When a mid-program student transfers in from another school (`STD-WF-17`), Academics evaluates prior transcripts and establishes recognized credits.
+* **Mechanism:** Academic Authority creates `academic_participations` rows with:
+  - `participation_type = 'transferred_in'` (or `'recognized_prior'`)
+  - `status = 'completed'`
+  - `source_institution` = Originating school name
+  - `external_grade_or_credit` = Recognized score/credits
+  - `recognition_basis` = Documentary evaluation reference
+  - `approved_by` = Authorizing academic official
+* **Transcript Representation:** Recognized units are displayed on official cumulative transcripts with a `[T]` transfer notation without generating synthetic lessons or attendance.
 
 ---
 
@@ -709,16 +764,14 @@ The findings of this Operational Workflow Discovery have been validated against 
    - Enrollment financial confirmation in Stage 1 is an inquiry status check against specific intake fees, distinct from the comprehensive clearance determinations of Stage 3.
 3. **No CRUD Assumptions:**
    - Every workflow documented represents a meaningful business process triggered by an authorized event, bounded by business rules, and producing auditable state changes. No artificial workflows were created for basic data entry or browsing.
-4. **No Unsupported Speculation:**
-   - All newly specified workflows (`STD-WF-16`, `STD-WF-17`, `ACD-WF-19`, `ACD-WF-20`) are justified by documented core entities, scope statements, or explicit roadmap deliverables.
-   - Unresolved policy questions (daily attendance, safeguarding scope, payment gates) are explicitly categorized with recommended actions rather than being silently resolved.
+4. **All Open Policy Questions Formally Resolved:**
+   - All 8 gaps (`GAP-01` to `GAP-08`) identified during discovery have been formally resolved through explicit, minimalist architectural rules aligned with domain boundaries.
 
 ---
 
 ## H. Next Steps and Implementation Handover
 
-Following the completion of this Operational Workflow Discovery, the project is positioned to proceed with subsequent system design activities:
+Following the completion and full resolution of this Operational Workflow Discovery, the project is positioned to proceed directly with subsequent system design activities:
 1. **Actor Definition & Workspace Modeling:** Define the actor profiles, responsibilities, and dedicated workspaces across all six domains based on the primary actors identified in Section B.
 2. **Use Case Specification:** Translate the 87 operational workflows into formal system use cases detailing pre-conditions, main success scenarios, exception flows, and post-conditions.
-3. **Stage 1 Implementation Kickoff:** Begin implementation of the Stage 1 foundational modules (Operations Calendar & Periods, Student Admission & Enrollment, Finance Obligations & Payments) in strict accordance with the Stage 1 completion criteria.
-4. **Resolution of Stage 1 Blockers:** Present `GAP-01` (enrollment payment gate) and `GAP-06` (initial fee schedule) to school governance stakeholders for policy confirmation.
+3. **Stage 1 Implementation Kickoff:** Begin implementation of the Stage 1 foundational modules (Operations Calendar & Periods, Student Admission & Enrollment, Finance Obligations & Payments) with zero unresolved blockers.
