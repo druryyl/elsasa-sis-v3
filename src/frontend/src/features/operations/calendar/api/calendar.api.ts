@@ -90,11 +90,18 @@ export async function getCalendars(academicYearId: string): Promise<SchoolCalend
 export async function getActiveCalendar(
   academicYearId: string,
 ): Promise<SchoolCalendarDto | null> {
-  const response = (await apiClient.get(
-    `/operations/academic-years/${encodeURIComponent(academicYearId)}/calendars/active`,
-  )) as unknown as SchoolCalendarDto | null;
+  try {
+    const response = (await apiClient.get(
+      `/operations/academic-years/${encodeURIComponent(academicYearId)}/calendars/active`,
+    )) as unknown as SchoolCalendarDto | null;
 
-  return response;
+    return response;
+  } catch (error) {
+    // A 404 simply means no published calendar exists yet (e.g. draft only).
+    const status = (error as { status?: number } | null)?.status;
+    if (status === 404) return null;
+    throw error;
+  }
 }
 
 /**

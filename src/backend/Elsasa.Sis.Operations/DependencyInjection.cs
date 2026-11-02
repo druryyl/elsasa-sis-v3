@@ -20,7 +20,7 @@ using Elsasa.Sis.Operations.Features.CalendarPeriods.RecordCorrections.CorrectOp
 using Elsasa.Sis.Operations.Features.CalendarPeriods.RecordCorrections.GetRecordCorrectionsList;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.CreateSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.GetActiveSchoolCalendar;
-using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.PublishSchoolCalendar;
+using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.GetSchoolCalendarsList;using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.PublishSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.WithdrawSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.DeclareSchoolClosure;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.GetSchoolClosuresList;
@@ -62,7 +62,7 @@ public static class DependencyInjection
         services.AddScoped<PublishSchoolCalendarHandler>();
         services.AddScoped<WithdrawSchoolCalendarHandler>();
         services.AddScoped<GetActiveSchoolCalendarHandler>();
-
+services.AddScoped<GetSchoolCalendarsListHandler>();
         // Calendar Entry & Matrix handlers
         services.AddScoped<CreateCalendarEntryHandler>();
         services.AddScoped<DeleteCalendarEntryHandler>();

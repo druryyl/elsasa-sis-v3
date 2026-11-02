@@ -22,6 +22,20 @@ builder.Services.AddSwaggerDocumentation();
 
 var app = builder.Build();
 
+// Apply pending database migrations automatically in Development and Testing
+// environments (ADR-006), so a stale local database schema never surfaces as
+// a 500 Internal Server Error at runtime.
+if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+{
+    var migrationConnectionString = builder.Configuration.GetConnectionString(DependencyInjection.DefaultConnectionKey);
+    if (!string.IsNullOrWhiteSpace(migrationConnectionString))
+    {
+        using var migrationLoggerFactory = LoggerFactory.Create(lb => lb.AddConsole());
+        var migrationLogger = migrationLoggerFactory.CreateLogger("DatabaseMigrator");
+        Program.RunMigration(migrationConnectionString, migrationLogger);
+    }
+}
+
 app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();

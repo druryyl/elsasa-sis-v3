@@ -122,6 +122,16 @@ export function useCreateCalendarMutation(
       payload: CreateCalendarPayload;
     }) => createCalendar(academicYearId, payload),
     onSuccess: (data, variables) => {
+      // Optimistically register the newly created calendar in the cached list so
+      // the workspace reflects it immediately, even before the refetch resolves.
+      queryClient.setQueryData<SchoolCalendarDto[]>(
+        calendarKeys.byAcademicYear(variables.academicYearId),
+        (old) => {
+          const list = Array.isArray(old) ? old : [];
+          if (list.some((c) => c.id === data.id)) return list;
+          return [...list, data];
+        },
+      );
       queryClient.invalidateQueries({ queryKey: calendarKeys.all });
       notifySuccess(
         toast,
