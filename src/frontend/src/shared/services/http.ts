@@ -207,7 +207,7 @@ export function setupInterceptors(instance: AxiosInstance): void {
  * Creates and configures a new Axios client instance.
  */
 export function createHttpClient(
-  baseURL: string = import.meta.env?.VITE_API_BASE_URL || '/api',
+  baseURL: string = import.meta.env?.VITE_API_BASE_URL || 'https://localhost:52390/api',
   timeout = 15000,
 ): AxiosInstance {
   const instance = axios.create({

@@ -118,7 +118,8 @@ BEGIN
 
     IF @df_academic_years_is_active IS NOT NULL
     BEGIN
-        EXEC(N'ALTER TABLE [operations].[academic_years] DROP CONSTRAINT ' + QUOTENAME(@df_academic_years_is_active));
+        DECLARE @drop_df_is_active NVARCHAR(512) = N'ALTER TABLE [operations].[academic_years] DROP CONSTRAINT ' + QUOTENAME(@df_academic_years_is_active);
+        EXEC(@drop_df_is_active);
     END;
 
     ALTER TABLE [operations].[academic_years] DROP COLUMN [is_active];
