@@ -40,7 +40,12 @@ export function getActiveAuthToken(): string | null {
     }
   }
 
-  // Fallback to local storage (elsasa:v3:session or elsasa:v3:token / auth_token)
+  // Fallback to local storage (elsasa:v3:auth_session, elsasa:v3:session or elsasa:v3:token / auth_token)
+  const authSession = storage.getItem<{ token?: string }>('auth_session');
+  if (authSession?.token) {
+    return authSession.token;
+  }
+
   const session = storage.getItem<{ token?: string }>('session');
   if (session?.token) {
     return session.token;

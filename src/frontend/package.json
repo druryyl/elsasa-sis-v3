@@ -12,7 +12,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest run",
-    "api:generate": "openapi-typescript http://localhost:5000/swagger/v1/swagger.json -o src/shared/types/api/schema.d.ts"
+    "api:generate": "openapi-typescript https://localhost:52390/swagger/v1/swagger.json -o src/shared/types/api/schema.d.ts"
   },
   "dependencies": {
     "@primevue/themes": "^4.2.0",

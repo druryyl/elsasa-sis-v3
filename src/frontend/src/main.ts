@@ -3,6 +3,7 @@ import App from '@/App.vue';
 import { registerAppProviders, type AppProvidersResult } from '@/app/providers';
 import { router } from '@/app/router';
 import { useAuthStore } from '@/app/stores/auth.store';
+import { setAuthTokenProvider, setSessionExpiredHandler } from '@/shared/services/http';
 import { logger } from '@/shared/services/logger';
 
 import '@/shared/styles/main.css';
@@ -33,9 +34,11 @@ export function bootstrapApplication(containerSelector: string = '#app'): Bootst
   // 1. Register application providers (Pinia, Vue Query, PrimeVue)
   const providers = registerAppProviders(app);
 
-  // 2. Hydrate client authentication session
+  // 2. Hydrate client authentication session and wire HTTP auth interceptor
   const authStore = useAuthStore(providers.pinia);
   authStore.restoreSession(true);
+  setAuthTokenProvider(() => authStore.token);
+  setSessionExpiredHandler(() => authStore.handleSessionExpired());
 
   // 3. Register Vue Router
   app.use(router);

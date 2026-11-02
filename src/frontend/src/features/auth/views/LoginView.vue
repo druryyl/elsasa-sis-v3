@@ -61,6 +61,7 @@ const onSubmit = handleSubmit(async (values) => {
 
     const token = `token-${Date.now()}`;
     authStore.setSession(token, userSession);
+    authStore.persistSession(true);
 
     // Navigate to original destination or default dashboard
     const redirectTarget = (route.query.redirect as string) || '/dashboard';

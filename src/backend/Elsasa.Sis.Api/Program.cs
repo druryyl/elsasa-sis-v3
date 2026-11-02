@@ -36,6 +36,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapEndpoints(DependencyInjection.Stage1Assemblies);
+new Elsasa.Sis.Api.Features.Auth.LoginEndpoint().MapEndpoint(app);
 
 // Provide a landing page so the default browser URL (root path) does not return 404.
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled", false))
