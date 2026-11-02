@@ -17,7 +17,8 @@ public sealed class CreateAcademicYearEndpoint : IEndpoint
 
         app.MapPost("/api/operations/academic-years", HandleAsync)
             .WithName("CreateAcademicYear")
-            .WithTags("CalendarPeriods")
+            .WithTags("AcademicYears")
+            .RequireAuthorization(Permissions.Operations.Calendar.Manage)
             .WithValidation<CreateAcademicYearRequest>()
             .Produces<CreateAcademicYearResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)

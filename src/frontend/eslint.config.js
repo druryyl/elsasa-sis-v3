@@ -23,10 +23,17 @@ for (const [domain, submodules] of Object.entries(featureDomains)) {
     const otherSubmodules = submodules.filter((s) => s !== submodule);
 
     const restrictedPatterns = [
-      // Cannot import upwards into app layer
+      // Cannot import upwards into app layer (except global stores and queryClient cache tiers)
       {
-        group: ['@/app', '@/app/**', '**/app', '**/app/**'],
-        message: 'Features must not import upwards into the app layer (ADR-FE-001).',
+        group: [
+          '@/app/router',
+          '@/app/router/**',
+          '@/app/layouts',
+          '@/app/layouts/**',
+          '@/app/config',
+          '@/app/config/**',
+        ],
+        message: 'Features must not import application shell, router, or layouts (ADR-FE-001).',
       },
       // Cannot import from other domains
       {
@@ -103,8 +110,15 @@ const generalFeaturesBoundaryConfig = {
       {
         patterns: [
           {
-            group: ['@/app', '@/app/**', '**/app', '**/app/**'],
-            message: 'Features must not import upwards into the app layer (ADR-FE-001).',
+            group: [
+              '@/app/router',
+              '@/app/router/**',
+              '@/app/layouts',
+              '@/app/layouts/**',
+              '@/app/config',
+              '@/app/config/**',
+            ],
+            message: 'Features must not import application shell, router, or layouts (ADR-FE-001).',
           },
         ],
       },

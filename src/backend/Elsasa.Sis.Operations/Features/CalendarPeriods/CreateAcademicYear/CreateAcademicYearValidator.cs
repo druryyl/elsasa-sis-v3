@@ -23,5 +23,9 @@ public sealed class CreateAcademicYearValidator : AbstractValidator<CreateAcadem
         RuleFor(x => x.EndDate)
             .NotEmpty().WithMessage("End date is required.")
             .GreaterThan(x => x.StartDate).WithMessage("End date must be greater than start date.");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(4000).WithMessage("Notes cannot exceed 4000 characters.")
+            .When(x => !string.IsNullOrEmpty(x.Notes));
     }
 }

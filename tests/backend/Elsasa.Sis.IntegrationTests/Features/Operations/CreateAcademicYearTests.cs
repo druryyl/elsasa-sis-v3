@@ -56,7 +56,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
             Code: "AY-2026-2027",
             Name: "Academic Year 2026/2027",
             StartDate: new DateOnly(2026, 9, 1),
-            EndDate: new DateOnly(2027, 6, 30));
+            EndDate: new DateOnly(2027, 6, 30),
+            Notes: "Initial draft notes.");
 
         // Act
         var response = await Client.PostAsJsonAsync(_academicYearsUri, request);
@@ -71,7 +72,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
         result.Name.Should().Be(request.Name);
         result.StartDate.Should().Be(request.StartDate);
         result.EndDate.Should().Be(request.EndDate);
-        result.IsActive.Should().BeTrue();
+        result.Status.Should().Be("draft");
+        result.Notes.Should().Be(request.Notes);
 
         response.Headers.Location.Should().NotBeNull();
         response.Headers.Location!.ToString().Should().Be($"/api/operations/academic-years/{result.Id}");
@@ -87,7 +89,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
             Code: "AY-2027-2028",
             Name: "Academic Year 2027/2028",
             StartDate: new DateOnly(2027, 9, 1),
-            EndDate: new DateOnly(2028, 6, 30));
+            EndDate: new DateOnly(2028, 6, 30),
+            Notes: "Created for database persistence verification.");
 
         // Act
         var response = await Client.PostAsJsonAsync(_academicYearsUri, request);
@@ -105,7 +108,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
                 name AS Name,
                 start_date AS StartDate,
                 end_date AS EndDate,
-                is_active AS IsActive,
+                status AS Status,
+                notes AS Notes,
                 created_at AS CreatedAt,
                 created_by AS CreatedBy
             FROM operations.academic_years
@@ -122,7 +126,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
         persistedRecord.Name.Should().Be(request.Name);
         persistedRecord.StartDate.Should().Be(request.StartDate);
         persistedRecord.EndDate.Should().Be(request.EndDate);
-        persistedRecord.IsActive.Should().BeTrue();
+        persistedRecord.Status.Should().Be("draft");
+        persistedRecord.Notes.Should().Be(request.Notes);
         persistedRecord.CreatedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
         persistedRecord.CreatedBy.Should().Be(Factory.CurrentUser.Username);
     }
@@ -167,7 +172,8 @@ public sealed class CreateAcademicYearTests(IntegrationTestWebAppFactory factory
         string Name,
         DateOnly StartDate,
         DateOnly EndDate,
-        bool IsActive,
+        string Status,
+        string? Notes,
         DateTimeOffset CreatedAt,
         string? CreatedBy);
 }

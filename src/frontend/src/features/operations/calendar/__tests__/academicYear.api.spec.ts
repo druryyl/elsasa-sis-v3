@@ -6,6 +6,12 @@ import { ApiError } from '@/shared/types/common';
 import {
   checkBackendHealth,
   createAcademicYear,
+  getAcademicYears,
+  getAcademicYearById,
+  updateAcademicYear,
+  approveAcademicYear,
+  activateAcademicYear,
+  applyPreset,
   type CreateAcademicYearPayload,
   type AcademicYearDto,
 } from '../api/academicYear.api';
@@ -212,6 +218,140 @@ describe('Academic Year API Integration (academicYear.api.ts)', () => {
       await createAcademicYear(validPayload);
       expect(capturedConfig).not.toBeNull();
       expect(capturedConfig!.headers['X-Correlation-ID']).toMatch(UUID_V4_REGEX);
+    });
+  });
+
+  describe('getAcademicYears & getAcademicYearById', () => {
+    it('calls GET /operations/academic-years with optional query param', async () => {
+      const mockList: AcademicYearDto[] = [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          code: 'AY-2026-2027',
+          name: 'Academic Year 2026/2027',
+          startDate: '2026-07-01',
+          endDate: '2027-06-30',
+          status: 'active',
+          isActive: true,
+        },
+      ];
+
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: mockList,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      const res = await getAcademicYears({ status: 'active' });
+      expect(capturedConfig?.url).toBe('/operations/academic-years');
+      expect(capturedConfig?.params).toEqual({ status: 'active' });
+      expect(res).toHaveLength(1);
+      expect(res[0].isActive).toBe(true);
+    });
+
+    it('calls GET /operations/academic-years/{id}', async () => {
+      const mockItem: AcademicYearDto = {
+        id: '11111111-1111-4111-8111-111111111111',
+        code: 'AY-2026-2027',
+        name: 'Academic Year 2026/2027',
+        startDate: '2026-07-01',
+        endDate: '2027-06-30',
+        status: 'draft',
+        isActive: false,
+      };
+
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: mockItem,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      const res = await getAcademicYearById('11111111-1111-4111-8111-111111111111');
+      expect(capturedConfig?.url).toBe('/operations/academic-years/11111111-1111-4111-8111-111111111111');
+      expect(res.code).toBe('AY-2026-2027');
+    });
+  });
+
+  describe('update, approve, activate & applyPreset', () => {
+    it('calls PUT /operations/academic-years/{id}', async () => {
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: { id: 'ay-1', status: 'draft' },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      await updateAcademicYear('ay-1', {
+        name: 'Updated Name',
+        startDate: '2026-07-01',
+        endDate: '2027-06-30',
+      });
+      expect(capturedConfig?.method?.toLowerCase()).toBe('put');
+      expect(capturedConfig?.url).toBe('/operations/academic-years/ay-1');
+    });
+
+    it('calls POST /operations/academic-years/{id}/approve', async () => {
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: { id: 'ay-1', status: 'approved' },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      const res = await approveAcademicYear('ay-1', { approvedBy: 'Dean' });
+      expect(capturedConfig?.url).toBe('/operations/academic-years/ay-1/approve');
+      expect(res.status).toBe('approved');
+    });
+
+    it('calls POST /operations/academic-years/{id}/activate', async () => {
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: { id: 'ay-1', status: 'active' },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      const res = await activateAcademicYear('ay-1');
+      expect(capturedConfig?.url).toBe('/operations/academic-years/ay-1/activate');
+      expect(res.status).toBe('active');
+    });
+
+    it('calls POST /operations/academic-years/{id}/apply-preset', async () => {
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: { academicYearId: 'ay-1', presetName: 'Indonesian 2-Semester', periodsCreated: 2 },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        } as AxiosResponse;
+      };
+
+      const res = await applyPreset('ay-1');
+      expect(capturedConfig?.url).toBe('/operations/academic-years/ay-1/apply-preset');
+      expect(res.periodsCreated).toBe(2);
     });
   });
 });

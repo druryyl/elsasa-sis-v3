@@ -19,12 +19,32 @@ public sealed class CreateAcademicYearHandler(
         """;
 
     private const string _insertAcademicYearSql = """
-        INSERT INTO operations.academic_years (id, code, name, start_date, end_date, is_active, created_at, created_by)
-        VALUES (@Id, @Code, @Name, @StartDate, @EndDate, @IsActive, @CreatedAt, @CreatedBy);
+        INSERT INTO operations.academic_years (
+            id,
+            code,
+            name,
+            start_date,
+            end_date,
+            status,
+            notes,
+            created_at,
+            created_by
+        )
+        VALUES (
+            @Id,
+            @Code,
+            @Name,
+            @StartDate,
+            @EndDate,
+            @Status,
+            @Notes,
+            @CreatedAt,
+            @CreatedBy
+        );
         """;
 
     /// <summary>
-    /// Handles the creation of a new academic year record.
+    /// Handles the creation of a new academic year record with initial 'draft' status.
     /// </summary>
     /// <param name="request">The creation request payload.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -51,9 +71,9 @@ public sealed class CreateAcademicYearHandler(
                     $"Academic year with code '{request.Code}' already exists."));
         }
 
-        // 2. Perform atomic insert
+        // 2. Perform atomic insert with initial status = 'draft'
         var academicYearId = Guid.NewGuid();
-        const bool isActive = true;
+        const string initialStatus = "draft";
         var createdAt = DateTimeOffset.UtcNow;
         var createdBy = currentUser.Username;
 
@@ -64,7 +84,8 @@ public sealed class CreateAcademicYearHandler(
             request.Name,
             request.StartDate,
             request.EndDate,
-            IsActive = isActive,
+            Status = initialStatus,
+            request.Notes,
             CreatedAt = createdAt,
             CreatedBy = createdBy,
         };
@@ -90,6 +111,7 @@ public sealed class CreateAcademicYearHandler(
             request.Name,
             request.StartDate,
             request.EndDate,
-            isActive));
+            initialStatus,
+            request.Notes));
     }
 }
