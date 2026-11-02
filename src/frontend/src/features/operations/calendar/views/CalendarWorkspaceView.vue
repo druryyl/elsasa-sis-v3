@@ -21,6 +21,8 @@ import {
   ShieldAlert,
   Send,
   Calendar,
+  CalendarRange,
+  Clock,
 } from 'lucide-vue-next';
 import {
   PageHeader,
@@ -265,6 +267,32 @@ const newYearForm = ref({
   endDate: '',
   notes: '',
 });
+
+// Duration calculation helper for Create Academic Year
+const newYearDurationDays = computed(() => {
+  if (!newYearForm.value.startDate || !newYearForm.value.endDate) return null;
+  const start = new Date(newYearForm.value.startDate);
+  const end = new Date(newYearForm.value.endDate);
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+});
+
+function applyAcademicYearPreset(preset: 'standard' | 'calendar') {
+  const currentYear = new Date().getFullYear();
+  if (preset === 'standard') {
+    const nextYear = currentYear + 1;
+    newYearForm.value.code = `AY-${currentYear}-${nextYear}`;
+    newYearForm.value.name = `Tahun Ajaran ${currentYear}/${nextYear}`;
+    newYearForm.value.startDate = `${currentYear}-07-01`;
+    newYearForm.value.endDate = `${nextYear}-06-30`;
+  } else {
+    newYearForm.value.code = `AY-${currentYear}`;
+    newYearForm.value.name = `Tahun Kalender ${currentYear}`;
+    newYearForm.value.startDate = `${currentYear}-01-01`;
+    newYearForm.value.endDate = `${currentYear}-12-31`;
+  }
+}
 
 function handleCreateYear(): void {
   createYearMutation.mutate({
@@ -533,80 +561,184 @@ function handleCreateYear(): void {
       v-model:visible="isCreateYearModalOpen"
       header="Create Academic Year"
       modal
-      class="max-w-md w-full"
+      class="max-w-xl w-full"
       data-testid="create-year-modal"
     >
-      <form class="space-y-4 pt-2" @submit.prevent="handleCreateYear">
-        <FormField id="new-ay-code" label="Academic Year Code" required hint="e.g. AY-2026-2027">
-          <InputText
-            id="new-ay-code"
-            v-model="newYearForm.code"
-            required
-            class="w-full text-sm"
-            data-testid="modal-code-input"
-          />
-        </FormField>
-        <FormField
-          id="new-ay-name"
-          label="Descriptive Name"
-          required
-          hint="e.g. Academic Year 2026/2027"
-        >
-          <InputText
-            id="new-ay-name"
-            v-model="newYearForm.name"
-            required
-            class="w-full text-sm"
-            data-testid="modal-name-input"
-          />
-        </FormField>
-        <div class="grid grid-cols-2 gap-3">
-          <FormField id="new-ay-start" label="Start Date" required>
-            <InputText
-              id="new-ay-start"
-              v-model="newYearForm.startDate"
-              type="date"
-              required
-              class="w-full text-sm"
-              data-testid="modal-start-date-input"
-            />
-          </FormField>
-          <FormField id="new-ay-end" label="End Date" required>
-            <InputText
-              id="new-ay-end"
-              v-model="newYearForm.endDate"
-              type="date"
-              required
-              class="w-full text-sm"
-              data-testid="modal-end-date-input"
-            />
-          </FormField>
+      <template #header>
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0 text-teal-600 shadow-xs">
+            <CalendarRange class="w-5 h-5" />
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-slate-800 text-base leading-snug">Create Academic Year</h3>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                New Baseline
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Establish a new institutional academic cycle, schedule framework, and terms foundation.
+            </p>
+          </div>
         </div>
-        <FormField id="new-ay-notes" label="Notes" hint="Optional institutional context">
+      </template>
+
+      <form class="space-y-4 pt-1" @submit.prevent="handleCreateYear">
+        <!-- Quick Preset Scaffolding Bar -->
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs shadow-2xs">
+          <div class="flex items-center gap-1.5 text-slate-700 font-medium">
+            <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+            <span>Quick Presets:</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="px-2.5 py-1 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-700 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50/50 transition cursor-pointer shadow-2xs"
+              @click="applyAcademicYearPreset('standard')"
+            >
+              Standard (Jul–Jun)
+            </button>
+            <button
+              type="button"
+              class="px-2.5 py-1 text-xs font-medium rounded-md bg-white border border-slate-200 text-slate-700 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50/50 transition cursor-pointer shadow-2xs"
+              @click="applyAcademicYearPreset('calendar')"
+            >
+              Calendar (Jan–Dec)
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: Identity & Naming Card -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3.5 space-y-3 shadow-2xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField
+              id="new-ay-code"
+              label="Academic Year Code"
+              required
+              helpText="Unique institutional identifier (e.g. AY-2026-2027)"
+            >
+              <InputText
+                id="new-ay-code"
+                v-model="newYearForm.code"
+                required
+                placeholder="e.g. AY-2026-2027"
+                class="w-full text-sm font-mono tracking-wide"
+                data-testid="modal-code-input"
+              />
+            </FormField>
+
+            <FormField
+              id="new-ay-name"
+              label="Descriptive Name"
+              required
+              helpText="Display name shown across portals & reports"
+            >
+              <InputText
+                id="new-ay-name"
+                v-model="newYearForm.name"
+                required
+                placeholder="e.g. Academic Year 2026/2027"
+                class="w-full text-sm"
+                data-testid="modal-name-input"
+              />
+            </FormField>
+          </div>
+        </div>
+
+        <!-- Section 2: Effective Date Span Card -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3.5 space-y-3 shadow-2xs">
+          <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <Clock class="w-3.5 h-3.5 text-teal-600" />
+              <span>Effective Date Span</span>
+            </div>
+            <div
+              v-if="newYearDurationDays !== null"
+              class="text-xs px-2 py-0.5 rounded font-medium"
+              :class="newYearDurationDays > 0 ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-rose-50 text-rose-700 border border-rose-200'"
+            >
+              <span v-if="newYearDurationDays > 0">Duration: {{ newYearDurationDays }} days (~{{ Math.round(newYearDurationDays / 30) }} mos)</span>
+              <span v-else>⚠️ End date must be after Start date</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <FormField
+              id="new-ay-start"
+              label="Start Date"
+              required
+              helpText="Beginning of academic calendar"
+            >
+              <InputText
+                id="new-ay-start"
+                v-model="newYearForm.startDate"
+                type="date"
+                required
+                class="w-full text-sm"
+                data-testid="modal-start-date-input"
+              />
+            </FormField>
+
+            <FormField
+              id="new-ay-end"
+              label="End Date"
+              required
+              helpText="Conclusion of academic calendar"
+            >
+              <InputText
+                id="new-ay-end"
+                v-model="newYearForm.endDate"
+                type="date"
+                required
+                class="w-full text-sm"
+                data-testid="modal-end-date-input"
+              />
+            </FormField>
+          </div>
+        </div>
+
+        <!-- Section 3: Notes -->
+        <FormField
+          id="new-ay-notes"
+          label="Institutional Notes"
+          optional
+          helpText="Ministerial decree references, curriculum notes, or administrative context"
+        >
           <Textarea
             id="new-ay-notes"
             v-model="newYearForm.notes"
             rows="2"
-            class="w-full text-sm"
+            placeholder="Add any administrative context or regulatory decree references..."
+            class="w-full text-sm resize-none"
             data-testid="modal-notes-input"
           />
         </FormField>
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-          <Button
-            type="button"
-            text
-            size="small"
-            label="Cancel"
-            @click="isCreateYearModalOpen = false"
-          />
-          <Button
-            type="submit"
-            size="small"
-            label="Create Year"
-            class="bg-teal-600 hover:bg-teal-700 text-white"
-            :loading="createYearMutation.isPending.value"
-            data-testid="modal-submit-create-year-btn"
-          />
+
+        <!-- Footer Actions -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-200/80">
+          <span class="text-xs text-slate-500 flex items-center gap-1">
+            <span class="text-rose-500 font-bold">*</span> Required fields
+          </span>
+          <div class="flex items-center gap-2">
+            <Button
+              type="button"
+              text
+              size="small"
+              label="Cancel"
+              class="text-slate-600 hover:text-slate-800"
+              @click="isCreateYearModalOpen = false"
+            />
+            <Button
+              type="submit"
+              size="small"
+              class="bg-teal-600 hover:bg-teal-700 text-white shadow-xs px-4"
+              :loading="createYearMutation.isPending.value"
+              data-testid="modal-submit-create-year-btn"
+            >
+              <PlusCircle class="w-4 h-4 mr-1.5" />
+              <span>Create Year</span>
+            </Button>
+          </div>
         </div>
       </form>
     </Dialog>
