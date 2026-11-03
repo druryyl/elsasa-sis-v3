@@ -92,6 +92,7 @@ public static class DependencyInjection
         // 6. Domain services & slice handlers
         services.AddOperationsDomain();
         services.AddStudentsDomain();
+        services.AddFinanceDomain();
         services.AddSharedStorage(configuration);
 
         return services;

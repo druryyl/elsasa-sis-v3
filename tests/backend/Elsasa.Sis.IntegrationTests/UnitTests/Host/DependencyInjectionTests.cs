@@ -2,6 +2,7 @@ namespace Elsasa.Sis.IntegrationTests.UnitTests.Host;
 
 using Elsasa.Sis.Api.Configuration;
 using Elsasa.Sis.Api.Services;
+using Elsasa.Sis.Contracts.Finance;
 using Elsasa.Sis.Shared.Common;
 using Elsasa.Sis.Shared.Database;
 using MediatR;
@@ -94,6 +95,49 @@ public sealed class DependencyInjectionTests
         // Assert
         var healthCheckService = provider.GetService<HealthCheckService>();
         Assert.NotNull(healthCheckService);
+    }
+
+    [Fact]
+    public void AddHostComposition_Should_RegisterFinanceModule()
+    {
+        // Arrange
+        var configuration = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddHostComposition(configuration);
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        // Assert
+        var financeModule = scope.ServiceProvider.GetService<IFinanceModule>();
+        Assert.NotNull(financeModule);
+    }
+
+    [Fact]
+    public void AddHostComposition_Should_ContainNoUnresolvableServices()
+    {
+        // Arrange
+        var inMemorySettings = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = "Server=localhost;Database=TestDb;Integrated Security=true;TrustServerCertificate=True;",
+        };
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(inMemorySettings).Build();
+        var services = new ServiceCollection();
+
+        // EndpointDataSource is normally supplied by the web host's routing services.
+        services.AddRouting();
+
+        // Act
+        services.AddHostComposition(configuration);
+
+        // Assert: ValidateOnBuild reproduces the host's startup service validation,
+        // catching missing registrations such as IFinanceModule.
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true,
+        });
     }
 
     [Fact]
