@@ -86,11 +86,26 @@ export const routes: RouteRecordRaw[] = [
           },
           {
             path: 'enrollment',
-            name: 'students.enrollment.desk',
-            component: () => import('@/features/students/enrollment/views/EnrollmentDeskView.vue'),
+            redirect: '/students/records',
+          },
+          {
+            path: 'records',
+            name: 'students.records.desk',
+            component: () =>
+              import('@/features/students/records/views/StudentRecordsDeskView.vue'),
             meta: {
-              permission: 'Permissions.Students.Enrollment.Execute',
-              title: 'Student Enrollment Desk',
+              permission: 'Permissions.Students.Records.View',
+              title: 'Student Records Desk',
+            },
+          },
+          {
+            path: 'records/:id',
+            name: 'students.records.detail',
+            component: () =>
+              import('@/features/students/records/views/StudentRecordsDeskView.vue'),
+            meta: {
+              permission: 'Permissions.Students.Records.View',
+              title: 'Student Records Desk',
             },
           },
         ],

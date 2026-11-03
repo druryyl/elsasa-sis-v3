@@ -7,28 +7,45 @@ using MediatR;
 /// <summary>
 /// In-memory notification handler capturing domain events for integration test verification (ADR-003).
 /// </summary>
-public sealed class TestEventCollector : INotificationHandler<ApplicantAcceptedEvent>
+public sealed class TestEventCollector :
+    INotificationHandler<ApplicantAcceptedEvent>,
+    INotificationHandler<StudentEnrolledEvent>
 {
-    private readonly ConcurrentBag<ApplicantAcceptedEvent> _events = [];
+    private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
+    private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
     /// </summary>
-    public IReadOnlyCollection<ApplicantAcceptedEvent> ApplicantAcceptedEvents => _events;
+    public IReadOnlyCollection<ApplicantAcceptedEvent> ApplicantAcceptedEvents => _applicantAcceptedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="StudentEnrolledEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<StudentEnrolledEvent> StudentEnrolledEvents => _studentEnrolledEvents;
 
     /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
     {
-        _events.Clear();
+        _applicantAcceptedEvents.Clear();
+        _studentEnrolledEvents.Clear();
     }
 
     /// <inheritdoc />
     public Task Handle(ApplicantAcceptedEvent notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
-        _events.Add(notification);
+        _applicantAcceptedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(StudentEnrolledEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _studentEnrolledEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

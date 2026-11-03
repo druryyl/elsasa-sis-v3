@@ -69,6 +69,19 @@ public sealed class StudentsDomainCompositionTests
     }
 
     [Fact]
+    public void AddStudentsDomain_Should_RegisterEnrollmentExecutionHandler()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddStudentsDomain();
+
+        // Assert
+        Assert.Contains(services, d => d.ServiceType == typeof(Elsasa.Sis.Students.Features.Enrollment.EnrollAcceptedApplicant.EnrollAcceptedApplicantHandler) && d.Lifetime == ServiceLifetime.Scoped);
+    }
+
+    [Fact]
     public void AddStudentsDomain_Should_RegisterDocumentManagementHandlers()
     {
         // Arrange

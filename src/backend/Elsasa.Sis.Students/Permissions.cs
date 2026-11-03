@@ -15,5 +15,16 @@ public static class Permissions
             public const string VerifyDocument = "Permissions.Students.Admission.VerifyDocument";
             public const string Decide = "Permissions.Students.Admission.Decide";
         }
+
+        public static class Enrollment
+        {
+            public const string Execute = "Permissions.Students.Enrollment.Execute";
+        }
+
+        public static class Records
+        {
+            public const string View = "Permissions.Students.Records.View";
+            public const string Edit = "Permissions.Students.Records.Edit";
+        }
     }
 }

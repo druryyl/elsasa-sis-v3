@@ -22,6 +22,8 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
     public TestEventCollector EventCollector { get; } = new();
 
+    public TestFinanceModule FinanceModule { get; } = new();
+
     public SqlServerContainerFixture ContainerFixture { get; }
 
     public IntegrationTestWebAppFactory()
@@ -81,6 +83,11 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             // Register TestEventCollector for capturing published MediatR domain events
             services.AddSingleton(EventCollector);
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Students.Events.ApplicantAcceptedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Students.Events.StudentEnrolledEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+
+            // Register TestFinanceModule for simulating IFinanceModule verification
+            services.RemoveAll<Elsasa.Sis.Contracts.Finance.IFinanceModule>();
+            services.AddSingleton<Elsasa.Sis.Contracts.Finance.IFinanceModule>(FinanceModule);
 
             // Configure TestAuthHandler for bypass/customizable claims
             services.AddAuthentication(options =>

@@ -15,6 +15,7 @@ import {
   AssessmentEvidenceModal,
   DocumentVerificationTab,
   AssessmentEvidenceTab,
+  EnrollApplicantModal,
 } from '../components';
 import type {
   AdmissionApplicationListItemDto,
@@ -26,12 +27,13 @@ import type {
 
 import type * as VueRouter from 'vue-router';
 
+const mockRouterPush = vi.fn();
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof VueRouter>();
   return {
     ...actual,
     useRoute: () => ({ params: {}, query: {} }),
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => ({ push: mockRouterPush }),
   };
 });
 
@@ -175,6 +177,8 @@ describe('StudentIntakeWorkbenchView.vue (SCR-STU-01)', () => {
         }));
     }
 
+    mockRouterPush.mockClear();
+    mockToastAdd.mockClear();
     setActivePinia(createPinia());
     queryClient = new QueryClient({
       defaultOptions: {
@@ -697,6 +701,211 @@ describe('StudentIntakeWorkbenchView.vue (SCR-STU-01)', () => {
       await flushPromises();
 
       expect(admissionApi.deleteAssessmentEvidence).toHaveBeenCalledWith('app-1', 'ev-1');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 6. Enrollment Integration Tests (SCR-STU-01, P9-S15)
+  // -------------------------------------------------------------------------
+  describe('Enrollment Integration (SCR-STU-01, P9-S15)', () => {
+    const mockAcceptedDossier: AdmissionApplicationDetailDto = {
+      ...mockDossier,
+      id: 'app-3',
+      applicationNumber: 'ADM-2026-0003',
+      status: 'decided',
+      decision: {
+        id: 'dec-accepted-1',
+        applicationId: 'app-3',
+        decisionType: 'accepted',
+        decisionDate: '2026-02-15',
+        effectiveDate: '2026-03-01',
+        decidedBy: 'officer-1',
+        reason: 'Meets academic entrance criteria',
+      },
+    };
+
+    it('renders [ Enroll Applicant ] button when application is decided with accepted decision and user has Execute permission', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession('test-token', {
+        userId: 'officer-1',
+        username: 'admission.officer',
+        fullName: 'Admission Officer',
+        roles: ['AdmissionOfficer'],
+        permissions: [
+          'Permissions.Students.Admission.View',
+          'Permissions.Students.Enrollment.Execute',
+        ],
+        campusId: 'campus-1',
+      });
+
+      vi.spyOn(admissionApi, 'getAdmissionApplicationById').mockResolvedValue(mockAcceptedDossier);
+
+      const wrapper = mountView();
+      await flushPromises();
+
+      await wrapper.findAll('[data-testid="view-dossier-button"]')[0].trigger('click');
+      await flushPromises();
+
+      const enrollBtn = wrapper.find('[data-testid="enroll-applicant-button"]');
+      expect(enrollBtn.exists()).toBe(true);
+      expect(enrollBtn.text()).toContain('Enroll Applicant');
+    });
+
+    it('does not render [ Enroll Applicant ] button when user lacks Permissions.Students.Enrollment.Execute', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession('test-token', {
+        userId: 'officer-1',
+        username: 'admission.officer',
+        fullName: 'Admission Officer',
+        roles: ['AdmissionOfficer'],
+        permissions: [
+          'Permissions.Students.Admission.View',
+          // Lacks Permissions.Students.Enrollment.Execute
+        ],
+        campusId: 'campus-1',
+      });
+
+      vi.spyOn(admissionApi, 'getAdmissionApplicationById').mockResolvedValue(mockAcceptedDossier);
+
+      const wrapper = mountView();
+      await flushPromises();
+
+      await wrapper.findAll('[data-testid="view-dossier-button"]')[0].trigger('click');
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="enroll-applicant-button"]').exists()).toBe(false);
+    });
+
+    it('does not render [ Enroll Applicant ] button when application is decided with rejected/waitlisted decision', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession('test-token', {
+        userId: 'officer-1',
+        username: 'admission.officer',
+        fullName: 'Admission Officer',
+        roles: ['AdmissionOfficer'],
+        permissions: [
+          'Permissions.Students.Admission.View',
+          'Permissions.Students.Enrollment.Execute',
+        ],
+        campusId: 'campus-1',
+      });
+
+      const mockRejectedDossier: AdmissionApplicationDetailDto = {
+        ...mockAcceptedDossier,
+        decision: {
+          id: 'dec-rejected-1',
+          applicationId: 'app-3',
+          decisionType: 'rejected',
+          decisionDate: '2026-02-15',
+          effectiveDate: '2026-03-01',
+          decidedBy: 'officer-1',
+        },
+      };
+
+      vi.spyOn(admissionApi, 'getAdmissionApplicationById').mockResolvedValue(mockRejectedDossier);
+
+      const wrapper = mountView();
+      await flushPromises();
+
+      await wrapper.findAll('[data-testid="view-dossier-button"]')[0].trigger('click');
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="enroll-applicant-button"]').exists()).toBe(false);
+    });
+
+    it('clicking [ Enroll Applicant ] opens EnrollApplicantModal.vue', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession('test-token', {
+        userId: 'officer-1',
+        username: 'admission.officer',
+        fullName: 'Admission Officer',
+        roles: ['AdmissionOfficer'],
+        permissions: [
+          'Permissions.Students.Admission.View',
+          'Permissions.Students.Enrollment.Execute',
+        ],
+        campusId: 'campus-1',
+      });
+
+      vi.spyOn(admissionApi, 'getAdmissionApplicationById').mockResolvedValue(mockAcceptedDossier);
+
+      const wrapper = mountView();
+      await flushPromises();
+
+      await wrapper.findAll('[data-testid="view-dossier-button"]')[0].trigger('click');
+      await flushPromises();
+
+      const modal = wrapper.findComponent(EnrollApplicantModal);
+      expect(modal.exists()).toBe(true);
+      expect(modal.props('visible')).toBe(false);
+
+      const enrollBtn = wrapper.find('[data-testid="enroll-applicant-button"]');
+      await enrollBtn.trigger('click');
+      await flushPromises();
+
+      expect(modal.props('visible')).toBe(true);
+    });
+
+    it('on enrollment success: closes modal, triggers toast, displays success banner, and refetches data', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession('test-token', {
+        userId: 'officer-1',
+        username: 'admission.officer',
+        fullName: 'Admission Officer',
+        roles: ['AdmissionOfficer'],
+        permissions: [
+          'Permissions.Students.Admission.View',
+          'Permissions.Students.Enrollment.Execute',
+        ],
+        campusId: 'campus-1',
+      });
+
+      vi.spyOn(admissionApi, 'getAdmissionApplicationById').mockResolvedValue(mockAcceptedDossier);
+
+      const wrapper = mountView();
+      await flushPromises();
+
+      await wrapper.findAll('[data-testid="view-dossier-button"]')[0].trigger('click');
+      await flushPromises();
+
+      const modal = wrapper.findComponent(EnrollApplicantModal);
+      await wrapper.find('[data-testid="enroll-applicant-button"]').trigger('click');
+      await flushPromises();
+      expect(modal.props('visible')).toBe(true);
+
+      // Trigger enrollment success from modal
+      modal.vm.$emit('success', {
+        studentId: 'std-uuid-42',
+        studentNumber: 'STD-2026-0042',
+        enrollmentId: 'enr-uuid-42',
+      });
+      await flushPromises();
+
+      // 1. Modal is closed
+      expect(modal.props('visible')).toBe(false);
+
+      // 2. Toast notification is triggered with assigned student number
+      expect(mockToastAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          detail: expect.stringContaining('Student successfully enrolled with Student Number: STD-2026-0042'),
+        }),
+      );
+
+      // 3. Success banner rendered with student number
+      const banner = wrapper.find('[data-testid="enrollment-success-banner"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.find('[data-testid="enrolled-student-number"]').text()).toBe('STD-2026-0042');
+
+      // 4. [ Open in Student Records Desk ] button routes to /students/records
+      const openDeskBtn = banner.find('[data-testid="open-records-desk-button"]');
+      expect(openDeskBtn.exists()).toBe(true);
+      await openDeskBtn.trigger('click');
+      expect(mockRouterPush).toHaveBeenCalledWith('/students/records');
+
+      // 5. Refetches were triggered
+      expect(admissionApi.getAdmissionApplicationsList).toHaveBeenCalled();
+      expect(admissionApi.getAdmissionApplicationById).toHaveBeenCalled();
     });
   });
 });

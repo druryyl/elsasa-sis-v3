@@ -29,7 +29,10 @@ import {
   AlertCircle,
   FileCheck,
   Shield,
+  CheckCircle2,
+  ExternalLink,
 } from 'lucide-vue-next';
+import { useToast } from 'primevue/usetoast';
 import {
   PageHeader,
   StatusPill,
@@ -40,6 +43,8 @@ import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { ADMISSION_PERMISSIONS } from '../constants/permissions';
+import { ENROLLMENT_PERMISSIONS } from '../../enrollment/constants/permissions';
+import { tryGetToast } from '../composables/toastNotifications';
 import type {
   AdmissionQueueFilterParams,
   ApplicantDocumentDto,
@@ -63,6 +68,8 @@ import {
   VerifyDocumentModal,
   AssessmentEvidenceModal,
   WithdrawApplicationModal,
+  EnrollApplicantModal,
+  type EnrollApplicantSuccessResult,
 } from '../components';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +101,16 @@ const canDecide = computed(() =>
 const canWithdraw = computed(() =>
   authStore.hasPermission(ADMISSION_PERMISSIONS.REGISTER),
 );
+const canEnroll = computed(() =>
+  authStore.hasPermission(ENROLLMENT_PERMISSIONS.EXECUTE),
+);
+
+let toastInstance: ReturnType<typeof tryGetToast> = null;
+try {
+  toastInstance = useToast();
+} catch {
+  toastInstance = tryGetToast();
+}
 
 // ---------------------------------------------------------------------------
 // 3. Filters & Search State
@@ -217,12 +234,14 @@ const activeDossierTab = ref<string>('info');
 function openDossier(applicationId: string) {
   selectedApplicationId.value = applicationId;
   activeDossierTab.value = 'info';
+  lastEnrolledStudent.value = null;
   isDossierOpen.value = true;
 }
 
 function closeDossier() {
   isDossierOpen.value = false;
   selectedApplicationId.value = null;
+  lastEnrolledStudent.value = null;
 }
 
 const {
@@ -313,6 +332,30 @@ function isApplicationActive(status: string | undefined): boolean {
   if (!status) return false;
   const s = status.toLowerCase();
   return s === 'registered' || s === 'under_review';
+}
+
+// Enroll Applicant Modal State
+const isEnrollModalOpen = ref(false);
+const lastEnrolledStudent = ref<EnrollApplicantSuccessResult | null>(null);
+
+function openEnrollModal() {
+  isEnrollModalOpen.value = true;
+}
+
+function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
+  isEnrollModalOpen.value = false;
+  lastEnrolledStudent.value = result;
+
+  const currentToast = toastInstance ?? tryGetToast();
+  currentToast?.add({
+    severity: 'success',
+    summary: 'Enrollment Successful',
+    detail: `Student successfully enrolled with Student Number: ${result.studentNumber}`,
+    life: 5000,
+  });
+
+  refetchQueue();
+  refetchDossier();
 }
 </script>
 
@@ -634,6 +677,39 @@ function isApplicationActive(status: string | undefined): boolean {
       </div>
 
       <div v-else class="space-y-6 pt-2 pb-8" data-testid="dossier-content">
+        <!-- Enrollment Success Banner -->
+        <div
+          v-if="lastEnrolledStudent"
+          class="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+          data-testid="enrollment-success-banner"
+        >
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-teal-100 text-teal-700 rounded-lg shrink-0">
+              <CheckCircle2 class="w-5 h-5 text-teal-700" />
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-teal-900">
+                Student Enrolled Successfully
+              </p>
+              <p class="text-xs text-teal-700">
+                Student Number:
+                <span class="font-mono font-bold" data-testid="enrolled-student-number">{{
+                  lastEnrolledStudent.studentNumber
+                }}</span>
+              </p>
+            </div>
+          </div>
+          <Button
+            size="small"
+            class="!text-xs !py-1.5 cursor-pointer !bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white font-medium shrink-0"
+            data-testid="open-records-desk-button"
+            @click="router.push('/students/records')"
+          >
+            <ExternalLink class="w-3.5 h-3.5 mr-1.5" />
+            <span>Open in Student Records Desk</span>
+          </Button>
+        </div>
+
         <!-- Dossier Workflow Actions Bar -->
         <div
           class="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200/90"
@@ -672,6 +748,18 @@ function isApplicationActive(status: string | undefined): boolean {
             >
               <Gavel class="w-3.5 h-3.5 mr-1" />
               <span>Record Decision</span>
+            </Button>
+
+            <!-- Enroll Applicant (Only when decided & accepted) -->
+            <Button
+              v-if="dossier.status === 'decided' && dossier.decision?.decisionType === 'accepted' && canEnroll"
+              size="small"
+              class="!text-xs cursor-pointer !bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white font-medium shadow-xs"
+              data-testid="enroll-applicant-button"
+              @click="openEnrollModal"
+            >
+              <UserCheck class="w-3.5 h-3.5 mr-1" />
+              <span>Enroll Applicant</span>
             </Button>
 
             <!-- Withdraw (Only when active: registered or under_review) -->
@@ -812,6 +900,15 @@ function isApplicationActive(status: string | undefined): boolean {
       :application-id="dossier?.id ?? ''"
       :evidence="selectedEvidenceForEdit"
       @saved="() => refetchDossier()"
+    />
+
+    <!-- 5. Enroll Applicant Modal -->
+    <EnrollApplicantModal
+      v-model:visible="isEnrollModalOpen"
+      :dossier="dossier"
+      :periods="admissionPeriods"
+      @success="handleEnrollSuccess"
+      @close="isEnrollModalOpen = false"
     />
   </div>
 </template>

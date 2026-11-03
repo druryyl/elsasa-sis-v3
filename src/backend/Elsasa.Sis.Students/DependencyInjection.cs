@@ -13,6 +13,17 @@ using Elsasa.Sis.Students.Features.Admission.RecordAdmissionDecision;
 using Elsasa.Sis.Students.Features.Admission.RegisterApplication;
 using Elsasa.Sis.Students.Features.Admission.StartApplicationReview;
 using Elsasa.Sis.Students.Features.Admission.WithdrawAdmissionApplication;
+using Elsasa.Sis.Students.Features.Enrollment.EnrollAcceptedApplicant;
+using Elsasa.Sis.Students.Features.Enrollment.Services;
+using Elsasa.Sis.Students.Features.Records.Documents.DownloadStudentDocument;
+using Elsasa.Sis.Students.Features.Records.Documents.GetStudentDocuments;
+using Elsasa.Sis.Students.Features.Records.Documents.UploadStudentDocument;
+using Elsasa.Sis.Students.Features.Records.Documents.VerifyStudentDocument;
+using Elsasa.Sis.Students.Features.Records.Guardians.AddGuardianRelationship;
+using Elsasa.Sis.Students.Features.Records.Guardians.UpdateGuardianRelationship;
+using Elsasa.Sis.Students.Features.Records.GetStudentById;
+using Elsasa.Sis.Students.Features.Records.SearchStudents;
+using Elsasa.Sis.Students.Features.Records.UpdateStudentIdentity;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -54,6 +65,25 @@ public static class DependencyInjection
         // Admission decision recording handler (P5-S09)
         services.AddScoped<RecordAdmissionDecisionHandler>();
 
+        // Enrollment domain services & handlers (P2-S03, P3-S04)
+        services.AddScoped<IStudentNumberGenerator, SqlStudentNumberGenerator>();
+        services.AddScoped<EnrollAcceptedApplicantHandler>();
+
+        // Student records query handlers (P4-S05, P4-S06)
+        services.AddScoped<SearchStudentsHandler>();
+        services.AddScoped<GetStudentByIdHandler>();
+        services.AddScoped<GetStudentDocumentsHandler>();
+
+        // Student records command handlers (P5-S07, P5-S08)
+        services.AddScoped<UpdateStudentIdentityHandler>();
+        services.AddScoped<AddGuardianRelationshipHandler>();
+        services.AddScoped<UpdateGuardianRelationshipHandler>();
+
+        // Student document lifecycle handlers (P6-S09)
+        services.AddScoped<UploadStudentDocumentHandler>();
+        services.AddScoped<DownloadStudentDocumentHandler>();
+        services.AddScoped<VerifyStudentDocumentHandler>();
+
         // Configure policy-based authorization requirements (ADR-009)
         services.AddAuthorization(options =>
         {
@@ -89,6 +119,21 @@ public static class DependencyInjection
                 Permissions.Students.Admission.Decide,
                 "AdmissionOfficer", "Admission Officer",
                 "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Students.Enrollment.Execute,
+                "StudentAdminOfficer", "Student Administration Officer",
+                "AdmissionOfficer", "Admission Officer");
+
+            AddPermissionPolicy(
+                Permissions.Students.Records.View,
+                "StudentAdminOfficer", "Student Administration Officer",
+                "AdmissionOfficer", "Admission Officer",
+                "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Students.Records.Edit,
+                "StudentAdminOfficer", "Student Administration Officer");
         });
 
         return services;

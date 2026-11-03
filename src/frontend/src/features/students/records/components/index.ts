@@ -1,0 +1,9 @@
+export { default as StudentIdentityTab } from './StudentIdentityTab.vue';
+export { default as EditIdentityModal } from './EditIdentityModal.vue';
+export { default as StudentGuardiansTab } from './StudentGuardiansTab.vue';
+export { default as AddGuardianModal } from './AddGuardianModal.vue';
+export { default as EditGuardianModal } from './EditGuardianModal.vue';
+export { default as StudentDocumentsTab } from './StudentDocumentsTab.vue';
+export { default as UploadDocumentModal } from './UploadDocumentModal.vue';
+export { default as VerifyDocumentModal } from './VerifyDocumentModal.vue';
+export { default as StudentEnrollmentHistoryTab } from './StudentEnrollmentHistoryTab.vue';
