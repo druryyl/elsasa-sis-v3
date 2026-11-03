@@ -7,7 +7,17 @@ import Textarea from 'primevue/textarea';
 import Select from 'primevue/select';
 import { useForm } from 'vee-validate';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ShieldAlert } from 'lucide-vue-next';
+import {
+  ShieldAlert,
+  ShieldCheck,
+  FileEdit,
+  History,
+  Lock,
+  Sparkles,
+  ArrowRight,
+  Database,
+  UserCheck,
+} from 'lucide-vue-next';
 import { FormField } from '@/shared/components';
 import { useAuthStore } from '@/app/stores/auth.store';
 import {
@@ -57,6 +67,13 @@ const standardYearFields = [
   { label: 'Start Date (start_date)', value: 'startDate' },
   { label: 'End Date (end_date)', value: 'endDate' },
   { label: 'Notes (notes)', value: 'notes' },
+];
+
+const JUSTIFICATION_PRESETS = [
+  'Adjustment per Ministry of Education / Religious Affairs decree',
+  'Rectification of clerical entry date in approved schedule',
+  'Academic Senate resolution on revised instructional calendar',
+  'Institutional campus holiday realignment',
 ];
 
 const { handleSubmit, errors, defineField, setValues } =
@@ -160,6 +177,10 @@ const correctionMutation = useSubmitCorrectionMutation({
   },
 });
 
+function applyJustificationPreset(preset: string): void {
+  formJustificationReason.value = preset;
+}
+
 const onSubmit = handleSubmit((values) => {
   correctionMutation.mutate({
     academicYearId: props.academicYearId || undefined,
@@ -182,69 +203,118 @@ defineExpose({
     v-model:visible="isDialogVisible"
     header="Authorized Record Correction (UC-OPS-13)"
     modal
-    class="max-w-lg w-full"
+    class="max-w-xl w-full"
     data-testid="correct-record-modal"
   >
-    <form class="space-y-4 pt-2 text-sm text-slate-700" @submit.prevent="onSubmit">
+    <!-- Custom Header -->
+    <template #header>
+      <div class="flex items-start gap-3">
+        <div
+          class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center shrink-0 text-amber-700 shadow-2xs"
+        >
+          <ShieldAlert class="w-5 h-5" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="font-semibold text-slate-900 text-base leading-snug">
+              Authorized Record Correction (UC-OPS-13)
+            </h3>
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+            >
+              <Lock class="w-3 h-3 text-amber-600" />
+              Audit Controlled
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Submit formal modifications to locked Academic Years or active Operational Periods.
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <form class="space-y-4 pt-1 text-sm text-slate-700" @submit.prevent="onSubmit">
       <!-- Institutional Warning Banner -->
       <div
-        class="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900"
+        class="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl flex items-start gap-3 text-xs text-amber-900 shadow-2xs leading-relaxed"
       >
-        <ShieldAlert class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <div class="space-y-0.5">
-          <p class="font-semibold">Formal Audit Trail Required</p>
-          <p class="text-amber-800">
+        <div class="p-1 rounded bg-amber-100/90 text-amber-800 shrink-0 mt-0.5">
+          <ShieldAlert class="w-4 h-4 text-amber-700" />
+        </div>
+        <div class="space-y-1">
+          <p class="font-semibold text-amber-950">Formal Audit Trail Required</p>
+          <p class="text-amber-800/95 leading-normal">
             Approved operational records cannot be modified without an auditable justification reason.
-            This correction will be permanently logged in <code>operations.operations_record_corrections</code>.
+            This correction will be permanently logged in
+            <code class="px-1.5 py-0.5 bg-amber-100/70 border border-amber-200 rounded font-mono text-[11px] text-amber-950">operations.operations_record_corrections</code>.
           </p>
         </div>
       </div>
 
-      <!-- Target Table & Target Record -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField
-          id="target-table"
-          label="Target Table"
-          required
-          :error="errors.targetTableName"
-        >
-          <Select
-            id="target-table"
-            v-model="formTargetTableName"
-            :options="targetTableOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full text-xs"
-            data-testid="target-table-select"
-          />
-        </FormField>
+      <!-- Section 1: Target Entity Card -->
+      <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-3 shadow-2xs">
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          <Database class="w-3.5 h-3.5 text-indigo-600" />
+          <span>1. Target Record Identification</span>
+        </div>
 
-        <FormField
-          id="target-record"
-          label="Target Record"
-          required
-          :error="errors.targetRecordId"
-        >
-          <Select
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField
+            id="target-table"
+            label="Target Table"
+            required
+            :error="errors.targetTableName"
+            help-text="Database entity scope"
+          >
+            <Select
+              id="target-table"
+              v-model="formTargetTableName"
+              :options="targetTableOptions"
+              option-label="label"
+              option-value="value"
+              class="w-full text-xs"
+              data-testid="target-table-select"
+            />
+          </FormField>
+
+          <FormField
             id="target-record"
-            v-model="formTargetRecordId"
-            :options="recordOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="Select target record"
-            class="w-full text-xs"
-            data-testid="target-record-select"
-          />
-        </FormField>
+            label="Target Record"
+            required
+            :error="errors.targetRecordId"
+            help-text="Specific entity instance"
+          >
+            <Select
+              id="target-record"
+              v-model="formTargetRecordId"
+              :options="recordOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="Select target record"
+              class="w-full text-xs"
+              data-testid="target-record-select"
+            />
+          </FormField>
+        </div>
       </div>
 
-      <!-- Field Name & Old Value (Reference) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- Section 2: Before & After Diff Card -->
+      <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-3 shadow-2xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <FileEdit class="w-3.5 h-3.5 text-teal-600" />
+            <span>2. Canonical Field & Value Transformation</span>
+          </div>
+          <span class="text-[11px] text-slate-500 font-medium">Exact Value Replacement</span>
+        </div>
+
+        <!-- Field to Correct Selection -->
         <FormField
           id="field-name"
           label="Field to Correct"
           required
           :error="errors.fieldName"
+          help-text="Select attribute or enter schema column"
         >
           <Select
             id="field-name"
@@ -254,100 +324,147 @@ defineExpose({
             option-value="value"
             editable
             placeholder="e.g. startDate or name"
-            class="w-full text-sm"
+            class="w-full text-xs"
             data-testid="field-name-select"
           />
         </FormField>
 
-        <FormField
-          id="old-value"
-          label="Current / Old Value"
-          optional
-          hint="Reference snapshot"
-        >
-          <InputText
+        <!-- Before & After Comparison Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <FormField
             id="old-value"
-            v-model="localOldValue"
-            placeholder="(optional reference)"
-            class="w-full text-sm bg-slate-50 text-slate-600"
-            data-testid="old-value-input"
+            label="Current / Old Value (Snapshot)"
+            optional
+            help-text="Immutable baseline state"
+          >
+            <div class="relative">
+              <InputText
+                id="old-value"
+                v-model="localOldValue"
+                placeholder="(Current value snapshot)"
+                class="w-full text-xs bg-slate-50/90 text-slate-600 font-mono pl-7 border-slate-200"
+                data-testid="old-value-input"
+              />
+              <Lock class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            </div>
+          </FormField>
+
+          <FormField
+            id="new-value"
+            label="New Corrected Value"
+            required
+            :error="errors.newValue"
+            help-text="Authoritative replacement"
+          >
+            <InputText
+              id="new-value"
+              v-model="formNewValue"
+              placeholder="Enter new value"
+              class="w-full text-xs font-medium"
+              :class="{ 'p-invalid': errors.newValue }"
+              data-testid="new-value-input"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      <!-- Section 3: Justification & Authorization Card -->
+      <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-3 shadow-2xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <History class="w-3.5 h-3.5 text-amber-600" />
+            <span>3. Audit Justification & Sign-off</span>
+          </div>
+          <span class="text-[11px] text-amber-700 font-medium">Mandatory & Geolocation Audited</span>
+        </div>
+
+        <!-- Quick Reason Presets -->
+        <div class="p-2 bg-slate-50 border border-slate-200/70 rounded-lg space-y-1.5">
+          <div class="flex items-center gap-1 text-[11px] font-medium text-slate-600">
+            <Sparkles class="w-3 h-3 text-amber-500" />
+            <span>Quick Justification Presets:</span>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button
+              v-for="preset in JUSTIFICATION_PRESETS"
+              :key="preset"
+              type="button"
+              class="text-[11px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 hover:border-amber-400 hover:text-amber-800 hover:bg-amber-50/50 transition cursor-pointer text-left truncate max-w-full"
+              @click="applyJustificationPreset(preset)"
+            >
+              {{ preset }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Mandatory Justification Reason -->
+        <FormField
+          id="justification-reason"
+          label="Justification Reason"
+          required
+          :error="errors.justificationReason"
+          help-text="Formal compliance explanation (min. 5 characters)"
+        >
+          <Textarea
+            id="justification-reason"
+            v-model="formJustificationReason"
+            rows="3"
+            placeholder="e.g. Corrected start date to align with Ministry of Education decree No. 14/2026..."
+            class="w-full text-xs leading-relaxed"
+            :class="{ 'p-invalid': errors.justificationReason }"
+            data-testid="justification-reason-input"
           />
+        </FormField>
+
+        <!-- Authorized By -->
+        <FormField
+          id="authorized-by"
+          label="Authorized By"
+          optional
+          :error="errors.authorizedBy"
+          help-text="Authenticated Operations Authority credential"
+        >
+          <div class="relative">
+            <InputText
+              id="authorized-by"
+              v-model="formAuthorizedBy"
+              placeholder="Operations Authority username"
+              class="w-full text-xs pl-7"
+              data-testid="authorized-by-input"
+            />
+            <UserCheck class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          </div>
         </FormField>
       </div>
 
-      <!-- New Value -->
-      <FormField
-        id="new-value"
-        label="New Corrected Value"
-        required
-        :error="errors.newValue"
-        hint="Authoritative replacement value"
-      >
-        <InputText
-          id="new-value"
-          v-model="formNewValue"
-          placeholder="Enter new value"
-          class="w-full text-sm"
-          :class="{ 'p-invalid': errors.newValue }"
-          data-testid="new-value-input"
-        />
-      </FormField>
-
-      <!-- Mandatory Justification Reason -->
-      <FormField
-        id="justification-reason"
-        label="Justification Reason"
-        required
-        :error="errors.justificationReason"
-        hint="Mandatory audit explanation (min. 5 characters)"
-      >
-        <Textarea
-          id="justification-reason"
-          v-model="formJustificationReason"
-          rows="3"
-          placeholder="e.g. Corrected start date to align with Ministry of Education decree No. 14/2026..."
-          class="w-full text-sm"
-          :class="{ 'p-invalid': errors.justificationReason }"
-          data-testid="justification-reason-input"
-        />
-      </FormField>
-
-      <!-- Authorized By -->
-      <FormField
-        id="authorized-by"
-        label="Authorized By"
-        optional
-        :error="errors.authorizedBy"
-        hint="Identity authorizing this correction"
-      >
-        <InputText
-          id="authorized-by"
-          v-model="formAuthorizedBy"
-          placeholder="Operations Authority username"
-          class="w-full text-sm"
-          data-testid="authorized-by-input"
-        />
-      </FormField>
-
       <!-- Modal Footer Actions -->
-      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-        <Button
-          type="button"
-          text
-          size="small"
-          label="Cancel"
-          data-testid="modal-cancel-btn"
-          @click="isDialogVisible = false"
-        />
-        <Button
-          type="submit"
-          size="small"
-          label="Submit Correction"
-          class="bg-amber-600 hover:bg-amber-700 text-white"
-          :loading="correctionMutation.isPending.value"
-          data-testid="modal-submit-correction-btn"
-          @click="onSubmit"
-        />
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <div class="flex items-center gap-1 text-xs text-slate-500">
+          <ShieldCheck class="w-3.5 h-3.5 text-amber-600" />
+          <span>Audit Record Append Only</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <Button
+            type="button"
+            text
+            size="small"
+            label="Cancel"
+            class="text-xs text-slate-600 hover:text-slate-800"
+            data-testid="modal-cancel-btn"
+            @click="isDialogVisible = false"
+          />
+          <Button
+            type="submit"
+            size="small"
+            label="Submit Correction"
+            icon="pi pi-shield"
+            class="bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs px-3.5 py-1.5 shadow-xs"
+            :loading="correctionMutation.isPending.value"
+            data-testid="modal-submit-correction-btn"
+            @click="onSubmit"
+          />
+        </div>
       </div>
     </form>
   </Dialog>

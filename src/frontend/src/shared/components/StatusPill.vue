@@ -34,6 +34,8 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   approved: 'emerald',
   completed: 'emerald',
   success: 'emerald',
+  decided: 'emerald',
+  verified: 'emerald',
 
   // Amber
   pending: 'amber',
@@ -45,6 +47,8 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   on_leave: 'amber',
   'on-leave': 'amber',
   warning: 'amber',
+  waitlisted: 'amber',
+  deferred: 'amber',
 
   // Rose
   rejected: 'rose',
@@ -62,10 +66,13 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   inactive: 'slate',
   draft: 'slate',
   slate: 'slate',
+  not_submitted: 'slate',
+  'not-submitted': 'slate',
 
   // Sky
   scheduled: 'sky',
   submitted: 'sky',
+  registered: 'sky',
   info: 'sky',
 };
 

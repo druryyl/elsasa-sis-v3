@@ -23,6 +23,27 @@ export const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  // PUBLIC SELF-SERVICE ADMISSION PORTAL (SCR-SELF-01)
+  {
+    path: '/admission',
+    component: () => import('@/app/layouts/AuthLayout.vue'),
+    children: [
+      {
+        path: 'apply',
+        name: 'admission.apply',
+        component: () =>
+          import('@/features/students/admission/views/AdmissionPortalView.vue'),
+        meta: { requiresAuth: false, title: 'Admission Application Portal', wide: true },
+      },
+      {
+        path: 'status',
+        name: 'admission.status',
+        component: () =>
+          import('@/features/students/admission/views/ApplicationTrackerView.vue'),
+        meta: { requiresAuth: false, title: 'Application Status Tracker' },
+      },
+    ],
+  },
   {
     path: '/',
     component: () => import('@/app/layouts/AppLayout.vue'),
@@ -42,7 +63,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admission',
             name: 'students.admission.queue',
-            component: () => import('@/features/students/admission/views/AdmissionQueueView.vue'),
+            component: () =>
+              import('@/features/students/admission/views/StudentIntakeWorkbenchView.vue'),
             meta: {
               permission: 'Permissions.Students.Admission.View',
               title: 'Admission Work Queue',
@@ -52,7 +74,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'admission/:id',
             name: 'students.admission.detail',
             component: () =>
-              import('@/features/students/admission/views/ApplicationDetailView.vue'),
+              import('@/features/students/admission/views/StudentIntakeWorkbenchView.vue'),
             meta: {
               permission: 'Permissions.Students.Admission.Review',
               title: 'Application Review',

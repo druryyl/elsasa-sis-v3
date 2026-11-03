@@ -7,6 +7,7 @@ using Elsasa.Sis.Finance;
 using Elsasa.Sis.Operations;
 using Elsasa.Sis.Shared.Common;
 using Elsasa.Sis.Shared.Database;
+using Elsasa.Sis.Shared.Storage;
 using Elsasa.Sis.Students;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
@@ -90,6 +91,8 @@ public static class DependencyInjection
 
         // 6. Domain services & slice handlers
         services.AddOperationsDomain();
+        services.AddStudentsDomain();
+        services.AddSharedStorage(configuration);
 
         return services;
     }

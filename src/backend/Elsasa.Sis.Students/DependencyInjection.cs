@@ -1,0 +1,96 @@
+namespace Elsasa.Sis.Students;
+
+using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.AddAssessmentEvidence;
+using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.DeleteAssessmentEvidence;
+using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.UpdateAssessmentEvidence;
+using Elsasa.Sis.Students.Features.Admission.Documents.DownloadApplicantDocument;
+using Elsasa.Sis.Students.Features.Admission.Documents.UploadApplicantDocument;
+using Elsasa.Sis.Students.Features.Admission.Documents.VerifyApplicantDocument;
+using Elsasa.Sis.Students.Features.Admission.GetAdmissionApplicationById;
+using Elsasa.Sis.Students.Features.Admission.GetAdmissionApplicationsList;
+using Elsasa.Sis.Students.Features.Admission.GetApplicationStatusByNumber;
+using Elsasa.Sis.Students.Features.Admission.RecordAdmissionDecision;
+using Elsasa.Sis.Students.Features.Admission.RegisterApplication;
+using Elsasa.Sis.Students.Features.Admission.StartApplicationReview;
+using Elsasa.Sis.Students.Features.Admission.WithdrawAdmissionApplication;
+using Microsoft.Extensions.DependencyInjection;
+
+/// <summary>
+/// Dependency injection registrations for the Students domain assembly (ADR-001).
+/// </summary>
+public static class DependencyInjection
+{
+    /// <summary>
+    /// Registers all feature slice handlers, domain services, and authorization policies for the Students bounded context.
+    /// </summary>
+    /// <param name="services">The service collection to register into.</param>
+    /// <returns>The service collection for fluent chaining.</returns>
+    public static IServiceCollection AddStudentsDomain(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // Admission registration feature handler (P3-S04)
+        services.AddScoped<RegisterApplicationHandler>();
+
+        // Admission query feature handlers (P3-S05)
+        services.AddScoped<GetAdmissionApplicationsListHandler>();
+        services.AddScoped<GetAdmissionApplicationByIdHandler>();
+        services.AddScoped<GetApplicationStatusByNumberHandler>();
+
+        // Document management handlers (P4-S06)
+        services.AddScoped<UploadApplicantDocumentHandler>();
+        services.AddScoped<DownloadApplicantDocumentHandler>();
+        services.AddScoped<VerifyApplicantDocumentHandler>();
+
+        // Assessment evidence handlers (P4-S07)
+        services.AddScoped<AddAssessmentEvidenceHandler>();
+        services.AddScoped<UpdateAssessmentEvidenceHandler>();
+        services.AddScoped<DeleteAssessmentEvidenceHandler>();
+
+        // Admission review lifecycle & withdrawal handlers (P5-S08)
+        services.AddScoped<StartApplicationReviewHandler>();
+        services.AddScoped<WithdrawAdmissionApplicationHandler>();
+
+        // Admission decision recording handler (P5-S09)
+        services.AddScoped<RecordAdmissionDecisionHandler>();
+
+        // Configure policy-based authorization requirements (ADR-009)
+        services.AddAuthorization(options =>
+        {
+            void AddPermissionPolicy(string permission, params string[] roles)
+            {
+                options.AddPolicy(permission, policy => policy.RequireAssertion(ctx =>
+                    ctx.User.Identity?.IsAuthenticated == true && (
+                        ctx.User.HasClaim(c => (c.Type == "permission" || c.Type == "permissions") && (c.Value == permission || c.Value == "*"))
+                        || ctx.User.IsInRole("Admin")
+                        || roles.Any(r => ctx.User.IsInRole(r)))));
+            }
+
+            AddPermissionPolicy(
+                Permissions.Students.Admission.View,
+                "AdmissionOfficer", "Admission Officer",
+                "StudentAdminOfficer", "Student Administration Officer",
+                "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Students.Admission.Register,
+                "AdmissionOfficer", "Admission Officer",
+                "StudentAdminOfficer", "Student Administration Officer");
+
+            AddPermissionPolicy(
+                Permissions.Students.Admission.Review,
+                "AdmissionOfficer", "Admission Officer");
+
+            AddPermissionPolicy(
+                Permissions.Students.Admission.VerifyDocument,
+                "AdmissionOfficer", "Admission Officer");
+
+            AddPermissionPolicy(
+                Permissions.Students.Admission.Decide,
+                "AdmissionOfficer", "Admission Officer",
+                "SchoolLeadership", "School Leadership");
+        });
+
+        return services;
+    }
+}

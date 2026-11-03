@@ -20,6 +20,8 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 {
     public TestCurrentUser CurrentUser { get; } = new();
 
+    public TestEventCollector EventCollector { get; } = new();
+
     public SqlServerContainerFixture ContainerFixture { get; }
 
     public IntegrationTestWebAppFactory()
@@ -75,6 +77,10 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.RemoveAll<ICurrentUser>();
             services.AddSingleton(CurrentUser);
             services.AddScoped<ICurrentUser>(sp => sp.GetRequiredService<TestCurrentUser>());
+
+            // Register TestEventCollector for capturing published MediatR domain events
+            services.AddSingleton(EventCollector);
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Students.Events.ApplicantAcceptedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
 
             // Configure TestAuthHandler for bypass/customizable claims
             services.AddAuthentication(options =>

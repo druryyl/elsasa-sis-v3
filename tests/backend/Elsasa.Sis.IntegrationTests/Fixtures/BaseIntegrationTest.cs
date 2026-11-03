@@ -44,6 +44,7 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
         }
 
         Factory.CurrentUser.Reset();
+        Factory.EventCollector.Reset();
     }
 
     /// <summary>
