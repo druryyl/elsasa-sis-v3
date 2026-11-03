@@ -71,6 +71,10 @@ export const routes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'admission/apply',
+            redirect: '/admission/apply',
+          },
+          {
             path: 'admission/:id',
             name: 'students.admission.detail',
             component: () =>

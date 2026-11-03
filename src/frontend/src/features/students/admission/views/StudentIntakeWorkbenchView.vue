@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { refDebounced } from '@vueuse/core';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -15,6 +15,7 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import {
   Users,
+  UserPlus,
   Search,
   RotateCcw,
   RefreshCw,
@@ -68,6 +69,7 @@ import {
 // 1. Navigation & Breadcrumbs
 // ---------------------------------------------------------------------------
 const route = useRoute();
+const router = useRouter();
 
 const breadcrumbs: BreadcrumbItem[] = [
   { label: 'Dashboard', to: '/dashboard' },
@@ -80,6 +82,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 // ---------------------------------------------------------------------------
 const authStore = useAuthStore();
 
+const canRegister = computed(() =>
+  authStore.hasPermission(ADMISSION_PERMISSIONS.REGISTER),
+);
 const canReview = computed(() =>
   authStore.hasPermission(ADMISSION_PERMISSIONS.REVIEW),
 );
@@ -340,6 +345,16 @@ function isApplicationActive(status: string | undefined): boolean {
           >
             <RefreshCw class="w-3.5 h-3.5 mr-1.5" :class="{ 'animate-spin': isFetchingQueue }" />
             <span>Refresh</span>
+          </Button>
+
+          <Button
+            size="small"
+            class="!text-xs !py-1.5 cursor-pointer bg-teal-700 hover:bg-teal-800 text-white font-medium"
+            data-testid="new-application-button"
+            @click="router.push('/admission/apply')"
+          >
+            <UserPlus class="w-3.5 h-3.5 mr-1.5" />
+            <span>New Application</span>
           </Button>
         </div>
       </template>
