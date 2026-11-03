@@ -8,6 +8,7 @@ import {
   useCreateOperationalPeriodMutation,
   useUpdateOperationalPeriodMutation,
   useCloseOperationalPeriodMutation,
+  useActivateOperationalPeriodMutation,
 } from '../useOperationalPeriodsQuery';
 import { operationalPeriodKeys, calendarKeys } from '../queryKeys';
 
@@ -194,6 +195,40 @@ describe('Operational Periods Composables (useOperationalPeriodsQuery.ts)', () =
         expect.objectContaining({
           severity: 'success',
           summary: 'Period Closed',
+        }),
+      );
+    });
+  });
+
+  describe('useActivateOperationalPeriodMutation', () => {
+    it('activates period and triggers cache invalidations and toast', async () => {
+      const activePeriod: operationalPeriodApi.OperationalPeriodDto = {
+        id: 'p-1',
+        academicYearId: 'ay-1',
+        periodCode: 'SEM-1-2026',
+        name: 'Semester 1',
+        periodType: 'semester',
+        startDate: '2026-07-15',
+        endDate: '2026-12-20',
+        parentPeriodId: null,
+        campusContext: 'All',
+        status: 'active',
+      };
+      vi.spyOn(operationalPeriodApi, 'activatePeriod').mockResolvedValue(activePeriod);
+
+      const { result, queryClient } = withSetup(() => useActivateOperationalPeriodMutation());
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      await result.mutateAsync('p-1');
+
+      expect(operationalPeriodApi.activatePeriod).toHaveBeenCalledWith('p-1');
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: operationalPeriodKeys.all });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: calendarKeys.matrixAll });
+      expect(mockToast.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          summary: 'Period Activated',
+          detail: "Operational period 'SEM-1-2026' has been activated.",
         }),
       );
     });

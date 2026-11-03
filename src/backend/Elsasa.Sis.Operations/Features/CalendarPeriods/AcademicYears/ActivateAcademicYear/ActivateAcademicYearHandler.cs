@@ -6,7 +6,7 @@ using Elsasa.Sis.Shared.Database;
 
 /// <summary>
 /// Feature handler executing the atomic activation of an approved academic year (ADR-004, ADR-005).
-/// Demotes any currently active academic year to 'completed' within a Dapper transaction.
+/// Cascades status transitions across academic years and child operational periods within a Dapper transaction.
 /// </summary>
 public sealed class ActivateAcademicYearHandler(
     ISqlConnectionFactory connectionFactory,
@@ -20,6 +20,17 @@ public sealed class ActivateAcademicYearHandler(
             status AS Status
         FROM operations.academic_years
         WHERE id = @Id;
+        """;
+
+    private const string _closeActivePeriodsOfOutgoingYearSql = """
+        UPDATE operations.operational_periods
+        SET status = 'closed',
+            updated_at = @UpdatedAt,
+            updated_by = @UpdatedBy
+        WHERE status = 'active'
+          AND academic_year_id IN (
+              SELECT id FROM operations.academic_years WHERE status = 'active'
+          );
         """;
 
     private const string _demoteActiveSql = """
@@ -38,8 +49,18 @@ public sealed class ActivateAcademicYearHandler(
         WHERE id = @Id;
         """;
 
+    private const string _activateChildPeriodsSql = """
+        UPDATE operations.operational_periods
+        SET status = 'active',
+            updated_at = @UpdatedAt,
+            updated_by = @UpdatedBy
+        WHERE academic_year_id = @Id
+          AND status IN ('draft', 'approved');
+        """;
+
     /// <summary>
-    /// Activates an approved academic year atomically demoting any existing active year to 'completed'.
+    /// Activates an approved academic year atomically demoting any existing active year to 'completed'
+    /// and cascading operational period statuses.
     /// </summary>
     public async Task<Result<ActivateAcademicYearResponse>> HandleAsync(
         Guid id,
@@ -73,16 +94,30 @@ public sealed class ActivateAcademicYearHandler(
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        // 1. Demote any currently active academic year to 'completed'
+        // 1. Demote active periods of current active academic year to 'closed'
+        await connection.ExecuteAsync(new CommandDefinition(
+            _closeActivePeriodsOfOutgoingYearSql,
+            new { UpdatedAt = now, UpdatedBy = username },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 2. Demote any currently active academic year to 'completed'
         await connection.ExecuteAsync(new CommandDefinition(
             _demoteActiveSql,
             new { UpdatedAt = now, UpdatedBy = username },
             transaction: transaction,
             cancellationToken: cancellationToken));
 
-        // 2. Activate the target academic year
+        // 3. Activate the target academic year
         await connection.ExecuteAsync(new CommandDefinition(
             _activateTargetSql,
+            new { Id = id, UpdatedAt = now, UpdatedBy = username },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 4. Promote child operational periods of target academic year with status IN ('draft', 'approved') to 'active'
+        await connection.ExecuteAsync(new CommandDefinition(
+            _activateChildPeriodsSql,
             new { Id = id, UpdatedAt = now, UpdatedBy = username },
             transaction: transaction,
             cancellationToken: cancellationToken));

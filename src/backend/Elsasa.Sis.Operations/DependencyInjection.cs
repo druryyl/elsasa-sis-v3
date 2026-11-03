@@ -10,6 +10,7 @@ using Elsasa.Sis.Operations.Features.CalendarPeriods.CreateAcademicYear;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.CalendarEntries.CreateCalendarEntry;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.CalendarEntries.DeleteCalendarEntry;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.CalendarEntries.GetCalendarMatrixProjection;
+using Elsasa.Sis.Operations.Features.CalendarPeriods.OperationalPeriods.ActivateOperationalPeriod;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.OperationalPeriods.CloseOperationalPeriod;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.OperationalPeriods.CreateOperationalPeriod;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.OperationalPeriods.GetOperationalPeriodsByAcademicYear;
@@ -54,6 +55,7 @@ public static class DependencyInjection
         // Operational Period handlers
         services.AddScoped<CreateOperationalPeriodHandler>();
         services.AddScoped<UpdateOperationalPeriodHandler>();
+        services.AddScoped<ActivateOperationalPeriodHandler>();
         services.AddScoped<CloseOperationalPeriodHandler>();
         services.AddScoped<GetOperationalPeriodsByAcademicYearHandler>();
 

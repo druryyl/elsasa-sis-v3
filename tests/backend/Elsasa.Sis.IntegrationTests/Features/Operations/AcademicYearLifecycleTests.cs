@@ -6,6 +6,7 @@ using Elsasa.Sis.IntegrationTests.Fixtures;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.AcademicYears.ActivateAcademicYear;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.AcademicYears.ApproveAcademicYear;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.CreateAcademicYear;
+using Elsasa.Sis.Operations.Features.CalendarPeriods.OperationalPeriods.CreateOperationalPeriod;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -195,6 +196,114 @@ public sealed class AcademicYearLifecycleTests(IntegrationTestWebAppFactory fact
         problem.Should().NotBeNull();
         problem!.Extensions.Should().ContainKey("errorCode");
         problem.Extensions["errorCode"]!.ToString().Should().Be("Operations.InvalidStatusTransition");
+    }
+
+    [SkippableFact]
+    public async Task ActivatingAcademicYear_Should_PromoteChildDraftPeriodsToActive_And_DemoteOutgoingYearActivePeriodsToClosed()
+    {
+        // Arrange
+        SkipIfDatabaseUnavailable();
+
+        // 1. Create, approve, and activate AY 1
+        var ay1Request = new CreateAcademicYearRequest(
+            Code: "AY-CASC-1",
+            Name: "First Academic Year For Cascading",
+            StartDate: new DateOnly(2025, 9, 1),
+            EndDate: new DateOnly(2026, 6, 30));
+
+        var createAy1Response = await Client.PostAsJsonAsync(_academicYearsUri, ay1Request);
+        createAy1Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ay1 = await createAy1Response.Content.ReadFromJsonAsync<CreateAcademicYearResponse>();
+        ay1.Should().NotBeNull();
+
+        await Client.PostAsync($"{_academicYearsUri}/{ay1!.Id}/approve", null);
+        var activateAy1Response = await Client.PostAsync($"{_academicYearsUri}/{ay1.Id}/activate", null);
+        activateAy1Response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Create child operational period for AY 1 and activate it
+        var ay1PeriodRequest = new CreateOperationalPeriodRequest(
+            PeriodCode: "SEM-AY1-ACTIVE",
+            Name: "AY 1 Active Semester",
+            PeriodType: "semester",
+            StartDate: new DateOnly(2025, 9, 1),
+            EndDate: new DateOnly(2026, 1, 31));
+
+        var ay1PeriodResponse = await Client.PostAsJsonAsync($"{_academicYearsUri}/{ay1.Id}/periods", ay1PeriodRequest);
+        ay1PeriodResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ay1Period = await ay1PeriodResponse.Content.ReadFromJsonAsync<CreateOperationalPeriodResponse>();
+        ay1Period.Should().NotBeNull();
+
+        var activateAy1PeriodResponse = await Client.PostAsync($"/api/operations/periods/{ay1Period!.Id}/activate", null);
+        activateAy1PeriodResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Verify AY 1 period is active in DB before AY 2 activation
+        const string selectPeriodStatusSql = "SELECT status FROM operations.operational_periods WHERE id = @Id;";
+        var ay1PeriodStatusBefore = await ExecuteScalarAsync<string>(selectPeriodStatusSql, new { Id = ay1Period.Id });
+        ay1PeriodStatusBefore.Should().Be("active");
+
+        // 2. Create AY 2 with child periods in draft status
+        var ay2Request = new CreateAcademicYearRequest(
+            Code: "AY-CASC-2",
+            Name: "Second Academic Year For Cascading",
+            StartDate: new DateOnly(2026, 9, 1),
+            EndDate: new DateOnly(2027, 6, 30));
+
+        var createAy2Response = await Client.PostAsJsonAsync(_academicYearsUri, ay2Request);
+        createAy2Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ay2 = await createAy2Response.Content.ReadFromJsonAsync<CreateAcademicYearResponse>();
+        ay2.Should().NotBeNull();
+
+        var ay2Period1Request = new CreateOperationalPeriodRequest(
+            PeriodCode: "SEM-AY2-DRAFT1",
+            Name: "AY 2 Semester 1 Draft",
+            PeriodType: "semester",
+            StartDate: new DateOnly(2026, 9, 1),
+            EndDate: new DateOnly(2027, 1, 31));
+
+        var ay2Period1Response = await Client.PostAsJsonAsync($"{_academicYearsUri}/{ay2!.Id}/periods", ay2Period1Request);
+        ay2Period1Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ay2Period1 = await ay2Period1Response.Content.ReadFromJsonAsync<CreateOperationalPeriodResponse>();
+        ay2Period1.Should().NotBeNull();
+        ay2Period1!.Status.Should().Be("draft");
+
+        var ay2Period2Request = new CreateOperationalPeriodRequest(
+            PeriodCode: "SEM-AY2-DRAFT2",
+            Name: "AY 2 Semester 2 Draft",
+            PeriodType: "semester",
+            StartDate: new DateOnly(2027, 2, 1),
+            EndDate: new DateOnly(2027, 6, 30));
+
+        var ay2Period2Response = await Client.PostAsJsonAsync($"{_academicYearsUri}/{ay2.Id}/periods", ay2Period2Request);
+        ay2Period2Response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ay2Period2 = await ay2Period2Response.Content.ReadFromJsonAsync<CreateOperationalPeriodResponse>();
+        ay2Period2.Should().NotBeNull();
+        ay2Period2!.Status.Should().Be("draft");
+
+        // Approve AY 2
+        var approveAy2Response = await Client.PostAsync($"{_academicYearsUri}/{ay2.Id}/approve", null);
+        approveAy2Response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act: Activate AY 2 -> cascades demotion to AY 1 active periods and promotion to AY 2 draft periods
+        var activateAy2Response = await Client.PostAsync($"{_academicYearsUri}/{ay2.Id}/activate", null);
+        activateAy2Response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Assert:
+        // 1) Active period of outgoing AY 1 is demoted to 'closed'
+        var ay1PeriodStatusAfter = await ExecuteScalarAsync<string>(selectPeriodStatusSql, new { Id = ay1Period.Id });
+        ay1PeriodStatusAfter.Should().Be("closed");
+
+        // 2) Child draft periods of target AY 2 are promoted to 'active'
+        var ay2Period1StatusAfter = await ExecuteScalarAsync<string>(selectPeriodStatusSql, new { Id = ay2Period1.Id });
+        var ay2Period2StatusAfter = await ExecuteScalarAsync<string>(selectPeriodStatusSql, new { Id = ay2Period2.Id });
+        ay2Period1StatusAfter.Should().Be("active");
+        ay2Period2StatusAfter.Should().Be("active");
+
+        // 3) AY 1 is completed and AY 2 is active
+        const string selectAyStatusSql = "SELECT status FROM operations.academic_years WHERE id = @Id;";
+        var ay1Status = await ExecuteScalarAsync<string>(selectAyStatusSql, new { Id = ay1.Id });
+        var ay2Status = await ExecuteScalarAsync<string>(selectAyStatusSql, new { Id = ay2.Id });
+        ay1Status.Should().Be("completed");
+        ay2Status.Should().Be("active");
     }
 
     private sealed record LifecycleDbRow(

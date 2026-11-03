@@ -6,6 +6,7 @@ import {
   createPeriod,
   updatePeriod,
   closePeriod,
+  activatePeriod,
 } from '../api/operationalPeriod.api';
 
 describe('Operational Period API Integration (operationalPeriod.api.ts)', () => {
@@ -124,5 +125,24 @@ describe('Operational Period API Integration (operationalPeriod.api.ts)', () => 
     expect(capturedConfig?.method?.toLowerCase()).toBe('post');
     expect(capturedConfig?.url).toBe('/operations/periods/p-2/close');
     expect(result.status).toBe('closed');
+  });
+
+  it('activatePeriod calls POST /operations/periods/{id}/activate', async () => {
+    apiClient.defaults.adapter = async (config) => {
+      capturedConfig = config;
+      return {
+        data: { id: 'p-2', periodCode: 'SEM-1', status: 'active' },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      } as AxiosResponse;
+    };
+
+    const result = await activatePeriod('p-2');
+    expect(capturedConfig?.method?.toLowerCase()).toBe('post');
+    expect(capturedConfig?.url).toBe('/operations/periods/p-2/activate');
+    expect(result.status).toBe('active');
+    expect(result.periodCode).toBe('SEM-1');
   });
 });

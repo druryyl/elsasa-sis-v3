@@ -6,6 +6,7 @@ import {
   createPeriod,
   updatePeriod,
   closePeriod,
+  activatePeriod,
   type OperationalPeriodDto,
   type CreateOperationalPeriodPayload,
   type UpdateOperationalPeriodPayload,
@@ -143,6 +144,35 @@ export function useCloseOperationalPeriodMutation(
     },
     onError: (error, variables) => {
       notifyError(toast, error, 'Close Period Failed', options);
+      options?.onError?.(error, variables);
+    },
+  });
+}
+
+/**
+ * Mutation hook activating an operational period.
+ */
+export function useActivateOperationalPeriodMutation(
+  options?: OperationalPeriodMutationOptions<OperationalPeriodDto, string>,
+) {
+  const queryClient = useQueryClient();
+  const toast = tryGetToast();
+
+  return useMutation({
+    mutationFn: (id: string) => activatePeriod(id),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: operationalPeriodKeys.all });
+      queryClient.invalidateQueries({ queryKey: calendarKeys.matrixAll });
+      notifySuccess(
+        toast,
+        'Period Activated',
+        `Operational period '${data.periodCode}' has been activated.`,
+        options,
+      );
+      options?.onSuccess?.(data, variables);
+    },
+    onError: (error, variables) => {
+      notifyError(toast, error, 'Period Activation Failed', options);
       options?.onError?.(error, variables);
     },
   });

@@ -48,7 +48,8 @@ public sealed class ApplicationRegistrationIntegrationTests(IntegrationTestWebAp
         periodResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var period = await periodResponse.Content.ReadFromJsonAsync<CreateOperationalPeriodResponse>();
 
-        await ExecuteAsync("UPDATE operations.operational_periods SET status = 'active' WHERE id = @Id;", new { Id = period!.Id });
+        var activatePeriodResponse = await Client.PostAsync($"/api/operations/periods/{period!.Id}/activate", null);
+        activatePeriodResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         return (ay.Id, period.Id);
     }
@@ -187,7 +188,6 @@ public sealed class ApplicationRegistrationIntegrationTests(IntegrationTestWebAp
         // Arrange
         SkipIfDatabaseUnavailable();
         var (_, period1Id) = await SetupAcademicYearAndAdmissionPeriodAsync($"RE1-{Guid.NewGuid():N}"[..8]);
-        var (_, period2Id) = await SetupAcademicYearAndAdmissionPeriodAsync($"RE2-{Guid.NewGuid():N}"[..8]);
 
         var govId = $"3171{Random.Shared.Next(10000000, 99999999)}0003";
         var dob = new DateOnly(2018, 7, 10);
@@ -213,6 +213,9 @@ public sealed class ApplicationRegistrationIntegrationTests(IntegrationTestWebAp
         response1.StatusCode.Should().Be(HttpStatusCode.Created, because: content1);
         var app1 = await response1.Content.ReadFromJsonAsync<RegisterApplicationResponse>();
         app1.Should().NotBeNull();
+
+        // Setup second academic year and admission period (simulating next admission cycle)
+        var (_, period2Id) = await SetupAcademicYearAndAdmissionPeriodAsync($"RE2-{Guid.NewGuid():N}"[..8]);
 
         // Register in Period 2 with the same government ID (deduplication matching)
         var request2 = new RegisterApplicationRequest(

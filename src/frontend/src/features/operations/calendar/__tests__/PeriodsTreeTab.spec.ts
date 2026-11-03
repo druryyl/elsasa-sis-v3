@@ -181,11 +181,15 @@ describe('PeriodsTreeTab.spec.ts (Tab 2: Academic Years & Hierarchical Periods)'
 
     expect(wrapper.find('[data-testid="academic-year-summary-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="ay-summary-code"]').text()).toContain('AY-2026-2027');
-    expect(wrapper.find('[data-testid="ay-summary-name"]').text()).toContain('Tahun Pelajaran 2026/2027');
+    expect(wrapper.find('[data-testid="ay-summary-name"]').text()).toContain(
+      'Tahun Pelajaran 2026/2027',
+    );
     expect(wrapper.find('[data-testid="ay-summary-dates"]').text()).toContain('2026-07-01');
     expect(wrapper.find('[data-testid="ay-summary-dates"]').text()).toContain('2027-06-30');
     expect(wrapper.find('[data-testid="ay-summary-approver"]').text()).toContain('Dr. Jane Doe');
-    expect(wrapper.find('[data-testid="ay-summary-notes"]').text()).toContain('Senate Resolution 42');
+    expect(wrapper.find('[data-testid="ay-summary-notes"]').text()).toContain(
+      'Senate Resolution 42',
+    );
   });
 
   it('renders primary Tab 2 action buttons: Add Period, Apply Preset, Correct Record', async () => {
@@ -273,5 +277,51 @@ describe('PeriodsTreeTab.spec.ts (Tab 2: Academic Years & Hierarchical Periods)'
     expect(wrapper.find('[data-testid="periods-tree-empty"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="empty-apply-preset-btn"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="empty-add-period-btn"]').exists()).toBe(true);
+  });
+
+  it('renders Activate Period button for draft operational periods and invokes mutation on click', async () => {
+    const activateSpy = vi
+      .spyOn(operationalPeriodApi, 'activatePeriod')
+      .mockResolvedValue({ ...mockPeriods[3], status: 'active' });
+
+    const wrapper = renderComponent();
+    await flushPromises();
+
+    // period-sem-2 has status: 'draft', others have 'active'
+    const activateBtns = wrapper.findAll('[data-testid="row-activate-period-btn"]');
+    expect(activateBtns.length).toBe(1);
+
+    await activateBtns[0].trigger('click');
+    await flushPromises();
+
+    expect(activateSpy).toHaveBeenCalledWith('period-sem-2');
+  });
+
+  it('does not render Activate Period button for active periods without draft or approved status', async () => {
+    vi.spyOn(operationalPeriodApi, 'getPeriods').mockResolvedValue([mockPeriods[0]]);
+
+    const wrapper = renderComponent();
+    await flushPromises();
+
+    const activateBtns = wrapper.findAll('[data-testid="row-activate-period-btn"]');
+    expect(activateBtns.length).toBe(0);
+  });
+
+  it('does not render Activate Period button when user lacks MANAGE permission', async () => {
+    const authStore = useAuthStore();
+    authStore.setSession('jwt.mock.token', {
+      userId: 'usr-readonly',
+      username: 'observer',
+      fullName: 'Observer User',
+      roles: ['OperationsViewer'],
+      permissions: [CALENDAR_PERMISSIONS.VIEW],
+      campusId: null,
+    });
+
+    const wrapper = renderComponent();
+    await flushPromises();
+
+    const activateBtns = wrapper.findAll('[data-testid="row-activate-period-btn"]');
+    expect(activateBtns.length).toBe(0);
   });
 });

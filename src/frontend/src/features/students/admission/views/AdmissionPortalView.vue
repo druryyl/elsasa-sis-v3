@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* global navigator, setTimeout, console, File, Event, HTMLInputElement */
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -208,6 +208,12 @@ const step5Error = ref<string | null>(null);
 const submissionError = ref<string | null>(null);
 const isUploadingDocuments = ref(false);
 
+watch(confirmationAccepted, (accepted) => {
+  if (accepted) {
+    step5Error.value = null;
+  }
+});
+
 // Post-submission success state
 const isSubmitted = ref(false);
 const submittedApplication = ref<RegisterApplicationResultDto | null>(null);
@@ -375,6 +381,19 @@ async function handleSubmitApplication(): Promise<void> {
   step5Error.value = null;
   submissionError.value = null;
 
+  if (!validateStep1()) {
+    currentStep.value = 1;
+    return;
+  }
+  if (!validateStep2()) {
+    currentStep.value = 2;
+    return;
+  }
+  if (!validateStep3()) {
+    currentStep.value = 3;
+    return;
+  }
+
   if (!confirmationAccepted.value) {
     step5Error.value = 'Please check the box below to certify and confirm your application details.';
     return;
@@ -472,6 +491,8 @@ function resetWizard(): void {
   submittedApplication.value = null;
   uploadedDocumentTypes.value = [];
   confirmationAccepted.value = false;
+  step5Error.value = null;
+  submissionError.value = null;
   step1.value = {
     admissionPeriodId: '',
     requestedEntryLevel: '',
@@ -1381,20 +1402,31 @@ function navigateToTracker(): void {
 
         <!-- Official Certification Checkbox -->
         <div class="pt-2">
-          <div class="flex items-start gap-2.5 rounded-lg border border-teal-200 bg-teal-50/60 p-3.5">
+          <div
+            :class="[
+              'flex items-start gap-2.5 rounded-lg border p-3.5 transition-colors',
+              step5Error ? 'border-rose-300 bg-rose-50/60' : 'border-teal-200 bg-teal-50/60'
+            ]"
+          >
             <Checkbox
-              id="confirm-application"
+              input-id="confirm-application"
               v-model="confirmationAccepted"
               :binary="true"
               class="mt-0.5"
+              data-testid="checkbox-confirm"
             />
-            <label for="confirm-application" class="text-xs text-slate-800 leading-relaxed cursor-pointer">
+            <label for="confirm-application" class="text-xs text-slate-800 leading-relaxed cursor-pointer select-none">
               <strong>Applicant Certification:</strong> I hereby certify that all information and
               credential documents provided in this registration form are truthful, complete, and accurate.
               I agree to abide by the admissions policies and entrance assessment procedures of Elsasa SIS.
             </label>
           </div>
-          <p v-if="step5Error" class="mt-1.5 text-xs font-medium text-rose-600">
+          <p
+            v-if="step5Error"
+            class="mt-1.5 text-xs font-medium text-rose-600 flex items-center gap-1.5"
+            data-testid="step5-error"
+          >
+            <AlertCircle class="h-3.5 w-3.5 shrink-0" />
             {{ step5Error }}
           </p>
         </div>
@@ -1437,10 +1469,10 @@ function navigateToTracker(): void {
             type="button"
             :label="isSubmitting ? 'Submitting Application...' : 'Submit Application'"
             icon="pi pi-check"
-            class="bg-teal-600 text-white hover:bg-teal-700 border-none text-xs px-5 py-2"
+            class="bg-teal-600 text-white hover:bg-teal-700 border-none text-xs px-5 py-2 cursor-pointer"
             data-testid="btn-submit"
             :loading="isSubmitting"
-            :disabled="isSubmitting || !confirmationAccepted"
+            :disabled="isSubmitting"
             @click="handleSubmitApplication"
           />
         </div>

@@ -238,6 +238,44 @@ describe('AdmissionPortalView.vue (SCR-SELF-01)', () => {
     expect(wrapper.text()).toContain('Sudirman (Father)');
   });
 
+  it('shows error message on Step 5 when Submit Application is clicked without checking certification', async () => {
+    const registerSpy = vi.spyOn(admissionApi, 'registerApplication');
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as {
+      step1: { admissionPeriodId: string; requestedEntryLevel: string };
+      step2: { fullName: string; dateOfBirth: string };
+      contacts: Array<{ fullName: string; relationship: string; phone: string; email: string }>;
+      currentStep: number;
+      maxStepReached: number;
+    };
+
+    vm.step1.admissionPeriodId = mockActivePeriods[0].id;
+    vm.step1.requestedEntryLevel = 'Grade 1';
+    vm.step2.fullName = 'Bambang Sudirman';
+    vm.step2.dateOfBirth = '2019-05-15';
+    vm.contacts[0].fullName = 'Sudirman';
+    vm.contacts[0].relationship = 'Father';
+    vm.contacts[0].phone = '+628123456789';
+    vm.contacts[0].email = 'sudirman@example.com';
+
+    vm.currentStep = 5;
+    vm.maxStepReached = 5;
+    await flushPromises();
+
+    const submitBtn = wrapper.find('[data-testid="btn-submit"]');
+    expect(submitBtn.exists()).toBe(true);
+    expect(submitBtn.attributes('disabled')).toBeUndefined();
+
+    await submitBtn.trigger('click');
+    await flushPromises();
+
+    expect(registerSpy).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="step5-error"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Please check the box below to certify and confirm your application details.');
+  });
+
   it('submits application, uploads documents, and displays confirmation card with application number', async () => {
     const mockRegistrationResponse: RegisterApplicationResultDto = {
       id: 'app-guid-1234',

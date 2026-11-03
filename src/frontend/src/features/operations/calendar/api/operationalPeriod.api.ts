@@ -52,7 +52,11 @@ export async function getPeriods(academicYearId: string): Promise<OperationalPer
   if (Array.isArray(response)) {
     return response;
   }
-  if (response && typeof response === 'object' && Array.isArray((response as { periods?: OperationalPeriodDto[] }).periods)) {
+  if (
+    response &&
+    typeof response === 'object' &&
+    Array.isArray((response as { periods?: OperationalPeriodDto[] }).periods)
+  ) {
     return (response as { periods: OperationalPeriodDto[] }).periods;
   }
   return [];
@@ -97,6 +101,19 @@ export async function updatePeriod(
 export async function closePeriod(id: string): Promise<OperationalPeriodDto> {
   const response = (await apiClient.post(
     `/operations/periods/${encodeURIComponent(id)}/close`,
+    {},
+  )) as unknown as OperationalPeriodDto;
+
+  return response;
+}
+
+/**
+ * Formally activates an operational period.
+ * POST /api/operations/periods/{id}/activate
+ */
+export async function activatePeriod(id: string): Promise<OperationalPeriodDto> {
+  const response = (await apiClient.post(
+    `/operations/periods/${encodeURIComponent(id)}/activate`,
     {},
   )) as unknown as OperationalPeriodDto;
 

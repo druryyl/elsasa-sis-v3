@@ -10,13 +10,9 @@ import {
   Calendar,
   FolderTree,
   Lock,
+  CheckCircle2,
 } from 'lucide-vue-next';
-import {
-  ContentCard,
-  StatusPill,
-  LoadingSpinner,
-  EmptyState,
-} from '@/shared/components';
+import { ContentCard, StatusPill, LoadingSpinner, EmptyState } from '@/shared/components';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { CALENDAR_PERMISSIONS } from '../../constants/permissions';
 import {
@@ -26,14 +22,11 @@ import {
 import {
   useOperationalPeriodsQuery,
   useCloseOperationalPeriodMutation,
+  useActivateOperationalPeriodMutation,
 } from '../../composables/useOperationalPeriodsQuery';
 import type { OperationalPeriodDto } from '../../api/operationalPeriod.api';
 import type { CorrectionTargetTable } from '../../schemas/recordCorrection.schema';
-import {
-  CreatePeriodModal,
-  ApplyPresetModal,
-  CorrectRecordModal,
-} from '../modals';
+import { CreatePeriodModal, ApplyPresetModal, CorrectRecordModal } from '../modals';
 
 const props = defineProps<{
   academicYearId?: string | null | undefined;
@@ -49,10 +42,9 @@ const canCorrect = computed(
 // 1. Academic Year Query & Details
 // --------------------------------------------------------------------------
 const { data: academicYears } = useAcademicYearsQuery();
-const { data: academicYearDetail } = useAcademicYearDetailQuery(
-  () => props.academicYearId,
-  { enabled: computed(() => Boolean(props.academicYearId)) },
-);
+const { data: academicYearDetail } = useAcademicYearDetailQuery(() => props.academicYearId, {
+  enabled: computed(() => Boolean(props.academicYearId)),
+});
 
 const currentAcademicYear = computed(() => {
   if (academicYearDetail.value) return academicYearDetail.value;
@@ -152,11 +144,17 @@ function getPeriodTypeBadge(type: string): { label: string; bgClass: string } {
     case 'quarter':
       return { label: 'Quarter', bgClass: 'bg-sky-50 text-sky-700 border-sky-200' };
     case 'admission_window':
-      return { label: 'Admission Window', bgClass: 'bg-purple-50 text-purple-700 border-purple-200' };
+      return {
+        label: 'Admission Window',
+        bgClass: 'bg-purple-50 text-purple-700 border-purple-200',
+      };
     case 'assessment_window':
       return { label: 'Assessment Window', bgClass: 'bg-amber-50 text-amber-700 border-amber-200' };
     case 'reporting_period':
-      return { label: 'Reporting Period', bgClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      return {
+        label: 'Reporting Period',
+        bgClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      };
     case 'event_period':
       return { label: 'Event Period', bgClass: 'bg-pink-50 text-pink-700 border-pink-200' };
     default:
@@ -226,6 +224,13 @@ function handleCorrectPeriod(period: OperationalPeriodDto): void {
   openCorrectRecordModal('operational_periods', period.id, 'name', period.name);
 }
 
+// Activate Period Mutation
+const activatePeriodMutation = useActivateOperationalPeriodMutation();
+
+function handleActivatePeriod(period: OperationalPeriodDto): void {
+  activatePeriodMutation.mutate(period.id);
+}
+
 // Close Period Mutation
 const closePeriodMutation = useCloseOperationalPeriodMutation();
 
@@ -247,12 +252,17 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
     >
       <div class="p-5 space-y-4">
         <!-- Card Header with Badges & Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div
+          class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3"
+        >
           <div class="flex items-center gap-3">
             <Calendar class="w-5 h-5 text-teal-600" />
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="text-base font-bold text-slate-900 font-mono" data-testid="ay-summary-code">
+                <h3
+                  class="text-base font-bold text-slate-900 font-mono"
+                  data-testid="ay-summary-code"
+                >
                   {{ currentAcademicYear.code }}
                 </h3>
                 <StatusPill
@@ -291,7 +301,10 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
             <span class="text-slate-400 font-medium uppercase tracking-wider text-[11px] block">
               Effective Date Span
             </span>
-            <div class="flex items-center gap-1.5 text-slate-800 font-mono font-medium" data-testid="ay-summary-dates">
+            <div
+              class="flex items-center gap-1.5 text-slate-800 font-mono font-medium"
+              data-testid="ay-summary-dates"
+            >
               <span>{{ currentAcademicYear.startDate }}</span>
               <span class="text-slate-400">to</span>
               <span>{{ currentAcademicYear.endDate }}</span>
@@ -306,11 +319,11 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
             <div class="text-slate-800" data-testid="ay-summary-approver">
               <span v-if="currentAcademicYear.approvedBy" class="font-medium">
                 {{ currentAcademicYear.approvedBy }}
-                <span class="text-slate-400 font-normal">({{ currentAcademicYear.approvedDate || 'Recorded' }})</span>
+                <span class="text-slate-400 font-normal"
+                  >({{ currentAcademicYear.approvedDate || 'Recorded' }})</span
+                >
               </span>
-              <span v-else class="text-slate-400 italic">
-                Pending Institutional Approval
-              </span>
+              <span v-else class="text-slate-400 italic"> Pending Institutional Approval </span>
             </div>
           </div>
 
@@ -319,7 +332,11 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
             <span class="text-slate-400 font-medium uppercase tracking-wider text-[11px] block">
               Governance Notes
             </span>
-            <p class="text-slate-600 truncate" :title="currentAcademicYear.notes || ''" data-testid="ay-summary-notes">
+            <p
+              class="text-slate-600 truncate"
+              :title="currentAcademicYear.notes || ''"
+              data-testid="ay-summary-notes"
+            >
               {{ currentAcademicYear.notes || 'No institutional notes recorded.' }}
             </p>
           </div>
@@ -342,9 +359,7 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
         <div class="space-y-0.5">
           <div class="flex items-center gap-2">
             <FolderTree class="w-4 h-4 text-teal-600" />
-            <h3 class="text-sm font-semibold text-slate-800">
-              Operational Periods Hierarchy
-            </h3>
+            <h3 class="text-sm font-semibold text-slate-800">Operational Periods Hierarchy</h3>
           </div>
           <p class="text-xs text-slate-500">
             Interactive multi-level periods tree (semesters, terms, assessment & admission windows).
@@ -540,6 +555,24 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
           <Column header="Actions" style="min-width: 130px; text-align: right">
             <template #body="{ node }: { node: PeriodTreeNode }">
               <div class="flex items-center justify-end gap-1">
+                <!-- Activate Period Action -->
+                <Button
+                  v-if="
+                    canManage && (node.data.status === 'draft' || node.data.status === 'approved')
+                  "
+                  type="button"
+                  text
+                  rounded
+                  size="small"
+                  class="p-1 text-slate-500 hover:text-emerald-600 cursor-pointer"
+                  title="Activate operational period"
+                  data-testid="row-activate-period-btn"
+                  :loading="activatePeriodMutation.isPending.value"
+                  @click="handleActivatePeriod(node.data)"
+                >
+                  <CheckCircle2 class="w-3.5 h-3.5" />
+                </Button>
+
                 <!-- Correct Period Action -->
                 <Button
                   v-if="canCorrect"
@@ -557,7 +590,9 @@ function handleClosePeriod(period: OperationalPeriodDto): void {
 
                 <!-- Close Period Action -->
                 <Button
-                  v-if="canManage && (node.data.status === 'active' || node.data.status === 'approved')"
+                  v-if="
+                    canManage && (node.data.status === 'active' || node.data.status === 'approved')
+                  "
                   type="button"
                   text
                   rounded
