@@ -28,7 +28,10 @@ import type {
 export async function getAdmissionApplicationsList(
   params?: AdmissionQueueFilterParams,
 ): Promise<AdmissionApplicationListItemDto[]> {
-  const cleanParams: Record<string, string | number> = {};
+  const cleanParams: Record<string, string | number> = {
+    page: typeof params?.page === 'number' ? params.page : 1,
+    pageSize: typeof params?.pageSize === 'number' ? params.pageSize : 50,
+  };
 
   if (params) {
     if (params.admissionPeriodId) cleanParams.admissionPeriodId = params.admissionPeriodId;
@@ -37,8 +40,6 @@ export async function getAdmissionApplicationsList(
       cleanParams.requestedEntryLevel = params.requestedEntryLevel;
     }
     if (params.searchTerm?.trim()) cleanParams.searchTerm = params.searchTerm.trim();
-    if (typeof params.page === 'number') cleanParams.page = params.page;
-    if (typeof params.pageSize === 'number') cleanParams.pageSize = params.pageSize;
   }
 
   const response = (await apiClient.get('/students/admission/applications', {

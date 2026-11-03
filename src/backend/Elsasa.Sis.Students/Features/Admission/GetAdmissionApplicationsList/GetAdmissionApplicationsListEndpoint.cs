@@ -27,8 +27,8 @@ public sealed class GetAdmissionApplicationsListEndpoint : IEndpoint
         string? status,
         string? requestedEntryLevel,
         string? searchTerm,
-        int page,
-        int pageSize,
+        int? page,
+        int? pageSize,
         GetAdmissionApplicationsListHandler handler,
         CancellationToken cancellationToken)
     {
@@ -37,8 +37,8 @@ public sealed class GetAdmissionApplicationsListEndpoint : IEndpoint
             status,
             requestedEntryLevel,
             searchTerm,
-            page,
-            pageSize,
+            page ?? 1,
+            pageSize ?? 20,
             cancellationToken);
 
         return result.IsSuccess
