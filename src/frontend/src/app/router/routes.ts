@@ -55,6 +55,24 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/features/dashboard/views/DashboardView.vue'),
         meta: { title: 'Dashboard' },
       },
+      // STAGE 2: ACADEMICS DOMAIN (SCR-ACD-03)
+      {
+        path: 'academics',
+        component: RouterView,
+        children: [
+          {
+            path: 'curriculum',
+            name: 'curriculum-workspace',
+            component: () =>
+              import('@/features/academics/curriculum/views/CurriculumWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.curriculum.view',
+              title: 'Curriculum & Learning Structures',
+            },
+          },
+        ],
+      },
       // STAGE 1: STUDENTS DOMAIN
       {
         path: 'students',

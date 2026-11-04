@@ -1,6 +1,7 @@
 namespace Elsasa.Sis.IntegrationTests.Fixtures;
 
 using System.Collections.Concurrent;
+using Elsasa.Sis.Contracts.Academics.Events;
 using Elsasa.Sis.Contracts.Finance.Events;
 using Elsasa.Sis.Contracts.Students.Events;
 using MediatR;
@@ -13,13 +14,15 @@ public sealed class TestEventCollector :
     INotificationHandler<StudentEnrolledEvent>,
     INotificationHandler<PlacementChangedEvent>,
     INotificationHandler<ObligationAssessedEvent>,
-    INotificationHandler<PaymentConfirmedEvent>
+    INotificationHandler<PaymentConfirmedEvent>,
+    INotificationHandler<LearningStructureActivatedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
     private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
     private readonly ConcurrentBag<ObligationAssessedEvent> _obligationAssessedEvents = [];
     private readonly ConcurrentBag<PaymentConfirmedEvent> _paymentConfirmedEvents = [];
+    private readonly ConcurrentBag<LearningStructureActivatedEvent> _learningStructureActivatedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -47,6 +50,11 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<PaymentConfirmedEvent> PaymentConfirmedEvents => _paymentConfirmedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="LearningStructureActivatedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<LearningStructureActivatedEvent> LearningStructureActivatedEvents => _learningStructureActivatedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -56,6 +64,7 @@ public sealed class TestEventCollector :
         _placementChangedEvents.Clear();
         _obligationAssessedEvents.Clear();
         _paymentConfirmedEvents.Clear();
+        _learningStructureActivatedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -95,6 +104,14 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _paymentConfirmedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(LearningStructureActivatedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _learningStructureActivatedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

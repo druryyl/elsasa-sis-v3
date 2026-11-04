@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Stage 2 Academics domain assembly (ADR-001, ADR-010, TD-02).
+    May reference only Shared and Contracts; must never reference Operations,
+    Students, Finance, Api, or Database. Compile-time isolation is verified by
+    the architecture tests.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Elsasa.Sis.Shared/Elsasa.Sis.Shared.csproj" />
+    <ProjectReference Include="../Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

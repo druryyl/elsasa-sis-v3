@@ -275,8 +275,53 @@ describe('AppLayout.vue', () => {
 
       expect(wrapper.find('[data-testid="nav-item-dashboard"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="nav-group-operations"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="nav-group-students"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="nav-group-finance"]').exists()).toBe(false);
+    });
+
+    it('renders Academics navigation group and Curriculum & Requirements item for user with permission', () => {
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics.curriculum.view'],
+        }),
+      );
+
+      const wrapper = mountLayout();
+
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
+      const curriculumItem = wrapper.find('[data-testid="nav-item-academics-curriculum"]');
+      expect(curriculumItem.exists()).toBe(true);
+      expect(curriculumItem.text()).toContain('Curriculum & Requirements');
+      expect(curriculumItem.attributes('href')).toBe('/academics/curriculum');
+      expect(curriculumItem.find('i.pi.pi-book').exists()).toBe(true);
+    });
+
+    it('renders Academics navigation for roles AcademicCoordinator, AcademicAuthority, and Admin', () => {
+      const authStore = useAuthStore();
+
+      for (const role of ['AcademicCoordinator', 'AcademicAuthority', 'Admin']) {
+        authStore.setSession(
+          'test-token',
+          createTestUser({
+            roles: [role],
+            permissions: [],
+          }),
+        );
+
+        const wrapper = mountLayout();
+        expect(
+          wrapper.find('[data-testid="nav-group-academics"]').exists(),
+          `Expected nav-group-academics to exist for role ${role}`,
+        ).toBe(true);
+        expect(
+          wrapper.find('[data-testid="nav-item-academics-curriculum"]').exists(),
+          `Expected nav-item-academics-curriculum to exist for role ${role}`,
+        ).toBe(true);
+      }
     });
 
     it('toggles group accordion in expanded sidebar mode', async () => {

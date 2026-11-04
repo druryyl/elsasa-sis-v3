@@ -217,6 +217,50 @@ describe('Navigation Guards & Router Integration', () => {
       expect(router.currentRoute.value.path).toBe('/403');
     });
 
+    it('enforces permissions on Academics curriculum workspace route', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // User lacking academics permission
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: ['Permissions.Operations.Calendar.Manage'],
+        }),
+      );
+
+      await router.push('/academics/curriculum');
+      expect(router.currentRoute.value.path).toBe('/403');
+
+      // User with academics.curriculum.view permission
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics.curriculum.view'],
+        }),
+      );
+
+      await router.push('/academics/curriculum');
+      expect(router.currentRoute.value.path).toBe('/academics/curriculum');
+      expect(router.currentRoute.value.name).toBe('curriculum-workspace');
+      expect(document.title).toBe('Curriculum & Learning Structures — Elsasa SIS');
+
+      // User with AcademicCoordinator role
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['AcademicCoordinator'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/curriculum');
+      expect(router.currentRoute.value.path).toBe('/academics/curriculum');
+      expect(router.currentRoute.value.name).toBe('curriculum-workspace');
+    });
+
     it('matches catch-all not-found route when authenticated', async () => {
       const router = createAppRouter({ history: createMemoryHistory() });
       const authStore = useAuthStore();

@@ -43,8 +43,16 @@ export function setupNavigationGuards(router: Router): void {
     }
 
     // 2. Permission barrier: Route requires a specific actor permission
-    if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
-      return '/403';
+    if (to.meta.permission) {
+      const isAllowed =
+        authStore.hasPermission(to.meta.permission) ||
+        (to.meta.permission === 'academics.curriculum.view' &&
+          (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
+            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin'])));
+
+      if (!isAllowed) {
+        return '/403';
+      }
     }
 
     // 3. Document title resolution

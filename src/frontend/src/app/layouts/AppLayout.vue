@@ -26,22 +26,25 @@ import {
   Shield,
   Layers,
   Wallet,
+  BookOpen,
 } from 'lucide-vue-next';
 
 interface NavChildItem {
   id: string;
   label: string;
   to: string;
-  icon?: VueComponent;
+  icon?: VueComponent | string;
   permission?: string;
+  roles?: string[];
 }
 
 interface NavParentItem {
   id: string;
   label: string;
   to?: string;
-  icon: VueComponent;
+  icon: VueComponent | string;
   permission?: string;
+  roles?: string[];
   children?: NavChildItem[];
 }
 
@@ -60,6 +63,7 @@ const isCampusSelectorOpen = ref(false);
 // Expanded menu groups in expanded sidebar mode
 const openGroups = ref<Record<string, boolean>>({
   operations: true,
+  academics: true,
   students: true,
   finance: true,
 });
@@ -112,6 +116,21 @@ const masterNavItems: NavParentItem[] = [
         to: '/operations/calendar',
         icon: CalendarDays,
         permission: 'Permissions.Operations.Calendar.Manage',
+      },
+    ],
+  },
+  {
+    id: 'academics',
+    label: 'Academics',
+    icon: BookOpen,
+    children: [
+      {
+        id: 'academics-curriculum',
+        label: 'Curriculum & Requirements',
+        to: '/academics/curriculum',
+        icon: 'pi pi-book',
+        permission: 'academics.curriculum.view',
+        roles: ['AcademicCoordinator', 'AcademicAuthority', 'Admin'],
       },
     ],
   },
@@ -187,21 +206,48 @@ const masterNavItems: NavParentItem[] = [
   },
 ];
 
-// Hierarchical navigation links filtered dynamically via authStore.hasPermission()
+function checkPermission(permission: string): boolean {
+  if (authStore.hasPermission(permission)) return true;
+  if (
+    permission === 'academics.curriculum.view' &&
+    authStore.hasPermission('Permissions.Academics.Curriculum.View')
+  ) {
+    return true;
+  }
+  if (
+    permission === 'Permissions.Academics.Curriculum.View' &&
+    authStore.hasPermission('academics.curriculum.view')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isNavAuthorized(item: { permission?: string; roles?: string[] }): boolean {
+  if (!item.permission && (!item.roles || item.roles.length === 0)) {
+    return true;
+  }
+  if (item.permission && checkPermission(item.permission)) {
+    return true;
+  }
+  if (item.roles && item.roles.length > 0 && authStore.hasAnyRole(item.roles)) {
+    return true;
+  }
+  return false;
+}
+
+// Hierarchical navigation links filtered dynamically via authStore permissions & roles
 const filteredNavItems = computed<NavParentItem[]>(() => {
   return masterNavItems
     .map((item) => {
-      // If parent item requires a direct permission
-      if (item.permission && !authStore.hasPermission(item.permission)) {
+      // If parent item requires a direct permission or role
+      if ((item.permission || item.roles) && !isNavAuthorized(item)) {
         return null;
       }
 
-      // If parent item has children, filter children by permission
+      // If parent item has children, filter children by permission or role
       if (item.children) {
-        const visibleChildren = item.children.filter((child) => {
-          if (!child.permission) return true;
-          return authStore.hasPermission(child.permission);
-        });
+        const visibleChildren = item.children.filter((child) => isNavAuthorized(child));
 
         // Hide parent group if it has no link itself and 0 visible children
         if (!item.to && visibleChildren.length === 0) {
@@ -333,7 +379,12 @@ function selectCampus(campusId: string) {
             :title="uiStore.isSidebarCollapsed ? item.label : undefined"
             :data-testid="`nav-item-${item.id}`"
           >
-            <component :is="item.icon" class="w-5 h-5 shrink-0" aria-hidden="true" />
+            <i
+              v-if="typeof item.icon === 'string'"
+              :class="[item.icon, 'text-base shrink-0']"
+              aria-hidden="true"
+            />
+            <component v-else :is="item.icon" class="w-5 h-5 shrink-0" aria-hidden="true" />
             <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ item.label }}</span>
           </RouterLink>
 
@@ -348,7 +399,12 @@ function selectCampus(campusId: string) {
               @click="toggleGroup(item.id)"
             >
               <span class="flex items-center gap-2 truncate">
-                <component :is="item.icon" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <i
+                  v-if="typeof item.icon === 'string'"
+                  :class="[item.icon, 'text-base shrink-0']"
+                  aria-hidden="true"
+                />
+                <component v-else :is="item.icon" class="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span class="truncate">{{ item.label }}</span>
               </span>
               <ChevronDown
@@ -367,7 +423,17 @@ function selectCampus(campusId: string) {
               :title="item.label"
               :data-testid="`nav-group-icon-${item.id}`"
             >
+              <i
+                v-if="typeof item.icon === 'string'"
+                :class="[
+                  item.icon,
+                  'text-lg',
+                  isGroupActive(item) ? 'text-elsasa-teal-600' : 'text-slate-400',
+                ]"
+                aria-hidden="true"
+              />
               <component
+                v-else
                 :is="item.icon"
                 :class="[
                   'w-5 h-5',
@@ -397,7 +463,12 @@ function selectCampus(campusId: string) {
                 :title="uiStore.isSidebarCollapsed ? child.label : undefined"
                 :data-testid="`nav-item-${child.id}`"
               >
-                <component :is="child.icon ?? Layers" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <i
+                  v-if="typeof child.icon === 'string'"
+                  :class="[child.icon, 'text-base shrink-0']"
+                  aria-hidden="true"
+                />
+                <component v-else :is="child.icon ?? Layers" class="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ child.label }}</span>
               </RouterLink>
             </div>
