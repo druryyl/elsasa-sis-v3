@@ -6,6 +6,11 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Select from 'primevue/select';
 import Checkbox from 'primevue/checkbox';
+import {
+  Users,
+  Phone,
+  ShieldCheck,
+} from 'lucide-vue-next';
 import { FormField } from '@/shared/components';
 import { updateGuardianSchema, GUARDIAN_RELATIONSHIP_TYPES } from '../schemas/records.schema';
 import { useUpdateGuardianMutation } from '../composables/useStudentRecordsMutations';
@@ -123,162 +128,221 @@ async function handleSubmit() {
   <Dialog
     :visible="visible"
     modal
-    :header="`Edit Responsibilities — ${guardian?.fullName || 'Guardian'}`"
-    class="w-full max-w-xl"
+    :style="{ width: '720px' }"
+    :breakpoints="{ '960px': '85vw', '640px': '95vw' }"
     data-testid="edit-guardian-dialog"
     @update:visible="emit('update:visible', $event)"
   >
-    <form class="space-y-4 py-2" @submit.prevent="handleSubmit">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Relationship Type -->
-        <div>
-          <FormField label="Relationship Type" required :error="errors.relationshipType">
-            <Select
-              v-model="relationshipType"
-              :options="relationshipOptions"
-              option-label="label"
-              option-value="value"
-              class="w-full"
-              :invalid="Boolean(errors.relationshipType)"
-              data-testid="select-edit-relationship-type"
-            />
-          </FormField>
+    <template #header>
+      <div class="flex items-start gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0 text-teal-600 dark:text-teal-400 shadow-xs">
+          <Users class="w-5 h-5" />
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center gap-2.5">
+            <h3 class="font-semibold text-surface-900 dark:text-surface-100 text-base leading-snug">
+              Edit Responsibilities — {{ guardian?.fullName || 'Guardian' }}
+            </h3>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+              Custody Roles
+            </span>
+          </div>
+          <p class="text-xs text-surface-500 dark:text-surface-400">
+            Adjust contact credentials, primary communication designations, and pickup authorizations.
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <form class="space-y-5 pt-3 pb-1" @submit.prevent="handleSubmit">
+      <!-- Section 1: Relationship & Occupation -->
+      <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+          <Users class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Guardian Classification</span>
         </div>
 
-        <!-- Occupation -->
-        <div>
-          <FormField label="Occupation" :error="errors.occupation">
-            <InputText
-              v-model="occupation"
-              placeholder="e.g. Architect"
-              class="w-full"
-              :invalid="Boolean(errors.occupation)"
-              data-testid="input-edit-guardian-occupation"
-            />
-          </FormField>
-        </div>
-
-        <!-- Phone -->
-        <div>
-          <FormField label="Phone / WhatsApp" :error="errors.phone">
-            <InputText
-              v-model="phone"
-              class="w-full"
-              :invalid="Boolean(errors.phone)"
-              data-testid="input-edit-guardian-phone"
-            />
-          </FormField>
-        </div>
-
-        <!-- Email -->
-        <div>
-          <FormField label="Email" :error="errors.email">
-            <InputText
-              v-model="email"
-              type="email"
-              class="w-full"
-              :invalid="Boolean(errors.email)"
-              data-testid="input-edit-guardian-email"
-            />
-          </FormField>
-        </div>
-
-        <!-- Address -->
-        <div class="md:col-span-2">
-          <FormField label="Address" :error="errors.address">
-            <Textarea
-              v-model="address"
-              rows="2"
-              class="w-full"
-              :invalid="Boolean(errors.address)"
-              data-testid="input-edit-guardian-address"
-            />
-          </FormField>
-        </div>
-
-        <!-- Responsibility Badges -->
-        <div class="md:col-span-2 p-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-800/40 space-y-3">
-          <span class="text-xs font-semibold text-surface-900 dark:text-surface-100 block">
-            Designated Responsibilities &amp; Contact Roles
-          </span>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="flex items-center gap-2">
-              <Checkbox
-                v-model="isPrimaryContact"
-                :binary="true"
-                input-id="edit-primary-contact"
-                data-testid="checkbox-edit-primary"
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Relationship Type -->
+          <div>
+            <FormField label="Relationship Type" required :error="errors.relationshipType">
+              <Select
+                v-model="relationshipType"
+                :options="relationshipOptions"
+                option-label="label"
+                option-value="value"
+                class="w-full text-sm"
+                :invalid="Boolean(errors.relationshipType)"
+                data-testid="select-edit-relationship-type"
               />
-              <label for="edit-primary-contact" class="text-xs cursor-pointer select-none">
-                <span class="font-medium text-emerald-700 dark:text-emerald-400 block">Primary Contact</span>
-                <span class="text-surface-500 text-[11px] block">Transfers primary designation to this guardian</span>
-              </label>
-            </div>
+            </FormField>
+          </div>
 
-            <div class="flex items-center gap-2">
-              <Checkbox
-                v-model="isEmergencyContact"
-                :binary="true"
-                input-id="edit-emergency-contact"
-                data-testid="checkbox-edit-emergency"
+          <!-- Occupation -->
+          <div>
+            <FormField label="Occupation / Profession" :error="errors.occupation">
+              <InputText
+                v-model="occupation"
+                placeholder="e.g. Architect"
+                class="w-full text-sm"
+                :invalid="Boolean(errors.occupation)"
+                data-testid="input-edit-guardian-occupation"
               />
-              <label for="edit-emergency-contact" class="text-xs cursor-pointer select-none">
-                <span class="font-medium text-amber-700 dark:text-amber-400 block">Emergency Contact</span>
-                <span class="text-surface-500 text-[11px] block">Authorized emergency contact</span>
-              </label>
-            </div>
+            </FormField>
+          </div>
+        </div>
+      </div>
 
-            <div class="flex items-center gap-2">
-              <Checkbox
-                v-model="isFinancialContact"
-                :binary="true"
-                input-id="edit-financial-contact"
-                data-testid="checkbox-edit-financial"
-              />
-              <label for="edit-financial-contact" class="text-xs cursor-pointer select-none">
-                <span class="font-medium text-blue-700 dark:text-blue-400 block">Financial Contact</span>
-                <span class="text-surface-500 text-[11px] block">Receives invoices &amp; fee statements</span>
-              </label>
-            </div>
+      <!-- Section 2: Contact & Residential Location -->
+      <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+          <Phone class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Contact Channels &amp; Address</span>
+        </div>
 
-            <div class="flex items-center gap-2">
-              <Checkbox
-                v-model="isAuthorizedPickup"
-                :binary="true"
-                input-id="edit-authorized-pickup"
-                data-testid="checkbox-edit-pickup"
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Phone -->
+          <div>
+            <FormField label="Phone / WhatsApp" :error="errors.phone">
+              <InputText
+                v-model="phone"
+                class="w-full text-sm"
+                :invalid="Boolean(errors.phone)"
+                data-testid="input-edit-guardian-phone"
               />
-              <label for="edit-authorized-pickup" class="text-xs cursor-pointer select-none">
-                <span class="font-medium text-purple-700 dark:text-purple-400 block">Authorized Pickup</span>
-                <span class="text-surface-500 text-[11px] block">Authorized for pickup clearance</span>
-              </label>
-            </div>
+            </FormField>
+          </div>
+
+          <!-- Email -->
+          <div>
+            <FormField label="Email Address" :error="errors.email">
+              <InputText
+                v-model="email"
+                type="email"
+                class="w-full text-sm"
+                :invalid="Boolean(errors.email)"
+                data-testid="input-edit-guardian-email"
+              />
+            </FormField>
+          </div>
+
+          <!-- Address -->
+          <div class="md:col-span-2">
+            <FormField label="Residential Address" :error="errors.address">
+              <Textarea
+                v-model="address"
+                rows="2"
+                class="w-full text-sm leading-relaxed"
+                :invalid="Boolean(errors.address)"
+                data-testid="input-edit-guardian-address"
+              />
+            </FormField>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Responsibility Badges -->
+      <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+          <ShieldCheck class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Designated Responsibilities &amp; Contact Roles</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <!-- Primary Contact -->
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 shadow-2xs hover:border-emerald-400 transition-colors">
+            <Checkbox
+              v-model="isPrimaryContact"
+              :binary="true"
+              input-id="edit-primary-contact"
+              data-testid="checkbox-edit-primary"
+              class="mt-0.5"
+            />
+            <label for="edit-primary-contact" class="text-xs cursor-pointer select-none space-y-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                Primary Contact
+              </span>
+              <span class="text-surface-500 dark:text-surface-400 text-xs block leading-normal">Transfers primary designation to this guardian</span>
+            </label>
+          </div>
+
+          <!-- Emergency Contact -->
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 shadow-2xs hover:border-amber-400 transition-colors">
+            <Checkbox
+              v-model="isEmergencyContact"
+              :binary="true"
+              input-id="edit-emergency-contact"
+              data-testid="checkbox-edit-emergency"
+              class="mt-0.5"
+            />
+            <label for="edit-emergency-contact" class="text-xs cursor-pointer select-none space-y-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                Emergency Contact
+              </span>
+              <span class="text-surface-500 dark:text-surface-400 text-xs block leading-normal">Authorized emergency contact</span>
+            </label>
+          </div>
+
+          <!-- Financial Contact -->
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 shadow-2xs hover:border-blue-400 transition-colors">
+            <Checkbox
+              v-model="isFinancialContact"
+              :binary="true"
+              input-id="edit-financial-contact"
+              data-testid="checkbox-edit-financial"
+              class="mt-0.5"
+            />
+            <label for="edit-financial-contact" class="text-xs cursor-pointer select-none space-y-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                Financial Contact
+              </span>
+              <span class="text-surface-500 dark:text-surface-400 text-xs block leading-normal">Receives invoices &amp; fee statements</span>
+            </label>
+          </div>
+
+          <!-- Authorized Pickup -->
+          <div class="flex items-start gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 shadow-2xs hover:border-purple-400 transition-colors">
+            <Checkbox
+              v-model="isAuthorizedPickup"
+              :binary="true"
+              input-id="edit-authorized-pickup"
+              data-testid="checkbox-edit-pickup"
+              class="mt-0.5"
+            />
+            <label for="edit-authorized-pickup" class="text-xs cursor-pointer select-none space-y-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-50 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                Authorized Pickup
+              </span>
+              <span class="text-surface-500 dark:text-surface-400 text-xs block leading-normal">Authorized for pickup clearance</span>
+            </label>
           </div>
         </div>
 
         <!-- Relationship Active Status -->
-        <div class="md:col-span-2 flex items-center gap-2">
-          <Checkbox
-            v-model="isActive"
-            :binary="true"
-            input-id="edit-active-status"
-            data-testid="checkbox-edit-active"
-          />
-          <label for="edit-active-status" class="text-xs cursor-pointer select-none">
-            <span class="font-medium text-surface-800 dark:text-surface-200">Active Relationship</span>
-            <span class="text-surface-500 text-[11px] block">Inactive guardians are retained for historical audit only</span>
-          </label>
+        <div class="p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-100/50 dark:bg-surface-800/40">
+          <div class="flex items-start gap-3">
+            <Checkbox
+              v-model="isActive"
+              :binary="true"
+              input-id="edit-active-status"
+              data-testid="checkbox-edit-active"
+              class="mt-0.5"
+            />
+            <label for="edit-active-status" class="text-xs cursor-pointer select-none space-y-0.5">
+              <span class="font-semibold text-surface-900 dark:text-surface-100 block">Active Relationship</span>
+              <span class="text-surface-500 dark:text-surface-400 block leading-normal">Inactive guardians are retained for historical audit only and cannot authorize school actions.</span>
+            </label>
+          </div>
         </div>
 
         <!-- Notes -->
-        <div class="md:col-span-2">
-          <FormField label="Notes" :error="errors.notes">
+        <div>
+          <FormField label="Administrative Remarks" :error="errors.notes">
             <Textarea
               v-model="notes"
               rows="2"
-              placeholder="Administrative remarks..."
-              class="w-full"
+              placeholder="Administrative remarks or changes..."
+              class="w-full text-sm leading-relaxed"
               :invalid="Boolean(errors.notes)"
               data-testid="input-edit-guardian-notes"
             />
@@ -288,22 +352,24 @@ async function handleSubmit() {
     </form>
 
     <template #footer>
-      <div class="flex items-center justify-end gap-2 pt-2">
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-surface-200 dark:border-surface-800">
         <Button
           size="small"
-          variant="text"
+          variant="outlined"
           severity="secondary"
           label="Cancel"
           :disabled="isPending"
           data-testid="btn-cancel-edit-guardian"
+          class="!px-4 !py-2 !text-xs font-medium cursor-pointer"
           @click="handleClose"
         />
         <Button
           size="small"
           severity="primary"
           label="Save Responsibilities"
+          icon="pi pi-check"
           :loading="isPending"
-          class="!bg-teal-700 hover:!bg-teal-800 !border-teal-700"
+          class="!bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white !px-4 !py-2 !text-xs font-semibold cursor-pointer shadow-xs"
           data-testid="btn-save-edit-guardian"
           @click="handleSubmit"
         />

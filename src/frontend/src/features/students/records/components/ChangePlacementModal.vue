@@ -113,10 +113,10 @@ function populateForm() {
 
   resetForm({
     values: {
-      campus: active?.campus || props.student?.campus || '',
-      schoolLevel: active?.schoolLevel || props.student?.schoolLevel || '',
-      grade: active?.grade || props.student?.grade || '',
-      academicYear: active?.academicYear || props.student?.academicYear || '',
+      campus: active?.campus || (props.student as any)?.campus || '',
+      schoolLevel: active?.schoolLevel || (props.student as any)?.schoolLevel || '',
+      grade: active?.grade || (props.student as any)?.grade || '',
+      academicYear: active?.academicYear || (props.student as any)?.academicYear || '',
       effectiveDate: initialEffDate,
       program: active?.program || '',
       stream: active?.stream || '',
@@ -210,50 +210,76 @@ async function handleFormSubmit() {
   <Dialog
     :visible="visible"
     modal
-    header="Change Administrative Placement"
-    :style="{ width: '680px' }"
-    :breakpoints="{ '960px': '75vw', '640px': '95vw' }"
+    :style="{ width: '760px' }"
+    :breakpoints="{ '960px': '85vw', '640px': '95vw' }"
     data-testid="change-placement-modal"
     @update:visible="handleClose"
   >
+    <template #header>
+      <div class="flex items-start gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0 text-teal-600 dark:text-teal-400 shadow-xs">
+          <GraduationCap class="w-5 h-5" />
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center gap-2.5">
+            <h3 class="font-semibold text-surface-900 dark:text-surface-100 text-base leading-snug">
+              Change Administrative Placement
+            </h3>
+            <span v-if="student?.studentNumber" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-mono">
+              {{ student.studentNumber }}
+            </span>
+          </div>
+          <p class="text-xs text-surface-500 dark:text-surface-400">
+            Reassign academic placement, grade progression, cohort allocation, and term parameters for <strong class="text-surface-700 dark:text-surface-300">{{ student?.fullName || 'student' }}</strong>.
+          </p>
+        </div>
+      </div>
+    </template>
+
     <!-- Modal Content -->
-    <div class="space-y-5">
+    <div class="space-y-5 pt-3 pb-1">
       <!-- Active placement context banner -->
       <div
         v-if="currentActivePlacement"
-        class="p-3 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/70 dark:bg-teal-950/40 text-xs text-teal-900 dark:text-teal-200 flex items-center justify-between gap-3"
+        class="p-4 rounded-xl border border-teal-200 dark:border-teal-800/80 bg-teal-50/60 dark:bg-teal-950/30 text-xs text-teal-900 dark:text-teal-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
         data-testid="active-placement-banner"
       >
-        <div class="flex items-center gap-2">
-          <Building2 class="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
-          <span>
-            <strong>Current:</strong> {{ currentActivePlacement.campus }} • {{ currentActivePlacement.grade }} ({{ currentActivePlacement.schoolLevel }})
-          </span>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-teal-100 dark:bg-teal-900/60 flex items-center justify-center text-teal-700 dark:text-teal-300 shrink-0">
+            <Building2 class="w-4 h-4" />
+          </div>
+          <div>
+            <span class="font-medium text-surface-500 dark:text-surface-400 block text-[11px]">Current Active Assignment</span>
+            <span class="font-bold text-surface-900 dark:text-surface-100 text-sm">
+              {{ currentActivePlacement.campus }} • {{ currentActivePlacement.grade }} ({{ currentActivePlacement.schoolLevel }})
+            </span>
+          </div>
         </div>
-        <div class="shrink-0 text-teal-700 dark:text-teal-300">
-          Effective: <strong>{{ formatDisplayDate(currentActivePlacement.effectiveDate) }}</strong>
+        <div class="shrink-0 text-left sm:text-right bg-white dark:bg-surface-800 px-3 py-1.5 rounded-lg border border-teal-200 dark:border-teal-800">
+          <span class="text-[11px] text-surface-500 dark:text-surface-400 block">Effective Since</span>
+          <strong class="text-teal-800 dark:text-teal-300 font-semibold">{{ formatDisplayDate(currentActivePlacement.effectiveDate) }}</strong>
         </div>
       </div>
 
       <!-- General Form Error Message -->
       <div
         v-if="formErrorMessage"
-        class="p-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center gap-2"
+        class="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center gap-2.5"
         data-testid="form-error-message"
       >
         <AlertCircle class="w-4 h-4 shrink-0 text-rose-600" />
-        <span>{{ formErrorMessage }}</span>
+        <span class="font-medium">{{ formErrorMessage }}</span>
       </div>
 
-      <form class="space-y-4" @submit.prevent="handleFormSubmit">
+      <form class="space-y-5" @submit.prevent="handleFormSubmit">
         <!-- 1. Primary Placement Attributes -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400 mb-3 flex items-center gap-1.5">
-            <GraduationCap class="w-3.5 h-3.5 text-teal-600" />
-            <span>Target Placement Details</span>
-          </h4>
+        <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+            <GraduationCap class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Target Institutional Placement Details</span>
+          </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               id="placement-campus"
               label="Campus"
@@ -312,7 +338,7 @@ async function handleFormSubmit() {
                 id="placement-academic-year"
                 v-model="academicYear"
                 placeholder="e.g., 2026/2027"
-                class="w-full text-sm"
+                class="w-full text-sm font-mono"
                 :invalid="Boolean(errors.academicYear)"
                 data-testid="input-academic-year"
               />
@@ -321,15 +347,15 @@ async function handleFormSubmit() {
         </div>
 
         <!-- 2. Effective Date & Scheduling -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400 mb-3 flex items-center gap-1.5">
-            <Calendar class="w-3.5 h-3.5 text-teal-600" />
-            <span>Effective Date &amp; Scheduling</span>
-          </h4>
+        <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+            <Calendar class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Effective Date &amp; Reassignment Scheduling</span>
+          </div>
 
           <FormField
             id="placement-effective-date"
-            label="Effective Date"
+            label="Effective Transition Date"
             required
             :error="errors.effectiveDate"
             :help-text="minEffectiveDateStr ? `Must be on or after current placement date (${minEffectiveDateStr})` : 'Date from which this placement becomes active'"
@@ -351,16 +377,16 @@ async function handleFormSubmit() {
         </div>
 
         <!-- 3. Academic Categorization & Homeroom (Optional) -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400 mb-3 flex items-center gap-1.5">
-            <Layers class="w-3.5 h-3.5 text-teal-600" />
-            <span>Academic Categorization &amp; Cohort (Optional)</span>
-          </h4>
+        <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+            <Layers class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Academic Track, Cohort &amp; Homeroom (Optional)</span>
+          </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               id="placement-program"
-              label="Program"
+              label="Academic Program"
               optional
               :error="errors.program"
             >
@@ -376,7 +402,7 @@ async function handleFormSubmit() {
 
             <FormField
               id="placement-stream"
-              label="Stream"
+              label="Academic Stream"
               optional
               :error="errors.stream"
             >
@@ -392,7 +418,7 @@ async function handleFormSubmit() {
 
             <FormField
               id="placement-cohort"
-              label="Cohort"
+              label="Assigned Cohort"
               optional
               :error="errors.cohort"
             >
@@ -408,7 +434,7 @@ async function handleFormSubmit() {
 
             <FormField
               id="placement-homeroom"
-              label="Homeroom"
+              label="Homeroom / Classroom"
               optional
               :error="errors.homeroom"
             >
@@ -425,13 +451,13 @@ async function handleFormSubmit() {
         </div>
 
         <!-- 4. Governance, Authorization & Reason -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400 mb-3 flex items-center gap-1.5">
-            <ShieldCheck class="w-3.5 h-3.5 text-teal-600" />
-            <span>Governance &amp; Authorization (Optional)</span>
-          </h4>
+        <div class="p-4 sm:p-5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+            <ShieldCheck class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Governance, Decree &amp; Reason (Optional)</span>
+          </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               id="placement-authorized-by"
               label="Authorized By"
@@ -450,7 +476,7 @@ async function handleFormSubmit() {
 
             <FormField
               id="placement-decision-reference"
-              label="Decision Reference"
+              label="Decision Decree Reference"
               optional
               :error="errors.decisionReference"
             >
@@ -458,7 +484,7 @@ async function handleFormSubmit() {
                 id="placement-decision-reference"
                 v-model="decisionReference"
                 placeholder="e.g., Decree SK/2026/042"
-                class="w-full text-sm"
+                class="w-full text-sm font-mono"
                 :invalid="Boolean(errors.decisionReference)"
                 data-testid="input-decision-reference"
               />
@@ -476,7 +502,7 @@ async function handleFormSubmit() {
               v-model="reason"
               rows="3"
               placeholder="Provide justification for administrative placement reassignment..."
-              class="w-full text-sm"
+              class="w-full text-sm leading-relaxed"
               :invalid="Boolean(errors.reason)"
               data-testid="input-reason"
             />
@@ -487,7 +513,7 @@ async function handleFormSubmit() {
 
     <!-- Modal Footer Actions -->
     <template #footer>
-      <div class="flex items-center justify-end gap-2 pt-2">
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-surface-200 dark:border-surface-800">
         <Button
           type="button"
           label="Cancel"
@@ -495,12 +521,15 @@ async function handleFormSubmit() {
           variant="outlined"
           :disabled="isPending"
           data-testid="btn-cancel-placement"
+          class="!px-4 !py-2 !text-xs font-medium cursor-pointer"
           @click="handleClose"
         />
         <Button
           type="button"
           label="Confirm Placement Change"
           severity="primary"
+          icon="pi pi-check"
+          class="!bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white !px-4 !py-2 !text-xs font-semibold cursor-pointer shadow-xs"
           :loading="isPending"
           data-testid="btn-submit-placement"
           @click="handleFormSubmit"

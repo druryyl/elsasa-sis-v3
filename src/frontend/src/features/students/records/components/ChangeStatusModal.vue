@@ -33,7 +33,6 @@ const props = withDefaults(
   }>(),
   {
     studentId: '',
-    student: undefined,
     currentStatus: '',
   },
 );
@@ -167,157 +166,193 @@ function handleClose() {
   <Dialog
     v-model:visible="isDialogVisible"
     modal
-    class="max-w-lg w-full"
+    :style="{ width: '600px' }"
+    :breakpoints="{ '960px': '75vw', '640px': '95vw' }"
     data-testid="change-status-modal"
   >
     <template #header>
-      <div class="flex items-start gap-3">
-        <div class="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0 text-teal-600 dark:text-teal-400 shadow-2xs">
+      <div class="flex items-start gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0 text-teal-600 dark:text-teal-400 shadow-xs">
           <Activity class="w-5 h-5" />
         </div>
-        <div>
-          <div class="flex items-center gap-2">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2.5">
             <h3 class="font-semibold text-surface-900 dark:text-surface-100 text-base leading-snug">
               Adjust Operational Status
             </h3>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
               TD-05
             </span>
           </div>
-          <p class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-            <span v-if="studentDisplayName">For <strong class="text-surface-700 dark:text-surface-300">{{ studentDisplayName }}</strong>. </span>
+          <p class="text-xs text-surface-500 dark:text-surface-400">
+            <span v-if="studentDisplayName">Target student: <strong class="text-surface-700 dark:text-surface-300">{{ studentDisplayName }}</strong>. </span>
             Update operational student status and record chronological audit transition.
           </p>
         </div>
       </div>
     </template>
 
-    <form class="space-y-4 py-2" @submit.prevent="onSubmit">
-      <!-- Target Status -->
-      <FormField
-        label="Operational Status"
-        required
-        :error="errors.status"
-        description="Select the official target operational status."
-      >
-        <Select
-          id="status-select"
-          v-model="status"
-          :options="statusOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Select operational status"
-          class="w-full text-sm"
-          :invalid="Boolean(errors.status)"
-          data-testid="status-select"
-        >
-          <template #option="slotProps">
-            <div class="py-0.5">
-              <div class="flex items-center gap-2">
-                <span class="font-semibold text-xs text-surface-800 dark:text-surface-100">
-                  {{ slotProps.option.label }}
-                </span>
-                <span
-                  class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border"
-                  :class="slotProps.option.badgeClass"
-                >
-                  {{ slotProps.option.value }}
-                </span>
-              </div>
-              <div class="text-[11px] text-surface-500 mt-0.5">{{ slotProps.option.desc }}</div>
-            </div>
-          </template>
-        </Select>
-      </FormField>
+    <form class="space-y-5 pt-3 pb-1" @submit.prevent="onSubmit">
+      <!-- Current vs Target Status Context Banner -->
+      <div class="p-3.5 rounded-xl border border-teal-200 dark:border-teal-800/80 bg-teal-50/60 dark:bg-teal-950/30 text-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2 text-surface-600 dark:text-surface-300">
+            <span class="font-medium text-surface-500">Current Status:</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-xs capitalize bg-surface-100 dark:bg-surface-800 text-surface-800 dark:text-surface-200 border border-surface-300 dark:border-surface-700">
+              {{ currentStatus || (student && 'currentStatus' in student ? student.currentStatus : '') || 'enrolled' }}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-surface-400 text-xs">➔ Next Target:</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md font-bold text-xs uppercase bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200 border border-teal-300 dark:border-teal-700">
+              {{ status || 'active' }}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <!-- Effective Date -->
-      <FormField
-        label="Effective Date"
-        required
-        :error="errors.effectiveDate"
-        description="Date from which this operational status takes effect (YYYY-MM-DD)."
-      >
-        <DatePicker
-          id="status-effective-date"
-          v-model="datePickerModel"
-          date-format="yy-mm-dd"
-          placeholder="YYYY-MM-DD"
-          show-icon
-          class="w-full text-sm"
-          :invalid="Boolean(errors.effectiveDate)"
-          data-testid="effective-date-picker"
-          input-id="effective-date-input"
-        />
-      </FormField>
+      <!-- Section 1: Transition Specification -->
+      <div class="p-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+          <Activity class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Operational Status Parameters</span>
+        </div>
 
-      <!-- Reason / Justification -->
-      <FormField
-        label="Adjustment Reason"
-        :error="errors.reason"
-        description="Authoritative operational rationale or decree justification."
-      >
-        <Textarea
-          id="status-reason"
-          v-model="reason"
-          rows="3"
-          placeholder="e.g. Cleared for regular class attendance following enrollment verification."
-          class="w-full text-sm"
-          :invalid="Boolean(errors.reason)"
-          data-testid="reason-input"
-        />
-      </FormField>
-
-      <!-- Authorizer & Decision Reference Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <!-- Authorized By -->
+        <!-- Target Status -->
         <FormField
-          label="Authorized By"
-          :error="errors.authorizedBy"
-          description="Officer or authority executing change."
+          label="Target Operational Status"
+          required
+          :error="errors.status"
+          description="Select the official target operational status according to administrative decree."
         >
-          <InputText
-            id="status-authorized-by"
-            v-model="authorizedBy"
-            placeholder="e.g. Head of Student Records"
+          <Select
+            id="status-select"
+            v-model="status"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Select operational status"
             class="w-full text-sm"
-            :invalid="Boolean(errors.authorizedBy)"
-            data-testid="authorized-by-input"
-          />
+            :invalid="Boolean(errors.status)"
+            data-testid="status-select"
+          >
+            <template #option="slotProps">
+              <div class="py-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-xs text-surface-800 dark:text-surface-100">
+                    {{ slotProps.option.label }}
+                  </span>
+                  <span
+                    class="text-[11px] uppercase font-bold px-1.5 py-0.5 rounded border"
+                    :class="slotProps.option.badgeClass"
+                  >
+                    {{ slotProps.option.value }}
+                  </span>
+                </div>
+                <div class="text-xs text-surface-500 mt-1 leading-normal">{{ slotProps.option.desc }}</div>
+              </div>
+            </template>
+          </Select>
         </FormField>
 
-        <!-- Decision Reference -->
+        <!-- Effective Date -->
         <FormField
-          label="Decision Reference"
-          :error="errors.decisionReference"
-          description="Formal memo, decree or SK number."
+          label="Effective Date"
+          required
+          :error="errors.effectiveDate"
+          description="Date from which this operational status takes effect (YYYY-MM-DD)."
         >
-          <InputText
-            id="status-decision-reference"
-            v-model="decisionReference"
-            placeholder="e.g. SK-STATUS-2026-004"
+          <DatePicker
+            id="status-effective-date"
+            v-model="datePickerModel"
+            date-format="yy-mm-dd"
+            placeholder="YYYY-MM-DD"
+            show-icon
             class="w-full text-sm"
-            :invalid="Boolean(errors.decisionReference)"
-            data-testid="decision-reference-input"
+            :invalid="Boolean(errors.effectiveDate)"
+            data-testid="effective-date-picker"
+            input-id="effective-date-input"
           />
         </FormField>
       </div>
 
+      <!-- Section 2: Administrative Governance & Authorization -->
+      <div class="p-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40 space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-surface-200 dark:border-surface-800 text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+          <ShieldAlert class="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Governance &amp; Authorization Rationale</span>
+        </div>
+
+        <!-- Reason / Justification -->
+        <FormField
+          label="Adjustment Reason &amp; Justification"
+          :error="errors.reason"
+          description="Authoritative operational rationale or decree justification."
+        >
+          <Textarea
+            id="status-reason"
+            v-model="reason"
+            rows="3"
+            placeholder="e.g. Cleared for regular class attendance following enrollment verification and tuition settlement."
+            class="w-full text-sm leading-relaxed"
+            :invalid="Boolean(errors.reason)"
+            data-testid="reason-input"
+          />
+        </FormField>
+
+        <!-- Authorizer & Decision Reference Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Authorized By -->
+          <FormField
+            label="Authorized By"
+            :error="errors.authorizedBy"
+            description="Officer or authority executing change."
+          >
+            <InputText
+              id="status-authorized-by"
+              v-model="authorizedBy"
+              placeholder="e.g. Head of Student Records"
+              class="w-full text-sm"
+              :invalid="Boolean(errors.authorizedBy)"
+              data-testid="authorized-by-input"
+            />
+          </FormField>
+
+          <!-- Decision Reference -->
+          <FormField
+            label="Decision Reference"
+            :error="errors.decisionReference"
+            description="Formal decree, memo or decree SK number."
+          >
+            <InputText
+              id="status-decision-reference"
+              v-model="decisionReference"
+              placeholder="e.g. SK-STATUS-2026-004"
+              class="w-full text-sm font-mono"
+              :invalid="Boolean(errors.decisionReference)"
+              data-testid="decision-reference-input"
+            />
+          </FormField>
+        </div>
+      </div>
+
       <!-- Footer Actions -->
-      <div class="flex justify-end items-center gap-2 pt-4 border-t border-surface-200 dark:border-surface-700">
+      <div class="flex justify-end items-center gap-3 pt-4 border-t border-surface-200 dark:border-surface-800">
         <Button
           type="button"
           label="Cancel"
           severity="secondary"
-          text
+          variant="outlined"
           :disabled="isPending"
           data-testid="btn-cancel-change-status"
+          class="!px-4 !py-2 !text-xs font-medium cursor-pointer"
           @click="handleClose"
         />
         <Button
           type="submit"
-          label="Adjust Status"
+          label="Confirm Status Adjustment"
           icon="pi pi-check"
-          class="!bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white"
+          class="!bg-teal-700 hover:!bg-teal-800 !border-teal-700 text-white !px-4 !py-2 !text-xs font-semibold cursor-pointer shadow-xs"
           :loading="isPending"
           data-testid="btn-submit-change-status"
         />
