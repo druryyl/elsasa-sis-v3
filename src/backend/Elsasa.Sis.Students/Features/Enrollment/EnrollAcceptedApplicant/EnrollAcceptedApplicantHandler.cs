@@ -28,7 +28,9 @@ public sealed class EnrollAcceptedApplicantHandler(
             a.applicant_id AS ApplicantId,
             a.academic_year_id AS AcademicYearId,
             a.status AS ApplicationStatus,
-            d.decision_type AS DecisionType
+            a.registration_date AS RegistrationDate,
+            d.decision_type AS DecisionType,
+            d.decision_date AS DecisionDate
         FROM students.admission_applications a
         LEFT JOIN students.admission_decisions d ON d.application_id = a.id
         WHERE (
@@ -44,7 +46,9 @@ public sealed class EnrollAcceptedApplicantHandler(
             a.applicant_id AS ApplicantId,
             a.academic_year_id AS AcademicYearId,
             a.status AS ApplicationStatus,
-            d.decision_type AS DecisionType
+            a.registration_date AS RegistrationDate,
+            d.decision_type AS DecisionType,
+            d.decision_date AS DecisionDate
         FROM students.admission_applications a
         LEFT JOIN students.admission_decisions d ON d.application_id = a.id
         WHERE a.applicant_id = @ApplicantId
@@ -116,7 +120,7 @@ public sealed class EnrollAcceptedApplicantHandler(
             @Phone,
             @Email,
             0,
-            'enrolled',
+            'active',
             @EnrollmentDate,
             @Notes,
             SYSUTCDATETIME(),
@@ -164,6 +168,113 @@ public sealed class EnrollAcceptedApplicantHandler(
             @PaymentWaived,
             @WaiverReference,
             @Notes,
+            SYSUTCDATETIME(),
+            @CreatedBy
+        );
+        """;
+
+    private const string _insertAdministrativePlacementSql = """
+        INSERT INTO students.administrative_placements
+        (
+            id,
+            student_id,
+            campus,
+            school_level,
+            grade,
+            academic_year,
+            effective_date,
+            program,
+            stream,
+            cohort,
+            homeroom,
+            end_date,
+            is_current,
+            reason,
+            authorized_by,
+            decision_reference,
+            created_at,
+            created_by
+        )
+        VALUES
+        (
+            @Id,
+            @StudentId,
+            @Campus,
+            @SchoolLevel,
+            @Grade,
+            @AcademicYear,
+            @EffectiveDate,
+            @Program,
+            @Stream,
+            @Cohort,
+            @Homeroom,
+            @EndDate,
+            @IsCurrent,
+            @Reason,
+            @AuthorizedBy,
+            @DecisionReference,
+            SYSUTCDATETIME(),
+            @CreatedBy
+        );
+        """;
+
+    private const string _insertStudentStatusSql = """
+        INSERT INTO students.student_statuses
+        (
+            id,
+            student_id,
+            status,
+            effective_date,
+            end_date,
+            is_current,
+            reason,
+            authorized_by,
+            decision_reference,
+            created_at,
+            created_by
+        )
+        VALUES
+        (
+            @Id,
+            @StudentId,
+            @Status,
+            @EffectiveDate,
+            @EndDate,
+            @IsCurrent,
+            @Reason,
+            @AuthorizedBy,
+            @DecisionReference,
+            SYSUTCDATETIME(),
+            @CreatedBy
+        );
+        """;
+
+    private const string _insertAdministrativeHistoryEntrySql = """
+        INSERT INTO students.administrative_history_entries
+        (
+            id,
+            student_id,
+            event_type,
+            event_date,
+            detail,
+            authorized_by,
+            decision_reference,
+            is_correction,
+            corrects_entry_id,
+            created_at,
+            created_by
+        )
+        VALUES
+        (
+            @Id,
+            @StudentId,
+            @EventType,
+            @EventDate,
+            @Detail,
+            @AuthorizedBy,
+            @DecisionReference,
+            @IsCorrection,
+            @CorrectsEntryId,
             SYSUTCDATETIME(),
             @CreatedBy
         );
@@ -513,7 +624,73 @@ public sealed class EnrollAcceptedApplicantHandler(
                 transaction: tx,
                 cancellationToken: cancellationToken));
 
-            // 6.3 Promote verified applicant documents
+            // 6.3 Insert initial administrative placement
+            var placementId = Guid.NewGuid();
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAdministrativePlacementSql,
+                new
+                {
+                    Id = placementId,
+                    StudentId = studentId,
+                    Campus = request.InitialCampus.Trim(),
+                    SchoolLevel = request.InitialLevel.Trim(),
+                    Grade = request.InitialLevel.Trim(),
+                    AcademicYear = request.InitialAcademicYear.Trim(),
+                    EffectiveDate = enrollmentDate,
+                    Program = string.IsNullOrWhiteSpace(request.InitialProgram) ? null : request.InitialProgram.Trim(),
+                    Stream = (string?)null,
+                    Cohort = string.IsNullOrWhiteSpace(request.InitialCohort) ? null : request.InitialCohort.Trim(),
+                    Homeroom = (string?)null,
+                    EndDate = (DateOnly?)null,
+                    IsCurrent = true,
+                    Reason = "Initial enrollment placement",
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            // 6.4 Insert sequential status rows (closed enrolled -> active)
+            var statusEnrolledId = Guid.NewGuid();
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertStudentStatusSql,
+                new
+                {
+                    Id = statusEnrolledId,
+                    StudentId = studentId,
+                    Status = "enrolled",
+                    EffectiveDate = enrollmentDate,
+                    EndDate = (DateOnly?)enrollmentDate,
+                    IsCurrent = false,
+                    Reason = "Initial enrollment completed",
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            var statusActiveId = Guid.NewGuid();
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertStudentStatusSql,
+                new
+                {
+                    Id = statusActiveId,
+                    StudentId = studentId,
+                    Status = "active",
+                    EffectiveDate = enrollmentDate,
+                    EndDate = (DateOnly?)null,
+                    IsCurrent = true,
+                    Reason = "Activated upon enrollment completion",
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            // 6.5 Promote verified applicant documents
             await connection.ExecuteAsync(new CommandDefinition(
                 _promoteVerifiedDocumentsSql,
                 new
@@ -525,7 +702,7 @@ public sealed class EnrollAcceptedApplicantHandler(
                 transaction: tx,
                 cancellationToken: cancellationToken));
 
-            // 6.4 Ingest guardians & relationships
+            // 6.6 Ingest guardians & relationships
             IReadOnlyList<EnrollGuardianRequest> guardiansToProcess = request.Guardians ?? [];
 
             if (guardiansToProcess.Count == 0)
@@ -645,6 +822,86 @@ public sealed class EnrollAcceptedApplicantHandler(
                     cancellationToken: cancellationToken));
             }
 
+            // 6.7 Insert 4 chronological intake history audit entries
+            var appRegistrationDate = application.RegistrationDate ?? enrollmentDate;
+            var admissionDecisionDate = application.DecisionDate ?? enrollmentDate;
+
+            // Event 1: application_submitted
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAdministrativeHistoryEntrySql,
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    EventType = "application_submitted",
+                    EventDate = appRegistrationDate,
+                    Detail = (string?)null,
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    IsCorrection = false,
+                    CorrectsEntryId = (Guid?)null,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            // Event 2: application_accepted
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAdministrativeHistoryEntrySql,
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    EventType = "application_accepted",
+                    EventDate = admissionDecisionDate,
+                    Detail = (string?)null,
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    IsCorrection = false,
+                    CorrectsEntryId = (Guid?)null,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            // Event 3: enrollment_completed
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAdministrativeHistoryEntrySql,
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    EventType = "enrollment_completed",
+                    EventDate = enrollmentDate,
+                    Detail = $"Enrolled at {request.InitialCampus.Trim()} {request.InitialLevel.Trim()}",
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    IsCorrection = false,
+                    CorrectsEntryId = (Guid?)null,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
+            // Event 4: student_activated
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAdministrativeHistoryEntrySql,
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = studentId,
+                    EventType = "student_activated",
+                    EventDate = enrollmentDate,
+                    Detail = "Official student status activated",
+                    AuthorizedBy = auditUser,
+                    DecisionReference = studentNumber,
+                    IsCorrection = false,
+                    CorrectsEntryId = (Guid?)null,
+                    CreatedBy = auditUser
+                },
+                transaction: tx,
+                cancellationToken: cancellationToken));
+
             await tx.CommitAsync(cancellationToken);
         }
         catch
@@ -669,7 +926,9 @@ public sealed class EnrollAcceptedApplicantHandler(
         Guid ApplicantId,
         Guid AcademicYearId,
         string ApplicationStatus,
-        string? DecisionType);
+        DateOnly? RegistrationDate,
+        string? DecisionType,
+        DateOnly? DecisionDate);
 
     private sealed record ApplicantBiographicalRow(
         Guid Id,

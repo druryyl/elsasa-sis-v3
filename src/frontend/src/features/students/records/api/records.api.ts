@@ -3,6 +3,11 @@ import type { PaginatedResponse } from '@/shared/types/common';
 import type {
   AddGuardianPayload,
   AddGuardianResponse,
+  ChangeAdministrativePlacementRequest,
+  ChangeAdministrativePlacementResponse,
+  ChangeStudentStatusRequest,
+  ChangeStudentStatusResponse,
+  GetStudentAdministrativeHistoryResponse,
   StudentDetail,
   StudentListItem,
   StudentSearchParams,
@@ -159,4 +164,50 @@ export async function verifyStudentDocument(
     `/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(docId)}/verify`,
     payload,
   );
+}
+
+/**
+ * Changes a student's administrative placement (SCR-STU-02, P5-S12, STD-WF-05, UC-STD-06).
+ * POST /api/students/{studentId}/placements
+ */
+export async function changeAdministrativePlacement(
+  studentId: string,
+  payload: ChangeAdministrativePlacementRequest,
+): Promise<ChangeAdministrativePlacementResponse> {
+  const response = (await apiClient.post(
+    `/students/${encodeURIComponent(studentId)}/placements`,
+    payload,
+  )) as unknown as ChangeAdministrativePlacementResponse;
+
+  return response;
+}
+
+/**
+ * Changes a student's operational status (SCR-STU-02, P5-S12).
+ * POST /api/students/{studentId}/status
+ */
+export async function changeStudentStatus(
+  studentId: string,
+  payload: ChangeStudentStatusRequest,
+): Promise<ChangeStudentStatusResponse> {
+  const response = (await apiClient.post(
+    `/students/${encodeURIComponent(studentId)}/status`,
+    payload,
+  )) as unknown as ChangeStudentStatusResponse;
+
+  return response;
+}
+
+/**
+ * Retrieves the complete chronological administrative history entries for a student (SCR-STU-02, P5-S12).
+ * GET /api/students/{studentId}/history
+ */
+export async function getStudentAdministrativeHistory(
+  studentId: string,
+): Promise<GetStudentAdministrativeHistoryResponse> {
+  const response = (await apiClient.get(
+    `/students/${encodeURIComponent(studentId)}/history`,
+  )) as unknown as GetStudentAdministrativeHistoryResponse;
+
+  return response;
 }

@@ -7,3 +7,7 @@ export { default as StudentDocumentsTab } from './StudentDocumentsTab.vue';
 export { default as UploadDocumentModal } from './UploadDocumentModal.vue';
 export { default as VerifyDocumentModal } from './VerifyDocumentModal.vue';
 export { default as StudentEnrollmentHistoryTab } from './StudentEnrollmentHistoryTab.vue';
+export { default as StudentPlacementTab } from './StudentPlacementTab.vue';
+export { default as ChangePlacementModal } from './ChangePlacementModal.vue';
+export { default as StudentAdministrativeHistoryTab } from './StudentAdministrativeHistoryTab.vue';
+export { default as ChangeStatusModal } from './ChangeStatusModal.vue';

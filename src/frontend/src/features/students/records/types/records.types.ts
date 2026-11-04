@@ -115,7 +115,12 @@ export interface StudentDetail {
   enrollmentHistory: EnrollmentHistoryItem[];
   guardianRelationships: GuardianRelationshipItem[];
   documents: StudentDocumentItem[];
+  currentPlacement?: AdministrativePlacementDto | null;
+  placementHistory?: AdministrativePlacementDto[];
+  statusHistory?: StudentStatusDto[];
 }
+
+export type StudentDetailResponse = StudentDetail;
 
 /**
  * Query search filter parameters for GET /api/students.
@@ -239,4 +244,111 @@ export interface VerifyStudentDocumentResponse {
   verifiedBy?: string | null;
   verifiedDate?: string | null;
   notes?: string | null;
+}
+
+/**
+ * Authoritative administrative organizational placement period record (SCR-STU-02, P5-S12).
+ */
+export interface AdministrativePlacementDto {
+  id: string;
+  campus: string;
+  schoolLevel: string;
+  grade: string;
+  academicYear: string;
+  effectiveDate: string;
+  endDate?: string | null;
+  isCurrent: boolean;
+  program?: string | null;
+  stream?: string | null;
+  cohort?: string | null;
+  homeroom?: string | null;
+  reason?: string | null;
+  authorizedBy?: string | null;
+  decisionReference?: string | null;
+}
+
+/**
+ * Authoritative student operational status period record (SCR-STU-02, P5-S12).
+ */
+export interface StudentStatusDto {
+  id: string;
+  status: string;
+  effectiveDate: string;
+  endDate?: string | null;
+  isCurrent: boolean;
+  reason?: string | null;
+  authorizedBy?: string | null;
+  decisionReference?: string | null;
+}
+
+/**
+ * Immutable administrative history audit timeline entry (SCR-STU-02, P5-S12).
+ */
+export interface AdministrativeHistoryEntryDto {
+  id: string;
+  eventType: string;
+  eventDate: string;
+  detail?: string | null;
+  authorizedBy?: string | null;
+  decisionReference?: string | null;
+  isCorrection: boolean;
+  correctsEntryId?: string | null;
+  createdAt: string;
+  createdBy?: string | null;
+}
+
+/**
+ * Request payload for changing an administrative placement (POST /api/students/{id}/placements).
+ */
+export interface ChangeAdministrativePlacementRequest {
+  campus: string;
+  schoolLevel: string;
+  grade: string;
+  academicYear: string;
+  effectiveDate: string;
+  program?: string | null;
+  stream?: string | null;
+  cohort?: string | null;
+  homeroom?: string | null;
+  reason?: string | null;
+  authorizedBy?: string | null;
+  decisionReference?: string | null;
+}
+
+/**
+ * Response payload returned after changing an administrative placement.
+ */
+export interface ChangeAdministrativePlacementResponse {
+  placementId: string;
+  studentId: string;
+  isCurrent: boolean;
+}
+
+/**
+ * Request payload for changing a student operational status (POST /api/students/{id}/status).
+ */
+export interface ChangeStudentStatusRequest {
+  status: string;
+  effectiveDate: string;
+  reason?: string | null;
+  authorizedBy?: string | null;
+  decisionReference?: string | null;
+}
+
+/**
+ * Response payload returned after changing a student operational status.
+ */
+export interface ChangeStudentStatusResponse {
+  statusId: string;
+  studentId: string;
+  status: string;
+  isCurrent: boolean;
+}
+
+/**
+ * Response payload for retrieving chronological administrative history (GET /api/students/{id}/history).
+ */
+export interface GetStudentAdministrativeHistoryResponse {
+  studentId: string;
+  entries: AdministrativeHistoryEntryDto[];
 }

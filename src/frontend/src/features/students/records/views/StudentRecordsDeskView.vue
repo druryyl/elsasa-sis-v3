@@ -33,12 +33,15 @@ import {
   Info,
   Clock,
   IdCard,
+  History,
+  Activity,
 } from 'lucide-vue-next';
 import {
   PageHeader,
   StatusPill,
   EmptyState,
   LoadingSpinner,
+  type StatusVariant,
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate, formatDisplayDateTime } from '@/shared/utils/dateUtils';
@@ -57,6 +60,10 @@ import {
   StudentDocumentsTab,
   UploadDocumentModal,
   StudentEnrollmentHistoryTab,
+  StudentPlacementTab,
+  ChangePlacementModal,
+  StudentAdministrativeHistoryTab,
+  ChangeStatusModal,
 } from '../components';
 
 // ---------------------------------------------------------------------------
@@ -127,14 +134,18 @@ function resetFilters() {
   selectedStatus.value = '';
 }
 
-const searchParams = computed<StudentSearchParams>(() => ({
-  searchTerm: debouncedSearch.value?.trim() || undefined,
-  campus: selectedCampus.value || undefined,
-  level: selectedLevel.value || undefined,
-  status: selectedStatus.value || undefined,
-  pageNumber: 1,
-  pageSize: 50,
-}));
+const searchParams = computed<StudentSearchParams>(() => {
+  const params: StudentSearchParams = {
+    pageNumber: 1,
+    pageSize: 50,
+  };
+  const term = debouncedSearch.value?.trim();
+  if (term) params.searchTerm = term;
+  if (selectedCampus.value) params.campus = selectedCampus.value;
+  if (selectedLevel.value) params.level = selectedLevel.value;
+  if (selectedStatus.value) params.status = selectedStatus.value;
+  return params;
+});
 
 // ---------------------------------------------------------------------------
 // 4. Candidate Search Query & Metrics
@@ -190,12 +201,23 @@ const {
   enabled: computed(() => Boolean(selectedStudentId.value)),
 });
 
+const student = computed(() => dossier.value);
+
+const statusBadgeVariant = computed<StatusVariant | undefined>(() => {
+  const s = dossier.value?.currentStatus?.toLowerCase().trim();
+  if (s === 'active') return 'emerald';
+  if (s === 'enrolled') return 'sky';
+  return undefined;
+});
+
 // ---------------------------------------------------------------------------
-// 6. Action Modals State (Shell Placeholders for P10-S17)
+// 6. Action Modals State
 // ---------------------------------------------------------------------------
 const isEditIdentityModalOpen = ref(false);
 const isAddGuardianModalOpen = ref(false);
 const isUploadDocumentModalOpen = ref(false);
+const isChangePlacementModalOpen = ref(false);
+const isChangeStatusModalOpen = ref(false);
 
 function handleEditIdentity() {
   isEditIdentityModalOpen.value = true;
@@ -207,6 +229,14 @@ function handleAddGuardian() {
 
 function handleUploadDocument() {
   isUploadDocumentModalOpen.value = true;
+}
+
+function openChangePlacementModal() {
+  isChangePlacementModalOpen.value = true;
+}
+
+function openChangeStatusModal() {
+  isChangeStatusModalOpen.value = true;
 }
 </script>
 
@@ -455,7 +485,7 @@ function handleUploadDocument() {
                   </span>
 
                   <!-- Status Badge -->
-                  <StatusPill :status="dossier.currentStatus" size="md" data-testid="dossier-status-badge" />
+                  <StatusPill :status="dossier.currentStatus" :variant="statusBadgeVariant" size="md" data-testid="dossier-status-badge" />
 
                   <!-- Independent Student Badge -->
                   <span
@@ -479,6 +509,19 @@ function handleUploadDocument() {
 
               <!-- Quick Action Buttons -->
               <div class="flex flex-wrap items-center gap-2" data-testid="dossier-quick-actions">
+                <Button
+                  size="small"
+                  severity="secondary"
+                  variant="outlined"
+                  :disabled="!canEdit"
+                  class="!text-xs cursor-pointer"
+                  data-testid="change-status-button"
+                  @click="openChangeStatusModal"
+                >
+                  <Activity class="w-3.5 h-3.5 mr-1 text-teal-600" />
+                  <span>Change Status</span>
+                </Button>
+
                 <Button
                   size="small"
                   severity="secondary"
@@ -532,6 +575,13 @@ function handleUploadDocument() {
                   </div>
                 </Tab>
 
+                <Tab value="placement" data-testid="tab-placement">
+                  <div class="flex items-center gap-1.5 py-1 text-xs">
+                    <Building2 class="w-3.5 h-3.5 text-teal-600" />
+                    <span class="font-medium">Placement</span>
+                  </div>
+                </Tab>
+
                 <Tab value="guardians" data-testid="tab-guardians">
                   <div class="flex items-center gap-1.5 py-1 text-xs">
                     <Users class="w-3.5 h-3.5 text-teal-600" />
@@ -570,6 +620,13 @@ function handleUploadDocument() {
                     </span>
                   </div>
                 </Tab>
+
+                <Tab value="history" data-testid="tab-history">
+                  <div class="flex items-center gap-1.5 py-1 text-xs" data-testid="tab-administrative-history">
+                    <History class="w-3.5 h-3.5 text-teal-600" />
+                    <span class="font-medium">Administrative History</span>
+                  </div>
+                </Tab>
               </TabList>
 
               <TabPanels class="p-5">
@@ -585,7 +642,19 @@ function handleUploadDocument() {
                 </TabPanel>
 
                 <!-- ======================================================= -->
-                <!-- TAB 2: Guardians & Household                           -->
+                <!-- TAB 2: Placement                                        -->
+                <!-- ======================================================= -->
+                <TabPanel value="placement" data-testid="panel-placement">
+                  <StudentPlacementTab
+                    v-if="student"
+                    :student="student"
+                    :can-edit="canEdit"
+                    @change-placement="openChangePlacementModal"
+                  />
+                </TabPanel>
+
+                <!-- ======================================================= -->
+                <!-- TAB 3: Guardians & Household                           -->
                 <!-- ======================================================= -->
                 <TabPanel value="guardians" data-testid="panel-guardians">
                   <StudentGuardiansTab
@@ -596,7 +665,7 @@ function handleUploadDocument() {
                 </TabPanel>
 
                 <!-- ======================================================= -->
-                <!-- TAB 3: Official Documents                              -->
+                <!-- TAB 4: Official Documents                              -->
                 <!-- ======================================================= -->
                 <TabPanel value="documents" data-testid="panel-documents">
                   <StudentDocumentsTab
@@ -607,12 +676,25 @@ function handleUploadDocument() {
                 </TabPanel>
 
                 <!-- ======================================================= -->
-                <!-- TAB 4: Enrollment History                              -->
+                <!-- TAB 5: Enrollment History                              -->
                 <!-- ======================================================= -->
                 <TabPanel value="enrollment" data-testid="panel-enrollment">
                   <StudentEnrollmentHistoryTab
                     :student="dossier"
                   />
+                </TabPanel>
+
+                <!-- ======================================================= -->
+                <!-- TAB 6: Administrative History                          -->
+                <!-- ======================================================= -->
+                <TabPanel value="history" data-testid="panel-history">
+                  <div data-testid="panel-administrative-history">
+                    <StudentAdministrativeHistoryTab
+                      v-if="student"
+                      :student-id="student.id"
+                      :student="student"
+                    />
+                  </div>
                 </TabPanel>
               </TabPanels>
             </Tabs>
@@ -621,7 +703,7 @@ function handleUploadDocument() {
       </div>
     </div>
 
-    <!-- Action Modals (P10-S17) -->
+    <!-- Action Modals -->
     <EditIdentityModal
       v-if="dossier"
       v-model:visible="isEditIdentityModalOpen"
@@ -640,6 +722,22 @@ function handleUploadDocument() {
       v-if="dossier"
       v-model:visible="isUploadDocumentModalOpen"
       :student-id="dossier.id"
+      @saved="() => refetchDossier()"
+    />
+
+    <ChangePlacementModal
+      v-if="dossier"
+      v-model:visible="isChangePlacementModalOpen"
+      :student="dossier"
+      @saved="() => refetchDossier()"
+    />
+
+    <ChangeStatusModal
+      v-if="dossier"
+      v-model:visible="isChangeStatusModalOpen"
+      :student-id="dossier.id"
+      :student="dossier"
+      :current-status="dossier.currentStatus"
       @saved="() => refetchDossier()"
     />
   </div>

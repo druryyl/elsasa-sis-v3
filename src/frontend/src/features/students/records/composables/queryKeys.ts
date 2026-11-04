@@ -16,4 +16,16 @@ export const studentRecordsKeys = {
     studentId !== undefined && studentId !== null && studentId !== ''
       ? ([...studentRecordsKeys.details(), studentId] as const)
       : ([...studentRecordsKeys.details()] as const),
+  history: (id: string) => [...studentRecordsKeys.detail(id), 'history'] as const,
+};
+
+export const queryKeys = {
+  students: {
+    all: studentRecordsKeys.all,
+    lists: studentRecordsKeys.lists,
+    list: studentRecordsKeys.list,
+    details: studentRecordsKeys.details,
+    detail: studentRecordsKeys.detail,
+    history: (id: string) => [...queryKeys.students.detail(id), 'history'] as const,
+  },
 };

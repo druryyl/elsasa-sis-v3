@@ -4,7 +4,7 @@ Code: STU-PLACEMENT-STATUS
 Artifact: IMPLEMENTATION-PLAN
 Version: 1.0
 LastUpdated: 2026-11-04
-Status: NOT-STARTED
+Status: COMPLETED
 Execution Approval: APPROVED
 ---
 
@@ -211,15 +211,15 @@ COMPLETED is a plan-level status only, set when every slice has implementation s
 
 ## P1 - Persistence & Contracts Foundation
 
-Implementation Status: NOT-STARTED  
+Implementation Status: IN-PROGRESS  
 Review Status: NOT-REVIEWED
 
 ### P1-S01
 
 Title: Database Schema Migration & Backfill Script (`20261104_0101_Students_PlacementStatus_Tables.sql`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author and register the sequential forward DbUp migration script `20261104_0101_Students_PlacementStatus_Tables.sql` in `Elsasa.Sis.Database/Scripts/` to create domain tables `students.administrative_placements`, `students.student_statuses`, and `students.administrative_history_entries` with partial unique indexes, foreign keys, and an idempotent historical data backfill.
@@ -249,6 +249,14 @@ Completion Criteria:
 Notes:
 - Must follow SQL Server 2022 syntax and schema conventions defined in TD-01, TD-02, TD-07 of ARCHITECTURE.
 - Migration runs cleanly through DbUp within an atomic database transaction.
+- Authored and embedded migration script `20261104_0101_Students_PlacementStatus_Tables.sql` creating tables `students.administrative_placements`, `students.student_statuses`, and `students.administrative_history_entries`.
+- Provisioned partial unique indexes `ux_administrative_placements_student_active` and `ux_student_statuses_student_active` enforcing single active invariant.
+- Provisioned chronological nonclustered query indexes and foreign keys.
+- Implemented idempotent SQL backfill queries for active placement, active status, and baseline intake history.
+- Verified compilation and assembly embedded resource registration.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Database/Scripts/20261104_0101_Students_PlacementStatus_Tables.sql`
 
 ---
 
@@ -256,8 +264,8 @@ Notes:
 
 Title: Placement Changed Domain Event & Shared Contracts (`PlacementChangedEvent`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Introduce `PlacementChangedEvent.cs` in `Elsasa.Sis.Contracts/Students/Events/` implementing `IDomainEvent` to enable decoupled post-commit domain event publishing via MediatR when a student's administrative placement changes.
@@ -291,6 +299,16 @@ Completion Criteria:
 Notes:
 - Adheres to ADR-003: Published strictly post-commit via `IPublisher`. Downstream modules (Operations, Finance) may subscribe in Stage 2/3.
 
+Implementation Notes:
+- Created `src/backend/Elsasa.Sis.Contracts/Students/Events/PlacementChangedEvent.cs` adhering strictly to target architecture specification.
+- Implemented `Elsasa.Sis.Contracts.Common.IDomainEvent` (`OccurredOn` property).
+- Implemented primary constructor record with required placement attributes (`StudentId`, `PlacementId`, `Campus`, `SchoolLevel`, `Grade`, `AcademicYear`, `EffectiveDate`, `Program`, `Stream`, `Cohort`, `Homeroom`, `OccurredOn`).
+- Implemented convenience constructor defaulting `OccurredOn` to `DateTimeOffset.UtcNow`.
+- Clean compilation verified via `dotnet build` with 0 warnings and 0 errors.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Contracts/Students/Events/PlacementChangedEvent.cs`
+
 ---
 
 ## P2 - Backend Intake Orchestration & Query Projections
@@ -302,8 +320,8 @@ Review Status: NOT-REVIEWED
 
 Title: Enrollment Intake Placement, Status & History Orchestration (`EnrollAcceptedApplicantHandler`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Enhance `EnrollAcceptedApplicantHandler.cs` in `Elsasa.Sis.Students/Features/Enrollment/EnrollAcceptedApplicant/` to atomically provision initial administrative placement, sequential status periods (`enrolled` &rarr; `active`), and 4 chronological intake audit history entries within its primary database transaction (`GAP-003`, TD-03).
@@ -332,7 +350,17 @@ Completion Criteria:
 - Code compiles cleanly and passes syntax checks.
 
 Notes:
-- Sourced dates for application submission and decision are obtained from prerequisite queries already loaded in `EnrollAcceptedApplicantHandler`.
+- Sourced dates for application submission (`registration_date`) and decision (`decision_date`) are loaded in prerequisite queries and mapped via `ApplicationPrerequisiteRow` with fallback to `enrollmentDate`.
+- Initial administrative placement inserted into `students.administrative_placements` with `is_current = 1`, `grade = request.InitialLevel`, `decision_reference = studentNumber`, and `authorized_by = auditUser`.
+- Sequential statuses inserted: row 1 `enrolled` closed (`is_current = 0`, `end_date = enrollmentDate`), row 2 `active` open (`is_current = 1`, `end_date = null`).
+- Chronological intake history entries inserted: `application_submitted`, `application_accepted`, `enrollment_completed` (`Enrolled at {request.InitialCampus} {request.InitialLevel}`), `student_activated`.
+- Verified student insertion updated to `current_status = 'active'`.
+- Updated test assertion in `EnrollAcceptedApplicantIntegrationTests.cs` to verify `current_status == "active"`.
+- Clean compilation verified with `dotnet build` on `Elsasa.Sis.Students` (0 warnings, 0 errors).
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Students/Features/Enrollment/EnrollAcceptedApplicant/EnrollAcceptedApplicantHandler.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Enrollment/EnrollAcceptedApplicantIntegrationTests.cs`
 
 ---
 
@@ -340,8 +368,8 @@ Notes:
 
 Title: 360-Degree Dossier Placement & Status Projections (`StudentDetailResponse` & `GetStudentByIdHandler`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Enrich `StudentDetailResponse.cs` and `GetStudentByIdHandler.cs` in `Elsasa.Sis.Students/Features/Records/GetStudentById/` to project current active placement, historical placements timeline, and status history periods in a single round-trip database query (`GAP-006`, TD-06).
@@ -366,14 +394,27 @@ Completion Criteria:
 Notes:
 - Uses Dapper `QueryMultipleAsync` keeping database round-trips to exactly 1.
 
+Implementation Notes:
+- Updated `StudentDetailResponse.cs` adding `AdministrativePlacementDto? CurrentPlacement`, `IReadOnlyList<AdministrativePlacementDto> PlacementHistory`, and `IReadOnlyList<StudentStatusDto> StatusHistory`.
+- Defined `AdministrativePlacementDto` and `StudentStatusDto` records matching TD-06 architecture specification.
+- Extended `_selectDossierMultiSql` in `GetStudentByIdHandler.cs` with Result set 5 (`students.administrative_placements`) and Result set 6 (`students.student_statuses`) ordered chronologically.
+- Read placement and status DTO collections and derived `CurrentPlacement = placements.FirstOrDefault(p => p.IsCurrent)`.
+- Existing dossier projections (Identity, EnrollmentHistory, GuardianRelationships, Documents) preserved intact.
+- Verified build succeeds across `Elsasa.Sis.Students` and the complete solution `Elsasa.Sis.sln` with 0 errors and 0 warnings.
+- Architecture tests passed (26/26).
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Students/Features/Records/GetStudentById/StudentDetailResponse.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/GetStudentById/GetStudentByIdHandler.cs`
+
 ---
 
 ### P2-S05
 
 Title: Chronological Administrative History Query Slice (`GetStudentAdministrativeHistory`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the dedicated vertical slice `GetStudentAdministrativeHistory` in `Elsasa.Sis.Students/Features/Records/History/GetStudentAdministrativeHistory/` (`GET /api/students/{id}/history`) projecting the immutable lifecycle audit log (`GAP-006`, TD-06).
@@ -392,6 +433,17 @@ Completion Criteria:
 
 Notes:
 - Read-only parameterized query executed via `connectionFactory.CreateConnectionAsync()`.
+- Created `AdministrativeHistoryEntryDto` record mapping table `students.administrative_history_entries`.
+- Created `GetStudentAdministrativeHistoryResponse` encapsulating student ID and read-only entries collection.
+- Created `GetStudentAdministrativeHistoryHandler` verifying student existence via parameterized query before fetching chronological entries ordered by `event_date DESC, created_at DESC`.
+- Created `GetStudentAdministrativeHistoryEndpoint` mapping `GET /api/students/{id:guid}/history` authorized under `Permissions.Students.Records.View`.
+- Clean compilation verified with 0 errors and 0 warnings.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Students/Features/Records/History/GetStudentAdministrativeHistory/AdministrativeHistoryEntryDto.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/History/GetStudentAdministrativeHistory/GetStudentAdministrativeHistoryResponse.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/History/GetStudentAdministrativeHistory/GetStudentAdministrativeHistoryHandler.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/History/GetStudentAdministrativeHistory/GetStudentAdministrativeHistoryEndpoint.cs`
 
 ---
 
@@ -404,8 +456,8 @@ Review Status: NOT-REVIEWED
 
 Title: Change Administrative Placement Vertical Slice (`ChangeAdministrativePlacement` — `POST /api/students/{id}/placements`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the vertical slice `ChangeAdministrativePlacement` in `Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/` executing effective-dated administrative placement reassignments with atomic record closure, invariant enforcement, history logging, and post-commit event publishing (`GAP-004`, `STD-WF-05`, `UC-STD-06`, TD-04).
@@ -438,14 +490,31 @@ Completion Criteria:
 Notes:
 - Invariant: SQL Server partial unique index `ux_administrative_placements_student_active` guarantees at most 1 active placement. Close must precede Insert in transaction.
 
+Implementation Notes:
+- Created vertical slice components in `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/`:
+  - `ChangeAdministrativePlacementRequest.cs` defining command payload.
+  - `ChangeAdministrativePlacementResponse.cs` defining response record with `PlacementId`, `StudentId`, and `IsCurrent`.
+  - `ChangeAdministrativePlacementValidator.cs` enforcing required fields, non-default effective date, and database length boundaries.
+  - `ChangeAdministrativePlacementHandler.cs` orchestrating student verification, current active placement existence check, effective date chronological validation, atomic `SqlTransaction` updating prior placement record and inserting new placement along with `students.administrative_history_entries` record, and post-commit `PlacementChangedEvent` MediatR dispatch.
+  - `ChangeAdministrativePlacementEndpoint.cs` mapping `POST /api/students/{id:guid}/placements` requiring `Permissions.Students.Records.Edit`.
+- Clean compilation verified via `dotnet build src/backend/Elsasa.Sis.Students/Elsasa.Sis.Students.csproj` with 0 warnings and 0 errors.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/ChangeAdministrativePlacementRequest.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/ChangeAdministrativePlacementResponse.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/ChangeAdministrativePlacementValidator.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/ChangeAdministrativePlacementHandler.cs`
+- `src/backend/Elsasa.Sis.Students/Features/Records/Placements/ChangeAdministrativePlacement/ChangeAdministrativePlacementEndpoint.cs`
+
+
 ---
 
 ### P3-S07
 
 Title: Change Student Status Vertical Slice (`ChangeStudentStatus` — `POST /api/students/{id}/status`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the vertical slice `ChangeStudentStatus` in `Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/` executing authoritative operational status transitions, closing prior status periods, inserting new status periods, synchronizing `students.students.current_status`, and appending history entries (`GAP-005`, TD-05).
@@ -475,14 +544,26 @@ Completion Criteria:
 Notes:
 - Single active status invariant is strictly maintained by SQL Server partial unique index `ux_student_statuses_student_active`.
 
+Implementation Notes:
+- Created request, response, validator, handler, and endpoint in `Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/`.
+- Verified validation rules for allowed statuses ('active', 'enrolled') and non-default effective date.
+- Handled atomic SQL transaction closing current status row (`is_current = 0`), inserting new status row (`is_current = 1`), updating `students.students.current_status`, and inserting chronological audit entry into `students.administrative_history_entries`.
+- Changed files:
+  - `src/backend/Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/ChangeStudentStatusRequest.cs`
+  - `src/backend/Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/ChangeStudentStatusResponse.cs`
+  - `src/backend/Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/ChangeStudentStatusValidator.cs`
+  - `src/backend/Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/ChangeStudentStatusHandler.cs`
+  - `src/backend/Elsasa.Sis.Students/Features/Records/Status/ChangeStudentStatus/ChangeStudentStatusEndpoint.cs`
+  - `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ### P3-S08
 
 Title: Dependency Injection & Endpoint Registration Wiring
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Register new command and query handlers, validators, and endpoint dependencies in `Elsasa.Sis.Students.DependencyInjection` to ensure seamless discovery and runtime execution.
@@ -503,6 +584,24 @@ Completion Criteria:
 Notes:
 - Minimal API endpoints are discovered automatically by assembly scanning via `app.MapEndpoints(DependencyInjection.Stage1Assemblies)`.
 
+Implementation Notes:
+- Updated `src/backend/Elsasa.Sis.Students/DependencyInjection.cs` with scoped service registrations for:
+  - `GetStudentAdministrativeHistoryHandler`
+  - `ChangeAdministrativePlacementHandler`
+  - `ChangeStudentStatusHandler`
+- FluentValidation validators (`ChangeAdministrativePlacementValidator`, `ChangeStudentStatusValidator`) are automatically discovered and registered via `AddValidatorsFromAssemblies(DomainAssemblies)`.
+- Added `MapEndpoints_Should_DiscoverStudentsEndpoints_IncludingPlacementAndStatusEndpoints` unit test in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Endpoints/EndpointDiscoveryTests.cs` verifying assembly scanning and parameter inference for:
+  - `GET /api/students/{id:guid}/history`
+  - `POST /api/students/{id:guid}/placements`
+  - `POST /api/students/{id:guid}/status`
+- Verified full solution builds cleanly with 0 errors and 0 warnings via `dotnet build src/backend/Elsasa.Sis.sln -warnaserror`.
+- Verified all EndpointDiscoveryTests and ArchitectureTests pass.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Students/DependencyInjection.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Endpoints/EndpointDiscoveryTests.cs`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ## P4 - Backend Automated Verification & Test Harness
@@ -514,8 +613,8 @@ Review Status: NOT-REVIEWED
 
 Title: Unit Tests for Placement & Status Validators, Events, and Domain Composition
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author comprehensive unit tests in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Students/` verifying validator rules, domain event contracts, and service registrations for Placement & Status.
@@ -542,14 +641,28 @@ Completion Criteria:
 Notes:
 - Unit tests run in-memory without database dependencies.
 
+Implementation Notes:
+- Authored `ChangeAdministrativePlacementValidatorTests.cs` covering valid requests, empty/whitespace required strings, length boundary violations (Campus, SchoolLevel, Grade, AcademicYear, Program, Stream, Cohort, Homeroom, Reason, AuthorizedBy, DecisionReference), and default effective date rejection.
+- Authored `ChangeStudentStatusValidatorTests.cs` covering accepted statuses ('active', 'enrolled' across varying cases and whitespace trimming), unsupported status rejection, default date rejection, optional field nullability, and string boundary violations.
+- Authored `PlacementChangedEventTests.cs` verifying property mapping in primary constructor, convenience constructor default timestamp behavior within tolerance of UtcNow, optional argument defaults, and `IDomainEvent` contract conformance.
+- Authored `StudentsPlacementDomainCompositionTests.cs` verifying scoped registration and clean resolution of `GetStudentAdministrativeHistoryHandler`, `ChangeAdministrativePlacementHandler`, and `ChangeStudentStatusHandler` via `AddStudentsDomain()`, as well as validator registration and resolution via `AddHostComposition()`.
+- Verified all 454 unit tests and 26 architecture tests pass with zero failures.
+
+Changed Files:
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Students/ChangeAdministrativePlacementValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Students/ChangeStudentStatusValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Students/PlacementChangedEventTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Students/StudentsPlacementDomainCompositionTests.cs`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ### P4-S10
 
 Title: Integration Tests for DbUp Migration, Invariant Enforcement, and Backfill
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author Testcontainers SQL Server integration tests in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Records/` verifying migration execution, active partial unique indexes, foreign keys, and idempotent backfill.
@@ -569,6 +682,17 @@ Completion Criteria:
 
 Notes:
 - Reuses existing test infrastructure (`SqlServerFixture` / `CustomWebApplicationFactory`).
+- Authored integration test suite in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Records/StudentsPlacementStatusMigrationTests.cs`.
+- Verified migration `20261104_0101` runs idempotently via `DatabaseMigrator.UpgradeDatabase` and is journaled in `dbo._SchemaVersions`.
+- Verified columns and indexes on `students.administrative_placements`, `students.student_statuses`, and `students.administrative_history_entries`.
+- Verified foreign key referential actions are `ON DELETE NO ACTION`.
+- Verified single active partial unique index invariant enforcement: duplicate active placements throw `SqlException` 2601/2627 while multiple inactive records are permitted.
+- Verified single active status invariant enforcement: duplicate active statuses throw `SqlException` 2601/2627 while multiple inactive records are permitted.
+- Verified idempotent backfill logic: creates active placement, active status, and intake history entry for pre-existing enrolled student without duplicates on successive executions.
+- All 9 integration tests pass cleanly.
+
+Changed Files:
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Records/StudentsPlacementStatusMigrationTests.cs`
 
 ---
 
@@ -576,8 +700,8 @@ Notes:
 
 Title: Integration Tests for Enrollment Intake Flow, Placement Reassignment, Status Adjustments, and History Projections
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author end-to-end integration tests verifying complete enrollment intake provisioning, placement mutation with event publishing, status adjustment with denormalized sync, and chronological history querying.
@@ -610,6 +734,25 @@ Completion Criteria:
 Notes:
 - Uses `HttpClient` against `WebApplicationFactory<Program>` with authenticated admin/officer claims.
 
+Implementation Notes:
+- Authored comprehensive lifecycle integration test suite in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Records/PlacementStatusLifecycleIntegrationTests.cs`.
+- Registered `PlacementChangedEvent` collection handler in `TestEventCollector.cs` and `IntegrationTestWebAppFactory.cs` for post-commit MediatR verification.
+- Verified enrollment intake orchestration creates active student status, active administrative placement row, 2 status period rows (closed enrolled, active active), 4 intake audit entries, and dispatches `StudentEnrolledEvent`.
+- Verified placement reassignment endpoint (`POST /api/students/{id}/placements`) closes previous active placement (`is_current = 0`, `end_date = effective_date`), inserts new active placement (`is_current = 1`, `end_date = NULL`), appends `placement_changed` audit history, and publishes `PlacementChangedEvent`.
+- Verified effective date chronological guard rejection (422 UnprocessableEntity) when reassignment effective date precedes current placement effective date.
+- Verified operational status change endpoint (`POST /api/students/{id}/status`) closes prior status, inserts new active status, updates `students.students.current_status` in lockstep, and logs audit history (`status_adjusted` / `student_activated`).
+- Verified status validation rejection (422 UnprocessableEntity) on invalid status strings.
+- Verified 360-degree dossier projection (`GET /api/students/{id}`) returns populated `CurrentPlacement`, `PlacementHistory`, and `StatusHistory`.
+- Verified chronological administrative history projection (`GET /api/students/{id}/history`) returns all lifecycle audit entries ordered descending.
+- Clean compilation verified via `dotnet build src/backend/Elsasa.Sis.sln -warnaserror` (0 warnings, 0 errors).
+- All unit and architecture tests verified passing.
+
+Changed Files:
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Students/Records/PlacementStatusLifecycleIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Fixtures/TestEventCollector.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Fixtures/IntegrationTestWebAppFactory.cs`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ## P5 - Frontend State, API Client & Validation Schemas
@@ -621,8 +764,8 @@ Review Status: NOT-REVIEWED
 
 Title: TypeScript Contracts, Zod Schemas & Axios API Client (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Define TypeScript data transfer interfaces, Zod validation schemas, and typed Axios API functions in `src/frontend/src/features/students/records/` for Placement, Status, and Administrative History.
@@ -651,7 +794,18 @@ Completion Criteria:
 - TypeScript builds cleanly (`pnpm type-check` or `vue-tsc`).
 
 Notes:
-- API functions use shared Axios instance configured in `src/frontend/src/shared/api/`.
+- API functions use shared Axios instance configured in `src/frontend/src/shared/services/http`.
+- Implementation Notes:
+  - Added `AdministrativePlacementDto`, `StudentStatusDto`, `AdministrativeHistoryEntryDto`, `ChangeAdministrativePlacementRequest`, `ChangeAdministrativePlacementResponse`, `ChangeStudentStatusRequest`, `ChangeStudentStatusResponse`, `GetStudentAdministrativeHistoryResponse` interfaces to `src/frontend/src/features/students/records/types/records.types.ts`.
+  - Extended `StudentDetail` and exported `StudentDetailResponse` with optional `currentPlacement`, `placementHistory`, `statusHistory` to maintain backward-compatibility with existing fixtures and components.
+  - Added `changePlacementSchema`, `changeStatusSchema`, `CHANGE_STATUS_ENUM`, and inferred form data types `ChangePlacementFormData` and `ChangeStatusFormData` to `src/frontend/src/features/students/records/schemas/records.schema.ts`.
+  - Implemented typed API functions `changeAdministrativePlacement`, `changeStudentStatus`, and `getStudentAdministrativeHistory` in `src/frontend/src/features/students/records/api/records.api.ts`.
+  - Verified clean TypeScript build (`pnpm --dir src/frontend type-check`) and existing unit test suite execution without regressions.
+- Changed Files:
+  - `src/frontend/src/features/students/records/types/records.types.ts`
+  - `src/frontend/src/features/students/records/schemas/records.schema.ts`
+  - `src/frontend/src/features/students/records/api/records.api.ts`
+  - `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
 
 ---
 
@@ -659,8 +813,8 @@ Notes:
 
 Title: TanStack Query Composables & Mutation Hooks (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Expand TanStack Query composables in `src/frontend/src/features/students/records/composables/` with query key factories, history query hooks, and placement/status mutation hooks with automatic cache invalidation.
@@ -685,6 +839,21 @@ Completion Criteria:
 
 Notes:
 - Invalidation guarantees that both the 360-degree dossier overview and the history tab update immediately without a full page reload.
+- Implementation Notes:
+  - Updated `src/frontend/src/features/students/records/composables/queryKeys.ts` with `queryKeys.students.history` nested under `detail(id)` and `studentRecordsKeys.history`.
+  - Added `useStudentAdministrativeHistoryQuery(studentId, options)` to `src/frontend/src/features/students/records/composables/useStudentRecordsQueries.ts` calling `getStudentAdministrativeHistory` with `TRANSACTIONAL` cache tier.
+  - Added `useChangePlacementMutation` to `src/frontend/src/features/students/records/composables/useStudentRecordsMutations.ts` invalidating `queryKeys.students.detail(studentId)` and `queryKeys.students.history(studentId)` with success toast notification.
+  - Added `useChangeStatusMutation` to `src/frontend/src/features/students/records/composables/useStudentRecordsMutations.ts` invalidating `queryKeys.students.detail(studentId)`, `queryKeys.students.history(studentId)`, and `queryKeys.students.list()` with success toast notification.
+  - Added dedicated unit test suite in `src/frontend/src/features/students/records/composables/__tests__/queryKeys.spec.ts` and extended `useStudentRecordsQueries.spec.ts` and `useStudentRecordsMutations.spec.ts`.
+  - Verified clean TypeScript build (`vue-tsc --noEmit`) and 100% passing tests (27/27 composable unit tests, 81/81 student records feature tests).
+- Changed Files:
+  - `src/frontend/src/features/students/records/composables/queryKeys.ts`
+  - `src/frontend/src/features/students/records/composables/useStudentRecordsQueries.ts`
+  - `src/frontend/src/features/students/records/composables/useStudentRecordsMutations.ts`
+  - `src/frontend/src/features/students/records/composables/__tests__/queryKeys.spec.ts`
+  - `src/frontend/src/features/students/records/composables/__tests__/useStudentRecordsQueries.spec.ts`
+  - `src/frontend/src/features/students/records/composables/__tests__/useStudentRecordsMutations.spec.ts`
+  - `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
 
 ---
 
@@ -697,8 +866,8 @@ Review Status: NOT-REVIEWED
 
 Title: Student Placement Tab & Change Placement Modal Components (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Create `StudentPlacementTab.vue` and `ChangePlacementModal.vue` in `src/frontend/src/features/students/records/components/` delivering administrative placement inspection and reassignment (`UC-STD-06`).
@@ -723,14 +892,28 @@ Completion Criteria:
 Notes:
 - Uses PrimeVue components (`Dialog`, `InputText`, `Dropdown`, `Calendar`, `Button`, `Tag`) with Tailwind CSS styling consistent with existing tabs.
 
+Implementation Notes:
+- Created `StudentPlacementTab.vue` rendering active placement card, chronological placement history list/cards, empty state fallback, and conditional "Change Placement" action guarded by `Permissions.Students.Records.Edit`.
+- Created `ChangePlacementModal.vue` utilizing PrimeVue `Dialog`, VeeValidate form with Zod `changePlacementSchema`, DatePicker with `:min-date` validation guarding against prior effective dates, and submitting through `useChangePlacementMutation`.
+- Exported `StudentPlacementTab` and `ChangePlacementModal` in `src/frontend/src/features/students/records/components/index.ts`.
+- Authored comprehensive unit test suite in `src/frontend/src/features/students/records/__tests__/StudentPlacementComponents.spec.ts` (8/8 passing).
+- Verified TypeScript build clean (`vue-tsc --noEmit`).
+
+Changed Files:
+- `src/frontend/src/features/students/records/components/StudentPlacementTab.vue`
+- `src/frontend/src/features/students/records/components/ChangePlacementModal.vue`
+- `src/frontend/src/features/students/records/components/index.ts`
+- `src/frontend/src/features/students/records/__tests__/StudentPlacementComponents.spec.ts`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ### P6-S15
 
 Title: Student Administrative History Tab & Change Status Modal Components (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Create `StudentAdministrativeHistoryTab.vue` and `ChangeStatusModal.vue` in `src/frontend/src/features/students/records/components/` delivering chronological audit inspection and operational status management.
@@ -756,14 +939,28 @@ Completion Criteria:
 Notes:
 - Complies with ADR-008 (Audit Trail Immutability): History entries are purely read-only on the client; no edit/delete buttons exist.
 
+Implementation Notes:
+- Created `StudentAdministrativeHistoryTab.vue` delivering chronological audit inspection with PrimeVue `Timeline`, event badge and icon mappings for application, enrollment, placement, and status events, authorizer and decision reference metadata, correction flag tracking (`isCorrection`, `correctsEntryId`), event type filtering (All, Placement, Status, Intake), and loading, error, and empty states.
+- Created `ChangeStatusModal.vue` delivering PrimeVue `Dialog` modal form powered by VeeValidate with `toTypedSchema(changeStatusSchema)`, field bindings for status (`active`, `enrolled`), effective date via PrimeVue `DatePicker` (defaulting to current date in `YYYY-MM-DD`), reason textarea, authorized by, and decision reference. Submits via `useChangeStatusMutation()` with pending spinner state, modal closure, and form reset upon success.
+- Exported both components in `src/frontend/src/features/students/records/components/index.ts`.
+- Author comprehensive unit tests in `src/frontend/src/features/students/records/__tests__/StudentAdministrativeHistoryTab.spec.ts` verifying rendering, event badges, category filtering, empty state, form fields, and mutation execution.
+- Verified clean TypeScript build (`vue-tsc --noEmit`) with 0 errors and all tests passing (5/5 in new spec, 638/638 entire frontend suite).
+
+Changed Files:
+- `src/frontend/src/features/students/records/components/StudentAdministrativeHistoryTab.vue`
+- `src/frontend/src/features/students/records/components/ChangeStatusModal.vue`
+- `src/frontend/src/features/students/records/components/index.ts`
+- `src/frontend/src/features/students/records/__tests__/StudentAdministrativeHistoryTab.spec.ts`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ### P6-S16
 
 Title: Student Records Desk (`SCR-STU-02`) Integration & Header Status Management (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Integrate `StudentPlacementTab.vue`, `StudentAdministrativeHistoryTab.vue`, and status adjustment actions into `StudentRecordsDeskView.vue` (`SCR-STU-02`), completing the Records Desk workspace.
@@ -785,6 +982,18 @@ Completion Criteria:
 Notes:
 - Aligns directly with screen inventory `SCR-STU-02` specifications and user case `UC-STD-06`.
 
+Implementation Notes:
+- Integrated `StudentPlacementTab.vue` and `StudentAdministrativeHistoryTab.vue` into `StudentRecordsDeskView.vue` (`SCR-STU-02`).
+- Updated dossier header summary with dynamic operational status badge (`active` = green / emerald, `enrolled` = blue / sky) and added a "Change Status" quick action button wired to `ChangeStatusModal.vue`.
+- Added `Placement` tab (`<StudentPlacementTab :student="student" :can-edit="canEdit" @change-placement="openChangePlacementModal" />`) and `Administrative History` tab (`<StudentAdministrativeHistoryTab :student-id="student.id" :student="student" />`) while retaining all 4 existing tabs (`Certified Identity`, `Guardians & Household`, `Official Documents`, `Enrollment History`).
+- Wired dialog visibility states and refetch triggers for `ChangePlacementModal` and `ChangeStatusModal`.
+- Configured search parameters conditionally to adhere cleanly to `exactOptionalPropertyTypes: true`.
+- Verified clean TypeScript build (`vue-tsc --noEmit`), passing tests in `StudentRecordsDeskView.spec.ts` (12/12) and all 106 tests across `src/features/students/records`.
+
+Changed Files:
+- `src/frontend/src/features/students/records/views/StudentRecordsDeskView.vue`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ## P7 - Frontend Automated Verification & Component Testing
@@ -796,8 +1005,8 @@ Review Status: NOT-REVIEWED
 
 Title: Vitest Unit Tests for API, Schemas, and Composables (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author unit tests in `src/frontend/src/features/students/records/__tests__/` verifying Zod schemas, Axios API functions, and TanStack Query composables for Placement & Status.
@@ -824,14 +1033,26 @@ Completion Criteria:
 Notes:
 - Mocks network calls via Vitest `vi.mock` / `vi.spyOn`.
 
+Implementation Notes:
+- Updated `src/frontend/src/features/students/records/__tests__/records.schema.spec.ts` with comprehensive unit test suites for `changePlacementSchema` (valid inputs, minimal optional fields, missing required fields, date formats, string length boundaries) and `changeStatusSchema` (allowed statuses `active`/`enrolled`, rejection of unsupported statuses, effective date validation, string boundaries).
+- Updated `src/frontend/src/features/students/records/__tests__/records.api.spec.ts` with Axios client tests for `changeAdministrativePlacement` (`POST /students/{id}/placements`), `changeStudentStatus` (`POST /students/{id}/status`), and `getStudentAdministrativeHistory` (`GET /students/{id}/history`).
+- Verified composable mutation tests in `src/frontend/src/features/students/records/composables/__tests__/useStudentRecordsMutations.spec.ts` testing cache invalidation on detail, history, and list keys for `useChangePlacementMutation` and `useChangeStatusMutation`.
+- Verified query composable tests in `src/frontend/src/features/students/records/composables/__tests__/useStudentRecordsQueries.spec.ts` testing `useStudentAdministrativeHistoryQuery` execution, empty student ID suppression, and enabled flags.
+- Verified all unit and feature tests pass cleanly with 100% success rate: 93/93 tests in `src/features/students/records`, 638/638 tests across all 73 test suites in the frontend project (`pnpm exec vitest run`), and clean TypeScript checking (`vue-tsc --noEmit`).
+
+Changed Files:
+- `src/frontend/src/features/students/records/__tests__/records.schema.spec.ts`
+- `src/frontend/src/features/students/records/__tests__/records.api.spec.ts`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
+
 ---
 
 ### P7-S18
 
 Title: Vitest Component & Workspace Integration Tests for Placement & History Tabs, Modals, and Records Desk (`src/frontend`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author component and view integration tests verifying rendering, user interactions, form submissions, and desk tab navigation in `src/frontend/src/features/students/records/__tests__/`.
@@ -857,6 +1078,22 @@ Completion Criteria:
 
 Notes:
 - Uses `@vue/test-utils` with PrimeVue test plugins and VueQuery test wrappers.
+
+Implementation Notes:
+- Created `src/frontend/src/features/students/records/__tests__/StudentPlacementTab.spec.ts` asserting current placement parameter rendering (campus, grade, level, academic year, homeroom, cohort, program, stream, authorizer, decision reference), historical placement timeline rendering, empty state handling, and click-to-emit event dispatch for "Change Placement" and "Assign Placement".
+- Verified `src/frontend/src/features/students/records/__tests__/StudentAdministrativeHistoryTab.spec.ts` asserting timeline rendering with event badges, dates, details, authorizers, decision references, correction flags, event category filtering (All, Placement, Status, Intake), and empty states.
+- Updated `src/frontend/src/features/students/records/__tests__/StudentRecordsDeskView.spec.ts` asserting all dossier navigation tabs including `Placement` (`tab-placement`) and `Administrative History` (`tab-history`), verifying header status pill displays current status ('enrolled'), and verifying clicking "Change Status" opens `ChangeStatusModal`.
+- Updated `src/frontend/src/features/students/records/__tests__/StudentRecordsTabsAndModals.spec.ts` asserting `ChangePlacementModal` and `ChangeStatusModal` input rendering and mutation submission with form event emission.
+- Corrected slot name in `StudentPlacementTab.vue` from `#action` to `#actions` matching `EmptyState.vue` slot contract.
+- Verified clean TypeScript compilation (`vue-tsc --noEmit`) and all 74 frontend test suites (647 tests) passing cleanly with 0 failures.
+
+Changed Files:
+- `src/frontend/src/features/students/records/__tests__/StudentPlacementTab.spec.ts`
+- `src/frontend/src/features/students/records/__tests__/StudentAdministrativeHistoryTab.spec.ts`
+- `src/frontend/src/features/students/records/__tests__/StudentRecordsDeskView.spec.ts`
+- `src/frontend/src/features/students/records/__tests__/StudentRecordsTabsAndModals.spec.ts`
+- `src/frontend/src/features/students/records/components/StudentPlacementTab.vue`
+- `docs/issues/IS005 - STU-PLACEMENT-STATUS-IMPLEMENTATION-PLAN.md`
 
 ---
 

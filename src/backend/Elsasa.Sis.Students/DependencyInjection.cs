@@ -22,7 +22,10 @@ using Elsasa.Sis.Students.Features.Records.Documents.VerifyStudentDocument;
 using Elsasa.Sis.Students.Features.Records.Guardians.AddGuardianRelationship;
 using Elsasa.Sis.Students.Features.Records.Guardians.UpdateGuardianRelationship;
 using Elsasa.Sis.Students.Features.Records.GetStudentById;
+using Elsasa.Sis.Students.Features.Records.History.GetStudentAdministrativeHistory;
+using Elsasa.Sis.Students.Features.Records.Placements.ChangeAdministrativePlacement;
 using Elsasa.Sis.Students.Features.Records.SearchStudents;
+using Elsasa.Sis.Students.Features.Records.Status.ChangeStudentStatus;
 using Elsasa.Sis.Students.Features.Records.UpdateStudentIdentity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -83,6 +86,11 @@ public static class DependencyInjection
         services.AddScoped<UploadStudentDocumentHandler>();
         services.AddScoped<DownloadStudentDocumentHandler>();
         services.AddScoped<VerifyStudentDocumentHandler>();
+
+        // Student administrative placement, status, and history handlers (IS005 P2-S05, P3-S06, P3-S07)
+        services.AddScoped<GetStudentAdministrativeHistoryHandler>();
+        services.AddScoped<ChangeAdministrativePlacementHandler>();
+        services.AddScoped<ChangeStudentStatusHandler>();
 
         // Configure policy-based authorization requirements (ADR-009)
         services.AddAuthorization(options =>

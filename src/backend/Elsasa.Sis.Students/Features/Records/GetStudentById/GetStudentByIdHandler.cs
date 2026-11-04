@@ -87,6 +87,39 @@ public sealed class GetStudentByIdHandler(ISqlConnectionFactory connectionFactor
         FROM students.student_documents doc
         WHERE doc.student_id = @Id
         ORDER BY doc.created_at ASC;
+
+        SELECT
+            p.id AS Id,
+            p.campus AS Campus,
+            p.school_level AS SchoolLevel,
+            p.grade AS Grade,
+            p.academic_year AS AcademicYear,
+            p.effective_date AS EffectiveDate,
+            p.end_date AS EndDate,
+            p.is_current AS IsCurrent,
+            p.program AS Program,
+            p.stream AS Stream,
+            p.cohort AS Cohort,
+            p.homeroom AS Homeroom,
+            p.reason AS Reason,
+            p.authorized_by AS AuthorizedBy,
+            p.decision_reference AS DecisionReference
+        FROM students.administrative_placements p
+        WHERE p.student_id = @Id
+        ORDER BY p.effective_date DESC, p.created_at DESC;
+
+        SELECT
+            st.id AS Id,
+            st.status AS Status,
+            st.effective_date AS EffectiveDate,
+            st.end_date AS EndDate,
+            st.is_current AS IsCurrent,
+            st.reason AS Reason,
+            st.authorized_by AS AuthorizedBy,
+            st.decision_reference AS DecisionReference
+        FROM students.student_statuses st
+        WHERE st.student_id = @Id
+        ORDER BY st.effective_date DESC, st.created_at DESC;
         """;
 
     private sealed record StudentHeaderRow(
@@ -139,6 +172,10 @@ public sealed class GetStudentByIdHandler(ISqlConnectionFactory connectionFactor
         var enrollments = (await multi.ReadAsync<EnrollmentHistoryDto>()).AsList();
         var guardians = (await multi.ReadAsync<StudentGuardianRelationshipDto>()).AsList();
         var documents = (await multi.ReadAsync<StudentDocumentDto>()).AsList();
+        var placements = (await multi.ReadAsync<AdministrativePlacementDto>()).AsList();
+        var statuses = (await multi.ReadAsync<StudentStatusDto>()).AsList();
+
+        var currentPlacement = placements.FirstOrDefault(p => p.IsCurrent);
 
         var response = new StudentDetailResponse(
             student.Id,
@@ -165,7 +202,10 @@ public sealed class GetStudentByIdHandler(ISqlConnectionFactory connectionFactor
             student.UpdatedBy,
             enrollments,
             guardians,
-            documents);
+            documents,
+            currentPlacement,
+            placements,
+            statuses);
 
         return Result.Success(response);
     }

@@ -9,10 +9,12 @@ using MediatR;
 /// </summary>
 public sealed class TestEventCollector :
     INotificationHandler<ApplicantAcceptedEvent>,
-    INotificationHandler<StudentEnrolledEvent>
+    INotificationHandler<StudentEnrolledEvent>,
+    INotificationHandler<PlacementChangedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
+    private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -25,12 +27,18 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<StudentEnrolledEvent> StudentEnrolledEvents => _studentEnrolledEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="PlacementChangedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<PlacementChangedEvent> PlacementChangedEvents => _placementChangedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
     {
         _applicantAcceptedEvents.Clear();
         _studentEnrolledEvents.Clear();
+        _placementChangedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -46,6 +54,14 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _studentEnrolledEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(PlacementChangedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _placementChangedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

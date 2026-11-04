@@ -2,15 +2,16 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
 import { CACHE_TIERS } from '@/app/providers/queryClient';
 import type { PaginatedResponse } from '@/shared/types/common';
-import { searchStudents, getStudentById } from '../api/records.api';
+import { searchStudents, getStudentById, getStudentAdministrativeHistory } from '../api/records.api';
 import type {
+  GetStudentAdministrativeHistoryResponse,
   StudentDetail,
   StudentListItem,
   StudentSearchParams,
 } from '../types/records.types';
-import { studentRecordsKeys } from './queryKeys';
+import { queryKeys, studentRecordsKeys } from './queryKeys';
 
-export { studentRecordsKeys };
+export { queryKeys, studentRecordsKeys };
 
 export interface StudentRecordsQueryOptions {
   enabled?: MaybeRefOrGetter<boolean>;
@@ -47,6 +48,29 @@ export function useStudentDossierQuery(
   return useQuery<StudentDetail>({
     queryKey: computed(() => ['students', 'records', 'detail', toValue(studentId)]),
     queryFn: () => getStudentById(toValue(studentId)!),
+    enabled: computed(() => {
+      const resolvedId = toValue(studentId);
+      const isEnabled = options?.enabled !== undefined ? toValue(options.enabled) : true;
+      return Boolean(resolvedId) && isEnabled;
+    }),
+    staleTime: CACHE_TIERS.TRANSACTIONAL.staleTime,
+    gcTime: CACHE_TIERS.TRANSACTIONAL.gcTime,
+    refetchOnWindowFocus: CACHE_TIERS.TRANSACTIONAL.refetchOnWindowFocus,
+  });
+}
+
+/**
+ * Reactive TanStack Query composable for fetching the chronological administrative history timeline (SCR-STU-02, P5-S13).
+ * Query key: `['students', 'records', 'detail', studentId, 'history']` via `queryKeys.students.history(studentId)`
+ * Uses TRANSACTIONAL cache tier (immediate staleness, 5m gc, refetch on window focus).
+ */
+export function useStudentAdministrativeHistoryQuery(
+  studentId: MaybeRefOrGetter<string | null | undefined>,
+  options?: StudentRecordsQueryOptions,
+) {
+  return useQuery<GetStudentAdministrativeHistoryResponse>({
+    queryKey: computed(() => queryKeys.students.history(toValue(studentId) ?? '')),
+    queryFn: () => getStudentAdministrativeHistory(toValue(studentId)!),
     enabled: computed(() => {
       const resolvedId = toValue(studentId);
       const isEnabled = options?.enabled !== undefined ? toValue(options.enabled) : true;

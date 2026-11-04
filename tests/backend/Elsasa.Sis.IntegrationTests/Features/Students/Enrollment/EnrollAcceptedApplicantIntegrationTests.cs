@@ -144,7 +144,7 @@ public sealed class EnrollAcceptedApplicantIntegrationTests(IntegrationTestWebAp
         var student = (await QueryAsync<dynamic>(studentSql, new { Id = responseBody.StudentId })).Single();
         ((string)student.student_number).Should().Be(responseBody.StudentNumber);
         ((Guid)student.applicant_id).Should().Be(applicantId);
-        ((string)student.current_status).Should().Be("enrolled");
+        ((string)student.current_status).Should().Be("active");
 
         // Assert students.enrollments record created
         const string enrollmentSql = "SELECT * FROM students.enrollments WHERE id = @Id;";

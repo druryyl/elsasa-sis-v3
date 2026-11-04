@@ -6,13 +6,20 @@ import {
   updateGuardianRelationship,
   uploadStudentDocument,
   verifyStudentDocument,
+  changeAdministrativePlacement,
+  changeStudentStatus,
 } from '../api/records.api';
 import type {
   AddGuardianPayload,
+  ChangeAdministrativePlacementRequest,
+  ChangeAdministrativePlacementResponse,
+  ChangeStudentStatusRequest,
+  ChangeStudentStatusResponse,
   UpdateGuardianPayload,
   UpdateIdentityPayload,
   VerifyDocumentPayload,
 } from '../types/records.types';
+import { queryKeys } from './queryKeys';
 import { tryGetToast, notifySuccess, notifyError, type ToastOptions } from './toastNotifications';
 
 export interface RecordsMutationOptions<TData, TVariables> extends ToastOptions {
@@ -286,3 +293,157 @@ export function useVerifyStudentDocumentMutation(
     },
   });
 }
+
+export interface ChangePlacementPayloadVariables {
+  studentId?: string;
+  payload: ChangeAdministrativePlacementRequest;
+}
+
+export type ChangePlacementVariables =
+  | ChangeAdministrativePlacementRequest
+  | ChangePlacementPayloadVariables
+  | (ChangeAdministrativePlacementRequest & { studentId?: string });
+
+/**
+ * Mutation composable for reassigning a student's administrative placement (SCR-STU-02, P5-S13, STD-WF-05, UC-STD-06).
+ * Invalidates detail and history queries on success.
+ */
+export function useChangePlacementMutation(
+  studentId?: MaybeRefOrGetter<string | null | undefined>,
+  options?: RecordsMutationOptions<ChangeAdministrativePlacementResponse, ChangePlacementVariables>,
+) {
+  const queryClient = useQueryClient();
+  const toast = tryGetToast();
+
+  return useMutation({
+    mutationFn: async (variables: ChangePlacementVariables) => {
+      const isWrapped =
+        'payload' in variables &&
+        typeof (variables as ChangePlacementPayloadVariables).payload === 'object' &&
+        (variables as ChangePlacementPayloadVariables).payload !== null;
+
+      const targetId = isWrapped
+        ? ((variables as ChangePlacementPayloadVariables).studentId ?? toValue(studentId))
+        : ('studentId' in variables && (variables as any).studentId
+          ? (variables as any).studentId
+          : toValue(studentId));
+
+      if (!targetId) {
+        throw new Error('Student ID is required to change administrative placement.');
+      }
+
+      const payload: ChangeAdministrativePlacementRequest = isWrapped
+        ? (variables as ChangePlacementPayloadVariables).payload
+        : (variables as ChangeAdministrativePlacementRequest);
+
+      return changeAdministrativePlacement(targetId, payload);
+    },
+    onSuccess: (data, variables) => {
+      const isWrapped =
+        'payload' in variables &&
+        typeof (variables as ChangePlacementPayloadVariables).payload === 'object' &&
+        (variables as ChangePlacementPayloadVariables).payload !== null;
+
+      const targetId = isWrapped
+        ? ((variables as ChangePlacementPayloadVariables).studentId ?? toValue(studentId))
+        : ('studentId' in variables && (variables as any).studentId
+          ? (variables as any).studentId
+          : toValue(studentId));
+
+      if (targetId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.detail(targetId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.history(targetId) });
+      }
+
+      notifySuccess(
+        toast,
+        'Placement Updated',
+        'Student administrative placement updated successfully.',
+        options,
+      );
+      options?.onSuccess?.(data, variables);
+    },
+    onError: (error, variables) => {
+      notifyError(toast, error, 'Placement Update Failed', options);
+      options?.onError?.(error, variables);
+    },
+  });
+}
+
+export interface ChangeStatusPayloadVariables {
+  studentId?: string;
+  payload: ChangeStudentStatusRequest;
+}
+
+export type ChangeStatusVariables =
+  | ChangeStudentStatusRequest
+  | ChangeStatusPayloadVariables
+  | (ChangeStudentStatusRequest & { studentId?: string });
+
+/**
+ * Mutation composable for adjusting a student's operational status (SCR-STU-02, P5-S13).
+ * Invalidates detail, history, and list queries on success.
+ */
+export function useChangeStatusMutation(
+  studentId?: MaybeRefOrGetter<string | null | undefined>,
+  options?: RecordsMutationOptions<ChangeStudentStatusResponse, ChangeStatusVariables>,
+) {
+  const queryClient = useQueryClient();
+  const toast = tryGetToast();
+
+  return useMutation({
+    mutationFn: async (variables: ChangeStatusVariables) => {
+      const isWrapped =
+        'payload' in variables &&
+        typeof (variables as ChangeStatusPayloadVariables).payload === 'object' &&
+        (variables as ChangeStatusPayloadVariables).payload !== null;
+
+      const targetId = isWrapped
+        ? ((variables as ChangeStatusPayloadVariables).studentId ?? toValue(studentId))
+        : ('studentId' in variables && (variables as any).studentId
+          ? (variables as any).studentId
+          : toValue(studentId));
+
+      if (!targetId) {
+        throw new Error('Student ID is required to change student status.');
+      }
+
+      const payload: ChangeStudentStatusRequest = isWrapped
+        ? (variables as ChangeStatusPayloadVariables).payload
+        : (variables as ChangeStudentStatusRequest);
+
+      return changeStudentStatus(targetId, payload);
+    },
+    onSuccess: (data, variables) => {
+      const isWrapped =
+        'payload' in variables &&
+        typeof (variables as ChangeStatusPayloadVariables).payload === 'object' &&
+        (variables as ChangeStatusPayloadVariables).payload !== null;
+
+      const targetId = isWrapped
+        ? ((variables as ChangeStatusPayloadVariables).studentId ?? toValue(studentId))
+        : ('studentId' in variables && (variables as any).studentId
+          ? (variables as any).studentId
+          : toValue(studentId));
+
+      if (targetId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.detail(targetId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.history(targetId) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.list() });
+
+      notifySuccess(
+        toast,
+        'Status Updated',
+        'Student operational status updated successfully.',
+        options,
+      );
+      options?.onSuccess?.(data, variables);
+    },
+    onError: (error, variables) => {
+      notifyError(toast, error, 'Status Update Failed', options);
+      options?.onError?.(error, variables);
+    },
+  });
+}
+

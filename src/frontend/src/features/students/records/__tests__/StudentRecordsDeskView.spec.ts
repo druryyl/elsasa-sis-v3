@@ -191,6 +191,10 @@ describe('StudentRecordsDeskView.vue (SCR-STU-02 Master Shell)', () => {
     } as PaginatedResponse<StudentListItem>);
 
     vi.spyOn(recordsApi, 'getStudentById').mockResolvedValue(mockDossier);
+    vi.spyOn(recordsApi, 'getStudentAdministrativeHistory').mockResolvedValue({
+      studentId: 'student-1',
+      entries: [],
+    });
   });
 
   function mountComponent() {
@@ -338,20 +342,56 @@ describe('StudentRecordsDeskView.vue (SCR-STU-02 Master Shell)', () => {
     expect(wrapper.find('[data-testid="upload-document-dialog"]').exists()).toBe(true);
   });
 
-  it('renders all four dossier navigation tabs and panels', async () => {
+  it('renders all dossier navigation tabs and panels including Placement and Administrative History', async () => {
     currentRouteParams = { id: 'student-1' };
     const wrapper = mountComponent();
     await flushPromises();
 
     expect(wrapper.find('[data-testid="tab-identity"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tab-placement"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="tab-guardians"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="tab-documents"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="tab-enrollment"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tab-history"]').exists()).toBe(true);
 
     // Default tab is Certified Identity
     expect(wrapper.find('[data-testid="panel-identity"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="panel-identity"]').text()).toContain('3171010000000001');
     expect(wrapper.find('[data-testid="panel-identity"]').text()).toContain('Jl. Merdeka No. 10, Jakarta');
+  });
+
+  it('asserts Placement and Administrative History tabs are rendered in the desk tab navigation', async () => {
+    currentRouteParams = { id: 'student-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const placementTab = wrapper.find('[data-testid="tab-placement"]');
+    expect(placementTab.exists()).toBe(true);
+    expect(placementTab.text()).toContain('Placement');
+
+    const historyTab = wrapper.find('[data-testid="tab-history"]');
+    expect(historyTab.exists()).toBe(true);
+    expect(historyTab.text()).toContain('Administrative History');
+  });
+
+  it('asserts header status badge displays current status and triggers status change modal', async () => {
+    currentRouteParams = { id: 'student-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const statusBadge = wrapper.find('[data-testid="dossier-status-badge"]');
+    expect(statusBadge.exists()).toBe(true);
+    expect(statusBadge.text().toLowerCase()).toContain('enrolled');
+
+    const changeStatusBtn = wrapper.find('[data-testid="change-status-button"]');
+    expect(changeStatusBtn.exists()).toBe(true);
+    expect(changeStatusBtn.attributes('disabled')).toBeUndefined();
+
+    // Trigger status change modal
+    await changeStatusBtn.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="change-status-modal"]').exists()).toBe(true);
   });
 
   it('renders empty candidate state when no search matches found', async () => {

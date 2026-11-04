@@ -2,6 +2,7 @@ namespace Elsasa.Sis.IntegrationTests.UnitTests.Endpoints;
 
 using System.Reflection;
 using Elsasa.Sis.Shared.Endpoints;
+using Elsasa.Sis.Students;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,9 +60,33 @@ public sealed class EndpointDiscoveryTests
         Assert.Same(app, returnedApp);
     }
 
+    [Fact]
+    public void MapEndpoints_Should_DiscoverStudentsEndpoints_IncludingPlacementAndStatusEndpoints()
+    {
+        var services = new ServiceCollection();
+        services.AddStudentsDomain();
+        var app = new DummyEndpointRouteBuilder(services.BuildServiceProvider());
+
+        app.MapEndpoints(typeof(Elsasa.Sis.Students.StudentsAssemblyMarker).Assembly);
+
+        var endpoints = app.DataSources
+            .SelectMany(ds => ds.Endpoints)
+            .OfType<RouteEndpoint>()
+            .ToList();
+
+        Assert.Contains(endpoints, e => e.RoutePattern.RawText == "/api/students/{id:guid}/history");
+        Assert.Contains(endpoints, e => e.RoutePattern.RawText == "/api/students/{id:guid}/placements");
+        Assert.Contains(endpoints, e => e.RoutePattern.RawText == "/api/students/{id:guid}/status");
+    }
+
     private sealed class DummyEndpointRouteBuilder : IEndpointRouteBuilder
     {
-        public IServiceProvider ServiceProvider => new ServiceCollection().BuildServiceProvider();
+        public DummyEndpointRouteBuilder(IServiceProvider? serviceProvider = null)
+        {
+            ServiceProvider = serviceProvider ?? new ServiceCollection().BuildServiceProvider();
+        }
+
+        public IServiceProvider ServiceProvider { get; }
         public ICollection<EndpointDataSource> DataSources { get; } = new List<EndpointDataSource>();
         public IApplicationBuilder CreateApplicationBuilder() => throw new NotImplementedException();
     }

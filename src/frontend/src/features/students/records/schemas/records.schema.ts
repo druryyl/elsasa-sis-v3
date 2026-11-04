@@ -305,3 +305,125 @@ export type AddGuardianFormValues = z.infer<typeof addGuardianSchema>;
 export type UpdateGuardianFormValues = z.infer<typeof updateGuardianSchema>;
 export type VerifyDocumentFormValues = z.infer<typeof verifyDocumentSchema>;
 export type StudentSearchFormValues = z.infer<typeof studentSearchSchema>;
+
+/**
+ * Zod schema for changing student administrative placement (POST /api/students/{id}/placements).
+ */
+export const changePlacementSchema = z.object({
+  campus: z
+    .string({ required_error: 'Campus is required.' })
+    .trim()
+    .min(1, 'Campus is required.')
+    .max(100, 'Campus cannot exceed 100 characters.'),
+  schoolLevel: z
+    .string({ required_error: 'School level is required.' })
+    .trim()
+    .min(1, 'School level is required.')
+    .max(64, 'School level cannot exceed 64 characters.'),
+  grade: z
+    .string({ required_error: 'Grade is required.' })
+    .trim()
+    .min(1, 'Grade is required.')
+    .max(64, 'Grade cannot exceed 64 characters.'),
+  academicYear: z
+    .string({ required_error: 'Academic year is required.' })
+    .trim()
+    .min(1, 'Academic year is required.')
+    .max(32, 'Academic year cannot exceed 32 characters.'),
+  effectiveDate: z
+    .string({ required_error: 'Effective date is required.' })
+    .trim()
+    .min(1, 'Effective date is required.')
+    .regex(ISO_DATE_REGEX, 'Effective date must be in YYYY-MM-DD format.'),
+  program: z
+    .string()
+    .trim()
+    .max(100, 'Program cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  stream: z
+    .string()
+    .trim()
+    .max(100, 'Stream cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  cohort: z
+    .string()
+    .trim()
+    .max(50, 'Cohort cannot exceed 50 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  homeroom: z
+    .string()
+    .trim()
+    .max(100, 'Homeroom cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  reason: z
+    .string()
+    .trim()
+    .max(500, 'Reason cannot exceed 500 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  authorizedBy: z
+    .string()
+    .trim()
+    .max(100, 'Authorized by cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  decisionReference: z
+    .string()
+    .trim()
+    .max(100, 'Decision reference cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+});
+
+export const CHANGE_STATUS_ENUM = ['active', 'enrolled'] as const;
+
+/**
+ * Zod schema for changing student operational status (POST /api/students/{id}/status).
+ */
+export const changeStatusSchema = z.object({
+  status: z.enum(CHANGE_STATUS_ENUM, {
+    errorMap: () => ({ message: "Status must be either 'active' or 'enrolled'." }),
+  }),
+  effectiveDate: z
+    .string({ required_error: 'Effective date is required.' })
+    .trim()
+    .min(1, 'Effective date is required.')
+    .regex(ISO_DATE_REGEX, 'Effective date must be in YYYY-MM-DD format.'),
+  reason: z
+    .string()
+    .trim()
+    .max(1000, 'Reason cannot exceed 1000 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  authorizedBy: z
+    .string()
+    .trim()
+    .max(100, 'Authorized by cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  decisionReference: z
+    .string()
+    .trim()
+    .max(100, 'Decision reference cannot exceed 100 characters.')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+});
+
+export type ChangePlacementFormData = z.infer<typeof changePlacementSchema>;
+export type ChangeStatusFormData = z.infer<typeof changeStatusSchema>;
+export type ChangePlacementFormValues = ChangePlacementFormData;
+export type ChangeStatusFormValues = ChangeStatusFormData;

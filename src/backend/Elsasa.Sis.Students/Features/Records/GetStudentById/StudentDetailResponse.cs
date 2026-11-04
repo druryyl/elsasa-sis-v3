@@ -28,7 +28,43 @@ public sealed record StudentDetailResponse(
     string? UpdatedBy,
     IReadOnlyList<EnrollmentHistoryDto> EnrollmentHistory,
     IReadOnlyList<StudentGuardianRelationshipDto> GuardianRelationships,
-    IReadOnlyList<StudentDocumentDto> Documents);
+    IReadOnlyList<StudentDocumentDto> Documents,
+    AdministrativePlacementDto? CurrentPlacement,
+    IReadOnlyList<AdministrativePlacementDto> PlacementHistory,
+    IReadOnlyList<StudentStatusDto> StatusHistory);
+
+/// <summary>
+/// Authoritative administrative placement period projection details.
+/// </summary>
+public sealed record AdministrativePlacementDto(
+    Guid Id,
+    string Campus,
+    string SchoolLevel,
+    string Grade,
+    string AcademicYear,
+    DateOnly EffectiveDate,
+    DateOnly? EndDate,
+    bool IsCurrent,
+    string? Program,
+    string? Stream,
+    string? Cohort,
+    string? Homeroom,
+    string? Reason,
+    string? AuthorizedBy,
+    string? DecisionReference);
+
+/// <summary>
+/// Authoritative operational student status period projection details.
+/// </summary>
+public sealed record StudentStatusDto(
+    Guid Id,
+    string Status,
+    DateOnly EffectiveDate,
+    DateOnly? EndDate,
+    bool IsCurrent,
+    string? Reason,
+    string? AuthorizedBy,
+    string? DecisionReference);
 
 /// <summary>
 /// Historical enrollment placement and payment record.

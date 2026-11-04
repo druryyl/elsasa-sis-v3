@@ -16,6 +16,8 @@ import {
   UploadDocumentModal,
   VerifyDocumentModal,
   StudentEnrollmentHistoryTab,
+  ChangePlacementModal,
+  ChangeStatusModal,
 } from '../components';
 import * as recordsApi from '../api/records.api';
 import type { StudentDetail, GuardianRelationshipItem, StudentDocumentItem } from '../types/records.types';
@@ -118,6 +120,42 @@ const mockStudent: StudentDetail = {
       fileSizeBytes: 524288,
       contentType: 'image/jpeg',
       fileReference: 'storage/doc2.jpg',
+    },
+  ],
+  currentPlacement: {
+    id: 'placement-100',
+    campus: 'Main Campus',
+    schoolLevel: 'Primary School',
+    grade: 'Grade 1',
+    academicYear: '2026/2027',
+    effectiveDate: '2026-07-01',
+    endDate: null,
+    isCurrent: true,
+    program: 'Bilingual',
+    stream: null,
+    cohort: '1B',
+    homeroom: 'Room 101',
+    reason: 'Initial enrollment placement',
+    authorizedBy: 'admission_officer',
+    decisionReference: 'SK-2026-01',
+  },
+  placementHistory: [
+    {
+      id: 'placement-100',
+      campus: 'Main Campus',
+      schoolLevel: 'Primary School',
+      grade: 'Grade 1',
+      academicYear: '2026/2027',
+      effectiveDate: '2026-07-01',
+      endDate: null,
+      isCurrent: true,
+      program: 'Bilingual',
+      stream: null,
+      cohort: '1B',
+      homeroom: 'Room 101',
+      reason: 'Initial enrollment placement',
+      authorizedBy: 'admission_officer',
+      decisionReference: 'SK-2026-01',
     },
   ],
 };
@@ -468,6 +506,155 @@ describe('Student Records Presentation Tabs & Action Modals (P10-S17)', () => {
       const link = wrapper.findComponent(RouterLinkStub);
       expect(link.exists()).toBe(true);
       expect(link.props().to).toBe('/students/admission');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 8. ChangePlacementModal.vue (P7-S18)
+  // -------------------------------------------------------------------------
+  describe('ChangePlacementModal.vue', () => {
+    it('renders form inputs and pre-populates with active placement values', async () => {
+      const wrapper = mount(ChangePlacementModal, {
+        props: {
+          visible: true,
+          student: mockStudent,
+        },
+        global: {
+          plugins: [pinia, [VueQueryPlugin, { queryClient }], PrimeVue, ToastService],
+          stubs: { Dialog: dialogStub },
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="change-placement-modal"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-campus"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-school-level"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-grade"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-academic-year"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-effective-date"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-program"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-stream"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-cohort"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-homeroom"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-reason"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-authorized-by"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="input-decision-reference"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="btn-submit-placement"]').exists()).toBe(true);
+
+      const campusInput = wrapper.find('[data-testid="input-campus"]').element as HTMLInputElement;
+      expect(campusInput.value).toBe('Main Campus');
+    });
+
+    it('submits changePlacement mutation on valid form inputs and emits saved and update:visible', async () => {
+      const changePlacementSpy = vi.spyOn(recordsApi, 'changeAdministrativePlacement').mockResolvedValueOnce({
+        placementId: 'plc-new-999',
+        studentId: 'student-100',
+        isCurrent: true,
+      });
+
+      const wrapper = mount(ChangePlacementModal, {
+        props: {
+          visible: true,
+          student: mockStudent,
+        },
+        global: {
+          plugins: [pinia, [VueQueryPlugin, { queryClient }], PrimeVue, ToastService],
+          stubs: { Dialog: dialogStub },
+        },
+      });
+      await flushPromises();
+
+      const gradeInput = wrapper.find('[data-testid="input-grade"]');
+      await gradeInput.setValue('Grade 2');
+
+      const submitBtn = wrapper.find('[data-testid="btn-submit-placement"]');
+      await submitBtn.trigger('click');
+      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
+
+      expect(changePlacementSpy).toHaveBeenCalledTimes(1);
+      expect(changePlacementSpy).toHaveBeenCalledWith(
+        'student-100',
+        expect.objectContaining({
+          campus: 'Main Campus',
+          grade: 'Grade 2',
+        }),
+      );
+      expect(wrapper.emitted('saved')).toBeTruthy();
+      expect(wrapper.emitted('update:visible')?.[0]).toEqual([false]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 9. ChangeStatusModal.vue (P7-S18)
+  // -------------------------------------------------------------------------
+  describe('ChangeStatusModal.vue', () => {
+    it('renders form inputs for status, effective date, reason, authorized by, and decision reference', async () => {
+      const wrapper = mount(ChangeStatusModal, {
+        props: {
+          visible: true,
+          studentId: 'student-100',
+          currentStatus: 'enrolled',
+          student: mockStudent,
+        },
+        global: {
+          plugins: [pinia, [VueQueryPlugin, { queryClient }], PrimeVue, ToastService],
+          stubs: { Dialog: dialogStub },
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="change-status-modal"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="status-select"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="effective-date-picker"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="reason-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="authorized-by-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="decision-reference-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="btn-submit-change-status"]').exists()).toBe(true);
+    });
+
+    it('submits changeStatus mutation and emits saved and update:visible on submission', async () => {
+      const changeStatusSpy = vi.spyOn(recordsApi, 'changeStudentStatus').mockResolvedValueOnce({
+        statusId: 'status-new-555',
+        studentId: 'student-100',
+        status: 'active',
+        isCurrent: true,
+      });
+
+      const wrapper = mount(ChangeStatusModal, {
+        props: {
+          visible: true,
+          studentId: 'student-100',
+          currentStatus: 'enrolled',
+          student: mockStudent,
+        },
+        global: {
+          plugins: [pinia, [VueQueryPlugin, { queryClient }], PrimeVue, ToastService],
+          stubs: { Dialog: dialogStub },
+        },
+      });
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.status = 'active';
+      vm.effectiveDate = '2026-11-04';
+      vm.reason = 'All intake requirements completed';
+      vm.authorizedBy = 'Academic Registrar';
+      vm.decisionReference = 'SK-REG-2026-88';
+      await wrapper.vm.$nextTick();
+
+      await wrapper.find('form').trigger('submit.prevent');
+      await flushPromises();
+
+      expect(changeStatusSpy).toHaveBeenCalledWith('student-100', {
+        status: 'active',
+        effectiveDate: '2026-11-04',
+        reason: 'All intake requirements completed',
+        authorizedBy: 'Academic Registrar',
+        decisionReference: 'SK-REG-2026-88',
+      });
+      expect(wrapper.emitted('saved')).toBeTruthy();
+      expect(wrapper.emitted('update:visible')?.[0]).toEqual([false]);
     });
   });
 });

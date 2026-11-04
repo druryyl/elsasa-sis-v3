@@ -9,9 +9,15 @@ import {
   useUpdateGuardianMutation,
   useUploadStudentDocumentMutation,
   useVerifyStudentDocumentMutation,
+  useChangePlacementMutation,
+  useChangeStatusMutation,
 } from '../useStudentRecordsMutations';
 import type {
   AddGuardianPayload,
+  ChangeAdministrativePlacementRequest,
+  ChangeAdministrativePlacementResponse,
+  ChangeStudentStatusRequest,
+  ChangeStudentStatusResponse,
   UpdateGuardianPayload,
   UpdateIdentityPayload,
 } from '../../types/records.types';
@@ -305,4 +311,187 @@ describe('useStudentRecordsMutations', () => {
       expect(onSuccess).toHaveBeenCalled();
     });
   });
+
+  describe('useChangePlacementMutation', () => {
+    const studentId = 'stu-500';
+    const payload: ChangeAdministrativePlacementRequest = {
+      campus: 'North Campus',
+      schoolLevel: 'Secondary',
+      grade: 'Grade 8',
+      academicYear: '2026/2027',
+      effectiveDate: '2026-08-01',
+      program: 'Regular',
+      stream: 'Science',
+      cohort: '2026',
+      homeroom: 'Room 8-B',
+      reason: 'Mid-year campus reassignment',
+      authorizedBy: 'principal@elsasa.sch.id',
+      decisionReference: 'DIR-2026-012',
+    };
+
+    const mockResponse: ChangeAdministrativePlacementResponse = {
+      placementId: 'plc-900',
+      studentId,
+      campus: 'North Campus',
+      schoolLevel: 'Secondary',
+      grade: 'Grade 8',
+      academicYear: '2026/2027',
+      effectiveDate: '2026-08-01',
+      isCurrent: true,
+    };
+
+    it('changes placement, invalidates detail and history queries, and triggers success toast', async () => {
+      vi.spyOn(recordsApi, 'changeAdministrativePlacement').mockResolvedValue(mockResponse);
+
+      const onSuccess = vi.fn();
+      const { result, queryClient } = withSetup(() =>
+        useChangePlacementMutation(studentId, { onSuccess }),
+      );
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const response = await result.mutateAsync(payload);
+
+      expect(recordsApi.changeAdministrativePlacement).toHaveBeenCalledWith(studentId, payload);
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', studentId],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', studentId, 'history'],
+      });
+      expect(mockToast.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          summary: 'Placement Updated',
+        }),
+      );
+      expect(onSuccess).toHaveBeenCalledWith(mockResponse, payload);
+      expect(response).toEqual(mockResponse);
+    });
+
+    it('supports wrapped variables with studentId and payload', async () => {
+      vi.spyOn(recordsApi, 'changeAdministrativePlacement').mockResolvedValue(mockResponse);
+
+      const { result, queryClient } = withSetup(() => useChangePlacementMutation());
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      await result.mutateAsync({ studentId: 'stu-999', payload });
+
+      expect(recordsApi.changeAdministrativePlacement).toHaveBeenCalledWith('stu-999', payload);
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', 'stu-999'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', 'stu-999', 'history'],
+      });
+    });
+
+    it('throws error and shows toast on mutation failure', async () => {
+      const error = new Error('Reassignment failed due to invalid effective date');
+      vi.spyOn(recordsApi, 'changeAdministrativePlacement').mockRejectedValue(error);
+
+      const onError = vi.fn();
+      const { result } = withSetup(() =>
+        useChangePlacementMutation(studentId, { onError }),
+      );
+
+      await expect(result.mutateAsync(payload)).rejects.toThrow('Reassignment failed');
+      expect(mockToast.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Placement Update Failed',
+        }),
+      );
+      expect(onError).toHaveBeenCalled();
+    });
+  });
+
+  describe('useChangeStatusMutation', () => {
+    const studentId = 'stu-600';
+    const payload: ChangeStudentStatusRequest = {
+      status: 'active',
+      effectiveDate: '2026-08-01',
+      reason: 'Returned from leave of absence',
+      authorizedBy: 'officer@elsasa.sch.id',
+      decisionReference: 'STA-2026-004',
+    };
+
+    const mockResponse: ChangeStudentStatusResponse = {
+      statusId: 'sta-901',
+      studentId,
+      status: 'active',
+      effectiveDate: '2026-08-01',
+      isCurrent: true,
+    };
+
+    it('changes status, invalidates detail, history, and list queries, and triggers success toast', async () => {
+      vi.spyOn(recordsApi, 'changeStudentStatus').mockResolvedValue(mockResponse);
+
+      const onSuccess = vi.fn();
+      const { result, queryClient } = withSetup(() =>
+        useChangeStatusMutation(studentId, { onSuccess }),
+      );
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const response = await result.mutateAsync(payload);
+
+      expect(recordsApi.changeStudentStatus).toHaveBeenCalledWith(studentId, payload);
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', studentId],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', studentId, 'history'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'list'],
+      });
+      expect(mockToast.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          summary: 'Status Updated',
+        }),
+      );
+      expect(onSuccess).toHaveBeenCalledWith(mockResponse, payload);
+      expect(response).toEqual(mockResponse);
+    });
+
+    it('supports wrapped variables with studentId and payload', async () => {
+      vi.spyOn(recordsApi, 'changeStudentStatus').mockResolvedValue(mockResponse);
+
+      const { result, queryClient } = withSetup(() => useChangeStatusMutation());
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      await result.mutateAsync({ studentId: 'stu-777', payload });
+
+      expect(recordsApi.changeStudentStatus).toHaveBeenCalledWith('stu-777', payload);
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', 'stu-777'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'detail', 'stu-777', 'history'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['students', 'records', 'list'],
+      });
+    });
+
+    it('throws error and shows toast on status change failure', async () => {
+      const error = new Error('Invalid status transition');
+      vi.spyOn(recordsApi, 'changeStudentStatus').mockRejectedValue(error);
+
+      const onError = vi.fn();
+      const { result } = withSetup(() =>
+        useChangeStatusMutation(studentId, { onError }),
+      );
+
+      await expect(result.mutateAsync(payload)).rejects.toThrow('Invalid status transition');
+      expect(mockToast.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Status Update Failed',
+        }),
+      );
+      expect(onError).toHaveBeenCalled();
+    });
+  });
 });
+

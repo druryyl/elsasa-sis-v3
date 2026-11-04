@@ -11,9 +11,17 @@ import {
   uploadStudentDocument,
   getStudentDocumentDownloadUrl,
   verifyStudentDocument,
+  changeAdministrativePlacement,
+  changeStudentStatus,
+  getStudentAdministrativeHistory,
 } from '../api/records.api';
 import type {
   AddGuardianPayload,
+  ChangeAdministrativePlacementRequest,
+  ChangeAdministrativePlacementResponse,
+  ChangeStudentStatusRequest,
+  ChangeStudentStatusResponse,
+  GetStudentAdministrativeHistoryResponse,
   StudentDetail,
   StudentSearchParams,
   UpdateGuardianPayload,
@@ -287,6 +295,153 @@ describe('Student Records API Client (records.api.ts)', () => {
         submissionStatus: 'verified',
         notes: 'Official stamp validated',
       });
+    });
+  });
+
+  describe('changeAdministrativePlacement', () => {
+    it('calls POST /students/{id}/placements with payload and returns response', async () => {
+      const studentId = '11111111-1111-1111-1111-111111111111';
+      const payload: ChangeAdministrativePlacementRequest = {
+        campus: 'North Campus',
+        schoolLevel: 'Secondary',
+        grade: 'Grade 8',
+        academicYear: '2026/2027',
+        effectiveDate: '2026-08-01',
+        program: 'Regular',
+        stream: 'Science',
+        cohort: '2026',
+        homeroom: 'Room 8-B',
+        reason: 'Mid-year reassignment',
+        authorizedBy: 'principal@elsasa.sch.id',
+        decisionReference: 'DIR-2026-012',
+      };
+
+      const mockResponse: ChangeAdministrativePlacementResponse = {
+        placementId: 'plc-900',
+        studentId,
+        campus: 'North Campus',
+        schoolLevel: 'Secondary',
+        grade: 'Grade 8',
+        academicYear: '2026/2027',
+        effectiveDate: '2026-08-01',
+        isCurrent: true,
+      };
+
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: mockResponse,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      };
+
+      const result = await changeAdministrativePlacement(studentId, payload);
+
+      expect(capturedConfig).not.toBeNull();
+      expect(capturedConfig?.method?.toLowerCase()).toBe('post');
+      expect(capturedConfig?.url).toBe(`/students/${studentId}/placements`);
+      expect(JSON.parse(capturedConfig?.data as string)).toEqual(payload);
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('changeStudentStatus', () => {
+    it('calls POST /students/{id}/status with payload and returns response', async () => {
+      const studentId = '11111111-1111-1111-1111-111111111111';
+      const payload: ChangeStudentStatusRequest = {
+        status: 'active',
+        effectiveDate: '2026-08-01',
+        reason: 'Activated upon completion of prerequisites',
+        authorizedBy: 'admin@elsasa.sch.id',
+        decisionReference: 'DEC-2026-099',
+      };
+
+      const mockResponse: ChangeStudentStatusResponse = {
+        statusId: 'sta-901',
+        studentId,
+        status: 'active',
+        effectiveDate: '2026-08-01',
+        isCurrent: true,
+      };
+
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: mockResponse,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      };
+
+      const result = await changeStudentStatus(studentId, payload);
+
+      expect(capturedConfig).not.toBeNull();
+      expect(capturedConfig?.method?.toLowerCase()).toBe('post');
+      expect(capturedConfig?.url).toBe(`/students/${studentId}/status`);
+      expect(JSON.parse(capturedConfig?.data as string)).toEqual(payload);
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('getStudentAdministrativeHistory', () => {
+    it('calls GET /students/{id}/history and returns chronological history entries', async () => {
+      const studentId = '11111111-1111-1111-1111-111111111111';
+      const mockResponse: GetStudentAdministrativeHistoryResponse = {
+        studentId,
+        entries: [
+          {
+            id: 'hist-1',
+            studentId,
+            eventType: 'placement_changed',
+            eventDate: '2026-08-01',
+            detail: 'Reassigned to North Campus, Secondary, Grade 8',
+            authorizedBy: 'principal@elsasa.sch.id',
+            decisionReference: 'DIR-2026-012',
+            isCorrection: false,
+            correctsEntryId: null,
+            createdAt: '2026-08-01T10:00:00Z',
+            createdBy: 'principal@elsasa.sch.id',
+          },
+          {
+            id: 'hist-2',
+            studentId,
+            eventType: 'student_activated',
+            eventDate: '2026-05-01',
+            detail: 'Official student status activated',
+            authorizedBy: 'officer@elsasa.sch.id',
+            decisionReference: 'STD-2026-0001',
+            isCorrection: false,
+            correctsEntryId: null,
+            createdAt: '2026-05-01T08:00:00Z',
+            createdBy: 'officer@elsasa.sch.id',
+          },
+        ],
+      };
+
+      apiClient.defaults.adapter = async (config) => {
+        capturedConfig = config;
+        return {
+          data: mockResponse,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      };
+
+      const result = await getStudentAdministrativeHistory(studentId);
+
+      expect(capturedConfig).not.toBeNull();
+      expect(capturedConfig?.method?.toLowerCase()).toBe('get');
+      expect(capturedConfig?.url).toBe(`/students/${studentId}/history`);
+      expect(result).toEqual(mockResponse);
+      expect(result.entries).toHaveLength(2);
+      expect(result.entries[0]?.eventType).toBe('placement_changed');
     });
   });
 });
