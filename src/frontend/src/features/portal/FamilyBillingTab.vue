@@ -15,18 +15,25 @@ import {
   DollarSign,
   ChevronRight,
   ShieldCheck,
+  Receipt,
 } from 'lucide-vue-next';
 import { StatusPill, EmptyState, LoadingSpinner } from '@/shared/components';
 import { formatIdr } from '../finance/shared/currency.utils';
 import { getBillingStatusDescriptor } from '../finance/shared/financeStatus.utils';
 import { useBillingDocumentsQuery } from '../finance/billing/composables/useFinanceBilling';
+import { usePaymentsQuery } from '../finance/payments/composables/useFinancePayments';
 import InvoiceDetailModal from '../finance/accounts/components/InvoiceDetailModal.vue';
+import ReceiptVoucherViewer from '../finance/payments/components/ReceiptVoucherViewer.vue';
+import SubmitPaymentModal from './components/SubmitPaymentModal.vue';
 import type { BillingDocumentDto } from '../finance/billing/types/billing.types';
+import type { SubmitPaymentResponse } from '../finance/payments/types/payments.types';
 
 interface Props {
   studentId?: string;
   studentName?: string;
   payerName?: string;
+  payerEmail?: string;
+  payerPhone?: string;
   initialDocuments?: BillingDocumentDto[];
 }
 
@@ -34,17 +41,28 @@ const props = withDefaults(defineProps<Props>(), {
   studentId: '',
   studentName: '',
   payerName: '',
+  payerEmail: '',
+  payerPhone: '',
   initialDocuments: () => [],
 });
 
 const emit = defineEmits<{
   (e: 'payNow', document: BillingDocumentDto): void;
   (e: 'viewInvoice', documentId: string): void;
+  (e: 'viewReceipt', paymentId: string | null): void;
 }>();
 
 // Selected document for invoice detail modal
 const selectedInvoiceId = ref<string | null>(null);
 const isInvoiceModalOpen = ref(false);
+
+// Payment submission modal state
+const isPaymentModalOpen = ref(false);
+const selectedBillForPayment = ref<BillingDocumentDto | null>(null);
+
+// Receipt voucher viewer state
+const isReceiptModalOpen = ref(false);
+const selectedPaymentId = ref<string | null>(null);
 
 // Query billing documents for this student
 const queryParams = computed(() => ({
@@ -57,6 +75,20 @@ const {
   isLoading,
   refetch,
 } = useBillingDocumentsQuery(queryParams, {
+  enabled: computed(() => Boolean(props.studentId)),
+});
+
+// Query confirmed payments for receipt viewing
+const paymentsQueryParams = computed(() => ({
+  studentId: props.studentId || undefined,
+  status: 'confirmed',
+  pageSize: 10,
+}));
+
+const {
+  data: paymentsResponse,
+  refetch: refetchPayments,
+} = usePaymentsQuery(paymentsQueryParams, {
   enabled: computed(() => Boolean(props.studentId)),
 });
 
@@ -82,17 +114,50 @@ const filteredDocuments = computed(() => {
   return documentsList.value;
 });
 
+// Open bills list for payment modal dropdown
+const openBills = computed(() =>
+  documentsList.value.filter(
+    (d) => d.deliveryStatus !== 'paid' && d.deliveryStatus !== 'cancelled',
+  ),
+);
+
 // Outstanding unpaid total
 const totalOutstanding = computed(() => {
-  return documentsList.value
-    .filter((d) => d.deliveryStatus !== 'paid' && d.deliveryStatus !== 'cancelled')
-    .reduce((sum, doc) => sum + (doc.totalBilledAmount ?? 0), 0);
+  return openBills.value.reduce((sum, doc) => sum + (doc.totalBilledAmount ?? 0), 0);
 });
 
 function openInvoice(docId: string) {
   selectedInvoiceId.value = docId;
   isInvoiceModalOpen.value = true;
   emit('viewInvoice', docId);
+}
+
+function handlePayNow(doc: BillingDocumentDto) {
+  selectedBillForPayment.value = doc;
+  isPaymentModalOpen.value = true;
+  emit('payNow', doc);
+}
+
+function handlePayOutstanding() {
+  const firstOpen = openBills.value[0] || null;
+  selectedBillForPayment.value = firstOpen;
+  isPaymentModalOpen.value = true;
+  if (firstOpen) {
+    emit('payNow', firstOpen);
+  }
+}
+
+function handleViewReceipt(doc: BillingDocumentDto) {
+  const confirmed = paymentsResponse.value?.items ?? [];
+  const matched = confirmed[0];
+  selectedPaymentId.value = matched?.id ?? doc.id;
+  isReceiptModalOpen.value = true;
+  emit('viewReceipt', selectedPaymentId.value);
+}
+
+function onPaymentSubmitted(_res: SubmitPaymentResponse) {
+  refetch();
+  refetchPayments();
 }
 </script>
 
@@ -129,7 +194,7 @@ function openInvoice(docId: string) {
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
           <div v-if="totalOutstanding > 0" class="flex items-center gap-1.5 text-xs text-amber-800 font-medium bg-amber-100/70 px-3 py-1.5 rounded-lg border border-amber-200">
             <AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
             <span>Please complete payment before the due date.</span>
@@ -138,6 +203,20 @@ function openInvoice(docId: string) {
             <CheckCircle2 class="w-4 h-4 text-emerald-600 shrink-0" />
             <span>All tuition and fees are up to date!</span>
           </div>
+
+          <Button
+            v-if="totalOutstanding > 0"
+            size="small"
+            severity="warn"
+            data-testid="pay-outstanding-btn"
+            class="!text-xs font-semibold shadow-xs"
+            @click="handlePayOutstanding"
+          >
+            <template #icon>
+              <CreditCard class="w-3.5 h-3.5 mr-1.5" />
+            </template>
+            Pay Now
+          </Button>
         </div>
       </div>
     </div>
@@ -179,7 +258,7 @@ function openInvoice(docId: string) {
         severity="secondary"
         text
         class="text-xs"
-        @click="refetch"
+        @click="() => { refetch(); refetchPayments(); }"
       >
         Refresh List
       </Button>
@@ -247,8 +326,8 @@ function openInvoice(docId: string) {
           </div>
         </div>
 
-        <div class="flex items-center gap-4 ml-auto">
-          <div class="text-right">
+        <div class="flex items-center gap-3 ml-auto">
+          <div class="text-right mr-2">
             <div class="text-xs text-slate-400 uppercase font-semibold">
               Amount
             </div>
@@ -260,6 +339,7 @@ function openInvoice(docId: string) {
             </div>
           </div>
 
+          <!-- View Details Button -->
           <Button
             size="small"
             severity="secondary"
@@ -272,6 +352,37 @@ function openInvoice(docId: string) {
             </template>
             View Details
           </Button>
+
+          <!-- Pay Now Button (on Open / Unpaid Bills) -->
+          <Button
+            v-if="doc.deliveryStatus !== 'paid' && doc.deliveryStatus !== 'cancelled'"
+            size="small"
+            severity="primary"
+            data-testid="pay-now-btn"
+            class="!text-xs font-semibold"
+            @click="handlePayNow(doc)"
+          >
+            <template #icon>
+              <CreditCard class="w-3.5 h-3.5 mr-1.5" />
+            </template>
+            Pay Now
+          </Button>
+
+          <!-- View / Download Receipt Button (on Settled Bills) -->
+          <Button
+            v-else-if="doc.deliveryStatus === 'paid'"
+            size="small"
+            severity="success"
+            outlined
+            data-testid="view-receipt-btn"
+            class="!text-xs font-semibold"
+            @click="handleViewReceipt(doc)"
+          >
+            <template #icon>
+              <Download class="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+            </template>
+            View / Download Receipt
+          </Button>
         </div>
       </div>
     </div>
@@ -280,6 +391,27 @@ function openInvoice(docId: string) {
     <InvoiceDetailModal
       v-model:visible="isInvoiceModalOpen"
       :document-id="selectedInvoiceId"
+    />
+
+    <!-- Submit Payment Modal (SCR-SELF-02) -->
+    <SubmitPaymentModal
+      v-if="isPaymentModalOpen"
+      v-model:visible="isPaymentModalOpen"
+      :student-id="studentId"
+      :student-name="studentName"
+      :payer-name="payerName"
+      :payer-email="payerEmail"
+      :payer-phone="payerPhone"
+      :bill="selectedBillForPayment"
+      :open-bills="openBills"
+      @submitted="onPaymentSubmitted"
+    />
+
+    <!-- Official Receipt Voucher Viewer (SCR-SELF-02) -->
+    <ReceiptVoucherViewer
+      v-if="isReceiptModalOpen"
+      v-model:visible="isReceiptModalOpen"
+      :payment-id="selectedPaymentId"
     />
   </div>
 </template>

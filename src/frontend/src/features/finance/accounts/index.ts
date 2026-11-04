@@ -10,3 +10,5 @@ export { default as ObligationsTable } from './components/ObligationsTable.vue';
 export { default as BillingDocumentsTable } from './components/BillingDocumentsTable.vue';
 export { default as AssessAdHocFeeModal } from './components/AssessAdHocFeeModal.vue';
 export { default as InvoiceDetailModal } from './components/InvoiceDetailModal.vue';
+export { default as PaymentsHistoryTable } from './components/PaymentsHistoryTable.vue';
+export { default as AllocationsTable } from './components/AllocationsTable.vue';

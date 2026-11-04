@@ -21,6 +21,8 @@ interface Props {
   loading?: boolean;
   canAssessFee?: boolean;
   canGenerateBill?: boolean;
+  totalPaid?: number;
+  unallocatedCredit?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -28,6 +30,8 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   canAssessFee: true,
   canGenerateBill: true,
+  totalPaid: undefined,
+  unallocatedCredit: 0,
 });
 
 const emit = defineEmits<{
@@ -136,8 +140,8 @@ const openObligationsCount = computed(
       </div>
     </div>
 
-    <!-- Core Financial Ledger Metrics -->
-    <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Core Financial Ledger Metrics (TD-02, SCR-FIN-03) -->
+    <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- 1. Total Assessed -->
       <div
         class="bg-slate-50/70 rounded-lg p-4 border border-slate-100 flex flex-col justify-between"
@@ -154,17 +158,17 @@ const openObligationsCount = computed(
             {{ formatIdr(account?.totalAssessed ?? 0) }}
           </div>
           <p class="text-xs text-slate-500 mt-1">
-            Aggregate historical fee obligations assessed.
+            Aggregate fee obligations assessed.
           </p>
         </div>
       </div>
 
-      <!-- 2. Total Settled -->
+      <!-- 2. Total Settled / Paid -->
       <div
         class="bg-emerald-50/50 rounded-lg p-4 border border-emerald-100/70 flex flex-col justify-between"
       >
         <div class="flex items-center justify-between text-emerald-800 text-xs font-semibold uppercase tracking-wider mb-2">
-          <span>Total Settled</span>
+          <span>Total Paid / Settled</span>
           <CheckCircle2 class="w-4 h-4 text-emerald-600" />
         </div>
         <div>
@@ -172,15 +176,39 @@ const openObligationsCount = computed(
             class="text-2xl font-bold font-mono text-emerald-700"
             data-testid="total-settled-amount"
           >
-            {{ formatIdr(account?.totalSettled ?? 0) }}
+            {{ formatIdr(totalPaid !== undefined ? totalPaid : (account?.totalSettled ?? 0)) }}
           </div>
+          <span class="sr-only" data-testid="total-paid-amount">
+            {{ formatIdr(totalPaid !== undefined ? totalPaid : (account?.totalSettled ?? 0)) }}
+          </span>
           <p class="text-xs text-emerald-600/80 mt-1">
-            Fully settled receipts and cleared payments.
+            Receipted and cleared payments.
           </p>
         </div>
       </div>
 
-      <!-- 3. Prominent Derived Current Balance (TD-02) -->
+      <!-- 3. Unallocated Credit Balance -->
+      <div
+        class="bg-blue-50/50 rounded-lg p-4 border border-blue-100/70 flex flex-col justify-between"
+      >
+        <div class="flex items-center justify-between text-blue-800 text-xs font-semibold uppercase tracking-wider mb-2">
+          <span>Unallocated Credit</span>
+          <Wallet class="w-4 h-4 text-blue-600" />
+        </div>
+        <div>
+          <div
+            class="text-2xl font-bold font-mono text-blue-700"
+            data-testid="unallocated-credit-amount"
+          >
+            {{ formatIdr(unallocatedCredit ?? 0) }}
+          </div>
+          <p class="text-xs text-blue-600/80 mt-1">
+            Available payment credit for allocation.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4. Prominent Derived Current Balance (TD-02) -->
       <div
         class="rounded-lg p-4 border flex flex-col justify-between transition-colors shadow-xs"
         :class="{
@@ -202,7 +230,7 @@ const openObligationsCount = computed(
         </div>
         <div>
           <div
-            class="text-3xl font-extrabold font-mono tracking-tight"
+            class="text-2xl font-extrabold font-mono tracking-tight"
             :class="{
               'text-amber-800': balanceVariant === 'warn',
               'text-emerald-800': balanceVariant === 'success',
@@ -226,5 +254,6 @@ const openObligationsCount = computed(
         </div>
       </div>
     </div>
+
   </div>
 </template>

@@ -86,6 +86,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Students.Events.StudentEnrolledEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Students.Events.PlacementChangedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Finance.Events.ObligationAssessedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Finance.Events.PaymentConfirmedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
 
             // Register TestFinanceModule for simulating IFinanceModule verification
             services.RemoveAll<Elsasa.Sis.Contracts.Finance.IFinanceModule>();

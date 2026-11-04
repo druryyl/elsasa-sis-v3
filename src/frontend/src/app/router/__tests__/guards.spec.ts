@@ -202,15 +202,15 @@ describe('Navigation Guards & Router Integration', () => {
       authStore.setSession(
         'valid-token',
         createTestUser({
-          permissions: ['Permissions.Finance.Payments.Receive'],
+          permissions: ['Permissions.Finance.Payments.View'],
         }),
       );
 
-      // Can access payments desk
+      // Can access payment verification queue
       await router.push('/finance/payments');
       expect(router.currentRoute.value.path).toBe('/finance/payments');
-      expect(router.currentRoute.value.name).toBe('finance.payments.desk');
-      expect(document.title).toBe('Payment Receipt Desk — Elsasa SIS');
+      expect(router.currentRoute.value.name).toBe('finance.payments.queue');
+      expect(document.title).toBe('Payment Verification Queue — Elsasa SIS');
 
       // Cannot access obligations list without Permissions.Finance.Obligations.View
       await router.push('/finance/obligations');

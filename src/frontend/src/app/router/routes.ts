@@ -166,11 +166,12 @@ export const routes: RouteRecordRaw[] = [
           },
           {
             path: 'payments',
-            name: 'finance.payments.desk',
-            component: () => import('@/features/finance/payments/views/PaymentDeskView.vue'),
+            name: 'finance.payments.queue',
+            component: () =>
+              import('@/features/finance/payments/views/PaymentVerificationQueueView.vue'),
             meta: {
-              permission: 'Permissions.Finance.Payments.Receive',
-              title: 'Payment Receipt Desk',
+              permission: 'Permissions.Finance.Payments.View',
+              title: 'Payment Verification Queue',
             },
           },
         ],

@@ -1,30 +1,71 @@
 namespace Elsasa.Sis.Finance.Services;
 
+using Dapper;
 using Elsasa.Sis.Contracts.Finance;
 using Elsasa.Sis.Shared.Common;
+using Elsasa.Sis.Shared.Database;
 
 /// <summary>
-/// Stage 1 implementation of the synchronous Finance query contract (ADR-003, FIN-WF-13).
+/// Authoritative implementation of the synchronous Finance query contract (ADR-003, FIN-WF-13, GAP-006, TD-06).
+/// Evaluates mandatory enrollment fee settlement in real time against the Finance ledger.
 /// </summary>
-/// <remarks>
-/// The Finance payment ledger tables (<c>finance.financial_obligations</c>,
-/// <c>finance.payments</c>, <c>finance.payment_allocations</c>) are not provisioned yet,
-/// so enrollment fee confirmation is denied by default. Denying is the safe behaviour:
-/// it keeps the enrollment payment gate closed instead of silently treating an
-/// unverified payment as settled. Replace this implementation with a ledger-backed
-/// query when the Finance payment slices are implemented.
-/// </remarks>
-public sealed class FinanceModule : IFinanceModule
+public sealed class FinanceModule(ISqlConnectionFactory? connectionFactory = null) : IFinanceModule
 {
+    private readonly ISqlConnectionFactory? _connectionFactory = connectionFactory;
+
+    static FinanceModule()
+    {
+        DapperTypeHandlers.RegisterTypeHandlers();
+    }
+
+    private const string _checkEnrollmentFeeSettledSql = """
+        SELECT 
+            fo.id AS Id,
+            fo.original_amount AS OriginalAmount,
+            ISNULL(SUM(CASE WHEN pa.status = 'active' THEN pa.allocated_amount ELSE 0 END), 0) AS TotalAllocated
+        FROM finance.financial_obligations fo
+        LEFT JOIN finance.payment_allocations pa ON pa.obligation_id = fo.id
+        LEFT JOIN operations.operational_periods op ON op.id = fo.academic_period_id
+        WHERE (fo.applicant_id = @ApplicantId OR fo.student_id = (SELECT id FROM students.students WHERE applicant_id = @ApplicantId))
+          AND fo.charge_type IN ('enrollment_fee', 'admission_fee')
+          AND fo.is_mandatory = 1
+          AND fo.status NOT IN ('cancelled')
+          AND (fo.academic_period_id = @AcademicYearId OR op.academic_year_id = @AcademicYearId)
+        GROUP BY fo.id, fo.original_amount;
+        """;
+
+    private sealed record ObligationSettlementRow(Guid Id, long OriginalAmount, long TotalAllocated);
+
     /// <inheritdoc />
-    public Task<Result<bool>> IsEnrollmentFeePaidAsync(
+    public async Task<Result<bool>> IsEnrollmentFeePaidAsync(
         Guid applicantId,
         Guid academicYearId,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        // No Finance ledger exists yet, therefore payment can never be confirmed.
-        return Task.FromResult(Result.Success(false));
+        if (_connectionFactory is null)
+        {
+            throw new InvalidOperationException("ISqlConnectionFactory is not configured.");
+        }
+
+        await using var connection = await _connectionFactory.CreateConnectionAsync(ct);
+
+        var obligations = (await connection.QueryAsync<ObligationSettlementRow>(
+            new CommandDefinition(
+                _checkEnrollmentFeeSettledSql,
+                new { ApplicantId = applicantId, AcademicYearId = academicYearId },
+                cancellationToken: ct))).ToList();
+
+        // Case 1: No mandatory enrollment obligations assessed -> no gate block required
+        if (obligations.Count == 0)
+        {
+            return Result.Success(true);
+        }
+
+        // Case 2: Return true if and only if EVERY mandatory enrollment obligation is 100% settled
+        var allSettled = obligations.All(o => o.TotalAllocated >= o.OriginalAmount);
+
+        return Result.Success(allSettled);
     }
 }

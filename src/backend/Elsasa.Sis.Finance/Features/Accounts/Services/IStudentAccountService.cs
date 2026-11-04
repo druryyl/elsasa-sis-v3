@@ -13,9 +13,10 @@ using System.Data;
 public sealed record StudentFinancialAccountSummary(
     Guid Id,
     string AccountNumber,
-    Guid StudentId,
+    Guid? StudentId,
     string AccountStatus,
-    DateOnly OpenedDate)
+    DateOnly OpenedDate,
+    Guid? ApplicantId = null)
 {
     /// <summary>
     /// Implicit conversion operator enabling seamless resolution to account UUID.
@@ -40,6 +41,17 @@ public interface IStudentAccountService
     /// <returns>The existing or newly provisioned account summary.</returns>
     Task<StudentFinancialAccountSummary> GetOrCreateAccountAsync(
         Guid studentId,
+        IDbConnection connection,
+        IDbTransaction? transaction = null,
+        string createdBy = "SYSTEM_ADHOC",
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves an existing active account for a candidate (student or pre-enrollment applicant), or provisions a new one (GAP-001, OQ-001).
+    /// </summary>
+    Task<StudentFinancialAccountSummary> GetOrCreateCandidateAccountAsync(
+        Guid? studentId,
+        Guid? applicantId,
         IDbConnection connection,
         IDbTransaction? transaction = null,
         string createdBy = "SYSTEM_ADHOC",

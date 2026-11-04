@@ -4,8 +4,10 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
 import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import FamilyBillingTab from '@/features/portal/FamilyBillingTab.vue';
 import * as billingApi from '../billing/api/billing.api';
+import * as paymentsApi from '../payments/api/payments.api';
 import type { BillingDocumentDto } from '../billing/types/billing.types';
 
 const mockBillingDocuments: BillingDocumentDto[] = [
@@ -129,6 +131,86 @@ describe('FamilyBillingTab.spec.ts (Family Portal Payer Workspace, SCR-SELF-02)'
       const doc = mockBillingDocuments.find((d) => d.id === id) ?? mockBillingDocuments[0];
       return Promise.resolve(doc);
     });
+
+    vi.spyOn(paymentsApi, 'getPayments').mockResolvedValue({
+      items: [
+        {
+          id: 'pay-001',
+          paymentNumber: 'PAY-2026-000001',
+          receiptNumber: 'REC-2026-000010',
+          studentAccountId: 'acc-001',
+          accountNumber: 'ACC-2026-0001',
+          studentId: 'stu-001',
+          studentNumber: '2026-001',
+          studentFullName: 'Ahmad Fauzi',
+          applicantId: null,
+          payerId: 'pyr-001',
+          payerNumber: 'PYR-2026-0001',
+          payerName: 'Bapak Ahmad',
+          paymentAmount: 500000,
+          currencyCode: 'IDR',
+          paymentMethod: 'bank_transfer',
+          externalReference: 'TRF-BCA-889911',
+          paymentDate: '2026-07-05',
+          submissionDate: '2026-07-05T10:00:00Z',
+          confirmationStatus: 'confirmed',
+          confirmationDate: '2026-07-05T10:30:00Z',
+          confirmedBy: 'Cashier Siti',
+          rejectionReason: null,
+          notes: null,
+          totalAllocated: 500000,
+          unallocatedAmount: 0,
+        },
+      ],
+      totalCount: 1,
+      pageNumber: 1,
+      pageSize: 50,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+
+    vi.spyOn(paymentsApi, 'getPaymentReceipt').mockResolvedValue({
+      header: {
+        schoolName: 'ELSASA INTEGRATED ISLAMIC SCHOOL',
+        schoolAddress: 'Jakarta',
+        contactInfo: '021-123456',
+        documentTitle: 'BUKTI PENERIMAAN PEMBAYARAN RESMI',
+      },
+      paymentId: 'pay-001',
+      paymentNumber: 'PAY-2026-000001',
+      receiptNumber: 'REC-2026-000010',
+      paymentDate: '2026-07-05',
+      receiptIssuedAt: '2026-07-05 10:30:00 UTC',
+      paymentMethod: 'bank_transfer',
+      externalReference: 'TRF-BCA-889911',
+      amount: 500000,
+      currencyCode: 'IDR',
+      amountInWords: 'Lima Ratus Ribu Rupiah',
+      payer: {
+        id: 'pyr-001',
+        payerNumber: 'PYR-2026-0001',
+        payerName: 'Bapak Ahmad',
+        identificationNumber: null,
+        email: null,
+        phoneNumber: null,
+      },
+      candidate: {
+        studentId: 'stu-001',
+        studentNumber: '2026-001',
+        studentFullName: 'Ahmad Fauzi',
+        applicantId: null,
+        accountNumber: 'ACC-2026-0001',
+      },
+      allocations: [],
+      cashier: {
+        confirmedBy: 'Cashier Siti',
+        confirmationDate: '2026-07-05',
+        title: 'Finance Cashier Officer',
+        officialStampText: '[ LUNAS / SETTLED ]',
+      },
+      notes: null,
+    });
   });
 
   afterEach(() => {
@@ -146,11 +228,12 @@ describe('FamilyBillingTab.spec.ts (Family Portal Payer Workspace, SCR-SELF-02)'
         ...propsData,
       },
       global: {
-        plugins: [PrimeVue, [VueQueryPlugin, { queryClient }]],
+        plugins: [PrimeVue, ToastService, [VueQueryPlugin, { queryClient }]],
         stubs: {
           RouterLink: {
             template: '<a><slot /></a>',
           },
+          teleport: true,
         },
       },
     });
@@ -275,5 +358,37 @@ describe('FamilyBillingTab.spec.ts (Family Portal Payer Workspace, SCR-SELF-02)'
     // Modal dialog is mounted to document.body
     expect(billingApi.getBillingDocumentById).toHaveBeenCalledWith('doc-001');
     expect(document.querySelector('[data-testid="invoice-detail-modal"]')).not.toBeNull();
+  });
+
+  it('triggers payment submission modal and emits payNow event when clicking "Pay Now" on open bill', async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const payNowBtn = wrapper.find('[data-testid="pay-now-btn"]');
+    expect(payNowBtn.exists()).toBe(true);
+    expect(payNowBtn.text()).toContain('Pay Now');
+
+    await payNowBtn.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('payNow')).toBeTruthy();
+    expect(wrapper.emitted('payNow')![0][0]).toEqual(
+      expect.objectContaining({ id: 'doc-001', documentNumber: 'BIL-2026-00001' }),
+    );
+    expect(wrapper.find('[data-testid="submit-payment-modal"]').exists()).toBe(true);
+  });
+
+  it('renders "View / Download Receipt" action on settled bills and opens ReceiptVoucherViewer', async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const viewReceiptBtn = wrapper.find('[data-testid="view-receipt-btn"]');
+    expect(viewReceiptBtn.exists()).toBe(true);
+    expect(viewReceiptBtn.text()).toContain('View / Download Receipt');
+
+    await viewReceiptBtn.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="receipt-voucher-modal"]').exists()).toBe(true);
   });
 });

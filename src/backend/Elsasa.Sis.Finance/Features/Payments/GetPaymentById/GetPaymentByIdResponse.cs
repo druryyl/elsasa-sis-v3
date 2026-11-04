@@ -1,0 +1,41 @@
+namespace Elsasa.Sis.Finance.Features.Payments.GetPaymentById;
+
+/// <summary>
+/// Detailed response payload for inspecting a single payment record (SCR-FIN-02, TD-04).
+/// </summary>
+public sealed record GetPaymentByIdResponse(
+    Guid Id,
+    string PaymentNumber,
+    string? ReceiptNumber,
+    Guid StudentAccountId,
+    string AccountNumber,
+    Guid? StudentId,
+    string? StudentNumber,
+    string? StudentFullName,
+    Guid? ApplicantId,
+    Guid PayerId,
+    string PayerNumber,
+    string PayerName,
+    string PayerType,
+    string? PayerIdentificationNumber,
+    string? PayerEmail,
+    string? PayerPhone,
+    long PaymentAmount,
+    string CurrencyCode,
+    string PaymentMethod,
+    string? ExternalReference,
+    DateOnly PaymentDate,
+    DateTimeOffset SubmissionDate,
+    string ConfirmationStatus,
+    DateTimeOffset? ConfirmationDate,
+    string? ConfirmedBy,
+    DateTimeOffset? ReceiptIssuedAt,
+    string? RejectionReason,
+    string? Notes,
+    DateTimeOffset CreatedAt,
+    string? CreatedBy,
+    DateTimeOffset? UpdatedAt,
+    string? UpdatedBy,
+    long TotalAllocated,
+    long UnallocatedAmount,
+    IReadOnlyList<PaymentAllocationItemDto> Allocations);

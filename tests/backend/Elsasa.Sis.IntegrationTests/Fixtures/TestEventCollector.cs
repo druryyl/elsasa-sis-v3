@@ -12,12 +12,14 @@ public sealed class TestEventCollector :
     INotificationHandler<ApplicantAcceptedEvent>,
     INotificationHandler<StudentEnrolledEvent>,
     INotificationHandler<PlacementChangedEvent>,
-    INotificationHandler<ObligationAssessedEvent>
+    INotificationHandler<ObligationAssessedEvent>,
+    INotificationHandler<PaymentConfirmedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
     private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
     private readonly ConcurrentBag<ObligationAssessedEvent> _obligationAssessedEvents = [];
+    private readonly ConcurrentBag<PaymentConfirmedEvent> _paymentConfirmedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -40,6 +42,11 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<ObligationAssessedEvent> ObligationAssessedEvents => _obligationAssessedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="PaymentConfirmedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<PaymentConfirmedEvent> PaymentConfirmedEvents => _paymentConfirmedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -48,6 +55,7 @@ public sealed class TestEventCollector :
         _studentEnrolledEvents.Clear();
         _placementChangedEvents.Clear();
         _obligationAssessedEvents.Clear();
+        _paymentConfirmedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -79,6 +87,14 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _obligationAssessedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(PaymentConfirmedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _paymentConfirmedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

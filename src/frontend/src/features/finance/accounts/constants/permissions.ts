@@ -15,3 +15,16 @@ export const FINANCE_BILLING_PERMISSIONS = {
   VIEW: 'Permissions.Finance.Billing.View',
   GENERATE: 'Permissions.Finance.Billing.Generate',
 } as const;
+
+export const FINANCE_PAYMENT_PERMISSIONS = {
+  VIEW: 'Permissions.Finance.Payments.View',
+  RECORD: 'Permissions.Finance.Payments.Record',
+  CONFIRM: 'Permissions.Finance.Payments.Confirm',
+  REJECT: 'Permissions.Finance.Payments.Reject',
+} as const;
+
+export const FINANCE_ALLOCATION_PERMISSIONS = {
+  VIEW: 'Permissions.Finance.Allocations.View',
+  EXECUTE: 'Permissions.Finance.Allocations.Execute',
+  REALLOCATE: 'Permissions.Finance.Allocations.Reallocate',
+} as const;

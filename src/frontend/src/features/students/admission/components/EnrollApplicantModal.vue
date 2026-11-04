@@ -11,8 +11,12 @@ import {
   UserCheck,
   AlertCircle,
   ShieldCheck,
+  CheckCircle2,
 } from 'lucide-vue-next';
 import { FormField } from '@/shared/components';
+import { formatIdr } from '@/features/finance/shared/currency.utils';
+import { useStudentReceivablesQuery } from '@/features/finance/allocations/composables/useFinanceAllocations';
+import { usePaymentsQuery } from '@/features/finance/payments/composables/useFinancePayments';
 import {
   enrollAcceptedApplicantSchema,
   type EnrollAcceptedApplicantFormValues,
@@ -270,6 +274,84 @@ function formatRelationship(type: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Real-Time Finance Mandatory Enrollment Fee Clearance Gate (GAP-01, TD-06)
+// ---------------------------------------------------------------------------
+const candidateId = computed(() => {
+  const app = activeApp.value;
+  return app?.applicantId || app?.applicant?.id || '';
+});
+
+// Real-time student receivables query (checking mandatory enrollment fees)
+const receivablesQuery = useStudentReceivablesQuery(candidateId, undefined, {
+  enabled: computed(() => Boolean(props.visible && candidateId.value)),
+});
+
+// Real-time payments query (retrieving confirmed sequential receipt number)
+const candidatePaymentsQuery = usePaymentsQuery(
+  computed(() => ({
+    applicantId: candidateId.value || undefined,
+    status: 'confirmed',
+  })),
+  {
+    enabled: computed(() => Boolean(props.visible && candidateId.value)),
+  },
+);
+
+const mandatoryEnrollmentObligations = computed(() => {
+  const list = receivablesQuery.data.value?.receivables ?? [];
+  return list.filter(
+    (r) =>
+      r.isMandatory &&
+      (r.chargeType === 'enrollment_fee' || r.chargeType === 'admission_fee'),
+  );
+});
+
+const isFeeGateSettled = computed<boolean | null>(() => {
+  if (!receivablesQuery.data.value) {
+    return null;
+  }
+  const obligations = mandatoryEnrollmentObligations.value;
+  if (obligations.length === 0) {
+    return true;
+  }
+  return obligations.every(
+    (o) => o.outstandingAmount <= 0 || o.receivableStatus === 'settled',
+  );
+});
+
+const outstandingMandatoryFee = computed<number>(() => {
+  return mandatoryEnrollmentObligations.value.reduce(
+    (sum, o) => sum + (o.outstandingAmount || 0),
+    0,
+  );
+});
+
+const verifiedReceiptNumber = computed<string | null>(() => {
+  const confirmedItems = candidatePaymentsQuery.data.value?.items ?? [];
+  const confirmedPayment = confirmedItems[0];
+  if (confirmedPayment?.receiptNumber) {
+    return confirmedPayment.receiptNumber;
+  }
+  if (confirmedPayment?.externalReference) {
+    return confirmedPayment.externalReference;
+  }
+  return null;
+});
+
+// Watch fee gate status: if settled, pre-select Payment Confirmed and set receipt ref if available
+watch(
+  () => [isFeeGateSettled.value, verifiedReceiptNumber.value] as const,
+  ([settled, receiptRef]) => {
+    if (settled === true) {
+      form.value.paymentWaived = false;
+      if (receiptRef && !form.value.paymentReference) {
+        form.value.paymentReference = receiptRef;
+      }
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Submission Pipeline
 // ---------------------------------------------------------------------------
 const enrollMutation = useEnrollAcceptedApplicantMutation({
@@ -459,9 +541,80 @@ function handleClose() {
 
       <!-- 2. Payment Gate (GAP-01) -->
       <div class="space-y-3 p-3.5 bg-slate-50/70 border border-slate-200 rounded-lg">
-        <div class="flex items-center gap-1.5 font-semibold text-slate-800 text-xs border-b border-slate-200 pb-2">
-          <CreditCard class="w-4 h-4 text-teal-600" />
-          <span>Payment Clearance Gate (GAP-01)</span>
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div class="flex items-center gap-1.5 font-semibold text-slate-800 text-xs">
+            <CreditCard class="w-4 h-4 text-teal-600" />
+            <span>Payment Clearance Gate (GAP-01)</span>
+          </div>
+          <!-- Real-Time Clearance Status Badge -->
+          <span
+            v-if="isFeeGateSettled === true"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200"
+            data-testid="gate-status-pill"
+          >
+            <CheckCircle2 class="w-3 h-3 text-emerald-600" />
+            Payment Verified &amp; Settled
+          </span>
+          <span
+            v-else-if="isFeeGateSettled === false"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+            data-testid="gate-status-pill"
+          >
+            <AlertCircle class="w-3 h-3 text-amber-600" />
+            Fees Outstanding
+          </span>
+        </div>
+
+        <!-- Clearance Banner: Prominent Green Clearance Badge vs Amber Warning -->
+        <div
+          v-if="isFeeGateSettled === true"
+          class="flex items-center justify-between p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900"
+          data-testid="payment-verified-badge"
+        >
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 class="w-4 h-4" />
+            </div>
+            <div>
+              <span class="font-bold text-xs text-emerald-950 block">Payment Verified &amp; Settled</span>
+              <p class="text-[11px] text-emerald-800">
+                Mandatory enrollment fees for this candidate are verified and settled in the Finance ledger.
+              </p>
+            </div>
+          </div>
+          <div v-if="verifiedReceiptNumber" class="text-right shrink-0">
+            <span class="text-[10px] uppercase font-semibold text-emerald-700 block">Receipt Reference</span>
+            <span
+              class="font-mono font-bold text-xs bg-emerald-100 px-2 py-0.5 rounded text-emerald-900 border border-emerald-300"
+              data-testid="verified-receipt-reference"
+            >
+              {{ verifiedReceiptNumber }}
+            </span>
+          </div>
+        </div>
+
+        <div
+          v-else-if="isFeeGateSettled === false"
+          class="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"
+          data-testid="payment-outstanding-warning"
+        >
+          <AlertCircle class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div class="space-y-1">
+            <span class="font-bold text-xs text-amber-950 block">
+              Enrollment Fees Outstanding: {{ formatIdr(outstandingMandatoryFee) }}
+            </span>
+            <p class="text-[11px] text-amber-800 leading-relaxed">
+              Mandatory enrollment obligations are unsettled. Please verify payment intake in
+              <a
+                href="/finance/payments"
+                target="_blank"
+                class="font-semibold underline text-amber-900 hover:text-amber-950"
+              >
+                SCR-FIN-02: Payment Verification Queue
+              </a>
+              or enter an authorized administrative fee waiver justification below.
+            </p>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

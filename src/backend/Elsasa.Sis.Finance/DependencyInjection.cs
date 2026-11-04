@@ -6,11 +6,25 @@ using Elsasa.Sis.Finance.Features.Accounts.SearchStudentFinancialAccounts;
 using Elsasa.Sis.Finance.Features.Obligations.AssessAdHocObligation;
 using Elsasa.Sis.Finance.Features.Obligations.BatchAssessObligations;
 using Elsasa.Sis.Finance.Features.Obligations.GetObligations;
+using Elsasa.Sis.Finance.Features.Payers.CreatePayer;
+using Elsasa.Sis.Finance.Features.Payers.GetPayerById;
+using Elsasa.Sis.Finance.Features.Payers.GetPayers;
 using Elsasa.Sis.Finance.Features.Policies.ApproveFinancialPolicy;
 using Elsasa.Sis.Finance.Features.Policies.CreateChargeRule;
 using Elsasa.Sis.Finance.Features.Policies.CreateFinancialPolicy;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicies;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicyById;
+using Elsasa.Sis.Finance.Features.Payments.ConfirmPayment;
+using Elsasa.Sis.Finance.Features.Payments.GetPaymentById;
+using Elsasa.Sis.Finance.Features.Payments.GetPaymentReceipt;
+using Elsasa.Sis.Finance.Features.Payments.GetPayments;
+using Elsasa.Sis.Finance.Features.Payments.RecordAndConfirmPayment;
+using Elsasa.Sis.Finance.Features.Payments.RejectPayment;
+using Elsasa.Sis.Finance.Features.Payments.SubmitPayment;
+using Elsasa.Sis.Finance.Features.Allocations.AllocatePayment;
+using Elsasa.Sis.Finance.Features.Allocations.GetStudentReceivables;
+using Elsasa.Sis.Finance.Features.Allocations.ReallocatePayment;
+using Elsasa.Sis.Finance.Features.Allocations.SuggestAllocations;
 using Elsasa.Sis.Finance.Services;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +48,11 @@ public static class DependencyInjection
 
         // Cross-domain query contract (ADR-003)
         services.AddScoped<IFinanceModule, FinanceModule>();
+        services.AddScoped<FinanceModule>();
+
+        // Payer resolution & deduplication service (GAP-005, OQ-002, TD-03)
+        services.AddScoped<IPayerResolver, PayerResolver>();
+        services.AddScoped<PayerResolver>();
 
         // Student financial account lifecycle & provisioning services (GAP-002, TD-03)
         services.AddScoped<Features.Accounts.Services.IStudentAccountService, Features.Accounts.Services.StudentAccountService>();
@@ -62,6 +81,26 @@ public static class DependencyInjection
         services.AddScoped<Features.Billing.GenerateStatement.GenerateStatementHandler>();
         services.AddScoped<Features.Billing.GetBillingDocuments.GetBillingDocumentsHandler>();
         services.AddScoped<Features.Billing.GetBillingDocumentById.GetBillingDocumentByIdHandler>();
+
+        // Payer Management feature handlers (P3-S06, TD-03)
+        services.AddScoped<GetPayersHandler>();
+        services.AddScoped<CreatePayerHandler>();
+        services.AddScoped<GetPayerByIdHandler>();
+
+        // Payment Intake, Cashiering & Receipt Voucher feature handlers (P3-S07, TD-04, OQ-004)
+        services.AddScoped<SubmitPaymentHandler>();
+        services.AddScoped<RecordAndConfirmPaymentHandler>();
+        services.AddScoped<ConfirmPaymentHandler>();
+        services.AddScoped<RejectPaymentHandler>();
+        services.AddScoped<GetPaymentsHandler>();
+        services.AddScoped<GetPaymentByIdHandler>();
+        services.AddScoped<GetPaymentReceiptHandler>();
+
+        // Payment Allocation & Reallocation Engine feature handlers (P3-S08, P3-S09, TD-05, OQ-003)
+        services.AddScoped<SuggestAllocationsHandler>();
+        services.AddScoped<AllocatePaymentHandler>();
+        services.AddScoped<ReallocatePaymentHandler>();
+        services.AddScoped<GetStudentReceivablesHandler>();
 
         // Configure policy-based authorization requirements (GAP-008, TD-07, ADR-009)
         services.AddAuthorization(options =>
@@ -117,6 +156,63 @@ public static class DependencyInjection
                 Permissions.Accounts.View,
                 "FinanceAuthority", "Finance Authority",
                 "FinanceOfficer", "Finance Officer");
+
+            // Payments operational permissions
+            AddPermissionPolicy(
+                Permissions.Payments.View,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Payments.Record,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
+
+            AddPermissionPolicy(
+                Permissions.Payments.Confirm,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
+
+            AddPermissionPolicy(
+                Permissions.Payments.Reject,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
+
+            // Allocations operational permissions
+            AddPermissionPolicy(
+                Permissions.Allocations.View,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Allocations.Execute,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
+
+            AddPermissionPolicy(
+                Permissions.Allocations.Reallocate,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
+
+            // Payers operational permissions
+            AddPermissionPolicy(
+                Permissions.Payers.View,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "SchoolLeadership", "School Leadership");
+
+            AddPermissionPolicy(
+                Permissions.Payers.Manage,
+                "FinanceAuthority", "Finance Authority",
+                "FinanceOfficer", "Finance Officer",
+                "Admin");
         });
 
         return services;

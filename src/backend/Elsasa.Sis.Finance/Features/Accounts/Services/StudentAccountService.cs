@@ -131,6 +131,130 @@ public sealed class StudentAccountService(ILogger<StudentAccountService> logger)
         }
     }
 
+    /// <inheritdoc />
+    public async Task<StudentFinancialAccountSummary> GetOrCreateCandidateAccountAsync(
+        Guid? studentId,
+        Guid? applicantId,
+        IDbConnection connection,
+        IDbTransaction? transaction = null,
+        string createdBy = "SYSTEM_ADHOC",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        if ((studentId is null || studentId == Guid.Empty) && (applicantId is null || applicantId == Guid.Empty))
+        {
+            throw new ArgumentException("Either student ID or applicant ID must be provided.");
+        }
+
+        var normalizedStudentId = studentId == Guid.Empty ? null : studentId;
+        var normalizedApplicantId = applicantId == Guid.Empty ? null : applicantId;
+
+        const string selectCandidateSql = """
+            SELECT TOP (1)
+                id AS Id,
+                account_number AS AccountNumber,
+                student_id AS StudentId,
+                account_status AS AccountStatus,
+                opened_date AS OpenedDate,
+                applicant_id AS ApplicantId
+            FROM finance.student_financial_accounts
+            WHERE (@StudentId IS NOT NULL AND student_id = @StudentId)
+               OR (@ApplicantId IS NOT NULL AND applicant_id = @ApplicantId)
+            ORDER BY created_at ASC;
+            """;
+
+        var existing = await connection.QueryFirstOrDefaultAsync<StudentFinancialAccountSummary>(
+            new CommandDefinition(
+                selectCandidateSql,
+                new { StudentId = normalizedStudentId, ApplicantId = normalizedApplicantId },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var accountId = Guid.NewGuid();
+        var seedId = normalizedStudentId ?? normalizedApplicantId ?? Guid.NewGuid();
+        var accountNumber = GenerateAccountNumber(seedId);
+        var openedDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        const string insertCandidateSql = """
+            INSERT INTO finance.student_financial_accounts (
+                id,
+                account_number,
+                student_id,
+                applicant_id,
+                currency_code,
+                account_status,
+                opened_date,
+                created_at,
+                created_by
+            ) VALUES (
+                @Id,
+                @AccountNumber,
+                @StudentId,
+                @ApplicantId,
+                'IDR',
+                'active',
+                @OpenedDate,
+                SYSUTCDATETIME(),
+                @CreatedBy
+            );
+            """;
+
+        try
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                insertCandidateSql,
+                new
+                {
+                    Id = accountId,
+                    AccountNumber = accountNumber,
+                    StudentId = normalizedStudentId,
+                    ApplicantId = normalizedApplicantId,
+                    OpenedDate = openedDate,
+                    CreatedBy = createdBy
+                },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+            logger.LogInformation(
+                "Provisioned financial account {AccountNumber} ({AccountId}) for candidate StudentId={StudentId}, ApplicantId={ApplicantId}.",
+                accountNumber,
+                accountId,
+                normalizedStudentId,
+                normalizedApplicantId);
+
+            return new StudentFinancialAccountSummary(
+                accountId,
+                accountNumber,
+                normalizedStudentId,
+                "active",
+                openedDate,
+                normalizedApplicantId);
+        }
+        catch (SqlException ex) when (ex.Number is 2601 or 2627)
+        {
+            logger.LogWarning(
+                ex,
+                "Concurrent race provisioning candidate financial account for StudentId={StudentId}, ApplicantId={ApplicantId}.",
+                normalizedStudentId,
+                normalizedApplicantId);
+
+            var reloaded = await connection.QueryFirstAsync<StudentFinancialAccountSummary>(
+                new CommandDefinition(
+                    selectCandidateSql,
+                    new { StudentId = normalizedStudentId, ApplicantId = normalizedApplicantId },
+                    transaction: transaction,
+                    cancellationToken: cancellationToken));
+
+            return reloaded;
+        }
+    }
+
     /// <summary>
     /// Generates the deterministic account number format: ACC-{Year}-{StudentIdPrefix8}.
     /// </summary>

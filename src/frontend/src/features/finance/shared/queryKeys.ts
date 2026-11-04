@@ -2,6 +2,9 @@ import type { FinancialPolicyFilters } from '../policies/types/policies.types';
 import type { GetObligationsParams } from '../obligations/types/obligations.types';
 import type { GetBillingDocumentsParams } from '../billing/types/billing.types';
 import type { SearchStudentAccountsParams } from '../accounts/types/accounts.types';
+import type { GetPayersParams } from '../payers/types/payers.types';
+import type { GetPaymentsParams } from '../payments/types/payments.types';
+import type { SuggestAllocationsParams } from '../allocations/types/allocations.types';
 
 /**
  * Standardized TanStack Query key factories for Finance bounded context.
@@ -54,5 +57,42 @@ export const financeKeys = {
     detail: (studentId: string) => [...financeKeys.accounts.details(), studentId] as const,
     balances: () => [...financeKeys.accounts.all, 'balance'] as const,
     balance: (studentId: string) => [...financeKeys.accounts.balances(), studentId] as const,
+  },
+
+  payers: {
+    all: ['finance', 'payers'] as const,
+    lists: () => [...financeKeys.payers.all, 'list'] as const,
+    list: (params?: GetPayersParams) =>
+      params !== undefined
+        ? ([...financeKeys.payers.lists(), params] as const)
+        : ([...financeKeys.payers.lists()] as const),
+    details: () => [...financeKeys.payers.all, 'detail'] as const,
+    detail: (id: string) => [...financeKeys.payers.details(), id] as const,
+  },
+
+  payments: {
+    all: ['finance', 'payments'] as const,
+    lists: () => [...financeKeys.payments.all, 'list'] as const,
+    list: (params?: GetPaymentsParams) =>
+      params !== undefined
+        ? ([...financeKeys.payments.lists(), params] as const)
+        : ([...financeKeys.payments.lists()] as const),
+    details: () => [...financeKeys.payments.all, 'detail'] as const,
+    detail: (id: string) => [...financeKeys.payments.details(), id] as const,
+    receipts: () => [...financeKeys.payments.all, 'receipt'] as const,
+    receipt: (id: string) => [...financeKeys.payments.receipts(), id] as const,
+  },
+
+  allocations: {
+    all: ['finance', 'allocations'] as const,
+    suggestions: () => [...financeKeys.allocations.all, 'suggest'] as const,
+    suggestion: (params: SuggestAllocationsParams) =>
+      [...financeKeys.allocations.suggestions(), params] as const,
+  },
+
+  receivables: {
+    all: ['finance', 'receivables'] as const,
+    byStudent: (studentId: string, openOnly?: boolean) =>
+      [...financeKeys.receivables.all, studentId, { openOnly }] as const,
   },
 } as const;

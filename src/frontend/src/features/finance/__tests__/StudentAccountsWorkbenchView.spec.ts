@@ -18,6 +18,7 @@ import * as obligationsApi from '../obligations/api/obligations.api';
 import * as billingApi from '../billing/api/billing.api';
 import * as academicYearApi from '@/features/operations/calendar/api/academicYear.api';
 import * as operationalPeriodApi from '@/features/operations/calendar/api/operationalPeriod.api';
+import * as paymentsApi from '../payments/api/payments.api';
 
 const mockToastAdd = vi.fn();
 vi.mock('primevue/usetoast', () => ({
@@ -154,6 +155,77 @@ const mockBillingDocumentDetail: billingApi.BillingDocumentDto = {
   ],
 };
 
+const mockStudentPayment: paymentsApi.PaymentListItemDto = {
+  id: 'pay-001',
+  paymentNumber: 'PAY-2026-000001',
+  receiptNumber: 'REC-2026-000099',
+  studentAccountId: '11111111-1111-1111-1111-111111111111',
+  accountNumber: 'ACC-2026-STUDENT1',
+  studentId: '22222222-2222-2222-2222-222222222222',
+  studentNumber: '2026-001',
+  studentFullName: 'Ahmad Fauzi',
+  applicantId: null,
+  payerId: 'pyr-001',
+  payerNumber: 'PYR-2026-0001',
+  payerName: 'Bapak Ahmad',
+  paymentAmount: 1500000,
+  currencyCode: 'IDR',
+  paymentMethod: 'bank_transfer',
+  externalReference: 'TRF-BCA-001',
+  paymentDate: '2026-08-05',
+  submissionDate: '2026-08-05T08:00:00Z',
+  confirmationStatus: 'confirmed',
+  confirmationDate: '2026-08-05T08:30:00Z',
+  confirmedBy: 'Cashier Siti',
+  rejectionReason: null,
+  notes: null,
+  totalAllocated: 1500000,
+  unallocatedAmount: 0,
+};
+
+const mockPaymentDetail: paymentsApi.PaymentDto = {
+  id: 'pay-001',
+  paymentNumber: 'PAY-2026-000001',
+  receiptNumber: 'REC-2026-000099',
+  studentAccountId: '11111111-1111-1111-1111-111111111111',
+  accountNumber: 'ACC-2026-STUDENT1',
+  studentId: '22222222-2222-2222-2222-222222222222',
+  studentNumber: '2026-001',
+  studentFullName: 'Ahmad Fauzi',
+  applicantId: null,
+  payerId: 'pyr-001',
+  payerNumber: 'PYR-2026-0001',
+  payerName: 'Bapak Ahmad',
+  paymentAmount: 1500000,
+  currencyCode: 'IDR',
+  paymentMethod: 'bank_transfer',
+  externalReference: 'TRF-BCA-001',
+  paymentDate: '2026-08-05',
+  submissionDate: '2026-08-05T08:00:00Z',
+  confirmationStatus: 'confirmed',
+  confirmationDate: '2026-08-05T08:30:00Z',
+  confirmedBy: 'Cashier Siti',
+  rejectionReason: null,
+  notes: null,
+  totalAllocated: 1500000,
+  unallocatedAmount: 0,
+  allocations: [
+    {
+      id: 'alc-001',
+      allocationNumber: 'ALC-2026-000001',
+      paymentId: 'pay-001',
+      obligationId: '33333333-3333-3333-3333-333333333333',
+      obligationDescription: 'SPP Bulanan Agustus 2026',
+      allocatedAmount: 750000,
+      currencyCode: 'IDR',
+      allocatedAt: '2026-08-05T08:30:00Z',
+      status: 'active',
+      supersededById: null,
+      reversalReason: null,
+    },
+  ],
+};
+
 describe('Student Accounts Workbench (SCR-FIN-03) & Family Portal (SCR-SELF-02)', () => {
   let queryClient: QueryClient;
 
@@ -199,9 +271,24 @@ describe('Student Accounts Workbench (SCR-FIN-03) & Family Portal (SCR-SELF-02)'
         'Permissions.Finance.Obligations.Assess',
         'Permissions.Finance.Billing.View',
         'Permissions.Finance.Billing.Generate',
+        'Permissions.Finance.Payments.View',
+        'Permissions.Finance.Allocations.View',
+        'Permissions.Finance.Allocations.Reallocate',
       ],
       campusId: null,
     });
+
+    vi.spyOn(paymentsApi, 'getPayments').mockResolvedValue({
+      items: [mockStudentPayment],
+      pageNumber: 1,
+      pageSize: 100,
+      totalCount: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    });
+
+    vi.spyOn(paymentsApi, 'getPaymentById').mockResolvedValue(mockPaymentDetail);
 
     vi.spyOn(accountsApi, 'searchStudentAccounts').mockResolvedValue({
       items: [mockStudentAccount],
@@ -505,6 +592,50 @@ describe('Student Accounts Workbench (SCR-FIN-03) & Family Portal (SCR-SELF-02)'
       await flushPromises();
 
       expect(document.querySelector('[data-testid="assess-ad-hoc-fee-modal"]')).not.toBeNull();
+    });
+
+    it('renders Payments history table with correct receipt number and status pill when switching to Payments tab', async () => {
+      const wrapper = mountComponent(StudentAccountsWorkbenchView);
+      await flushPromises();
+
+      // Inspect student
+      await wrapper.find('[data-testid="select-student-action-btn"]').trigger('click');
+      await flushPromises();
+
+      // Switch to Payments tab
+      const paymentsTab = wrapper.find('[data-testid="tab-payments"]');
+      expect(paymentsTab.exists()).toBe(true);
+      await paymentsTab.trigger('click');
+      await flushPromises();
+
+      // Assert payments table container is rendered
+      expect(wrapper.find('[data-testid="payments-history-table-container"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain('REC-2026-000099');
+      expect(wrapper.text()).toContain('PAY-2026-000001');
+      expect(wrapper.text()).toContain('Confirmed');
+      expect(wrapper.text()).toContain('Rp 1.500.000');
+    });
+
+    it('renders Allocations table with correct allocation number, obligation description, and status pill when switching to Allocations tab', async () => {
+      const wrapper = mountComponent(StudentAccountsWorkbenchView);
+      await flushPromises();
+
+      // Inspect student
+      await wrapper.find('[data-testid="select-student-action-btn"]').trigger('click');
+      await flushPromises();
+
+      // Switch to Allocations tab
+      const allocationsTab = wrapper.find('[data-testid="tab-allocations"]');
+      expect(allocationsTab.exists()).toBe(true);
+      await allocationsTab.trigger('click');
+      await flushPromises();
+
+      // Assert allocations table container is rendered
+      expect(wrapper.find('[data-testid="allocations-table-container"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain('ALC-2026-000001');
+      expect(wrapper.text()).toContain('SPP Bulanan Agustus 2026');
+      expect(wrapper.text()).toContain('Active');
+      expect(wrapper.text()).toContain('Rp 750.000');
     });
   });
 

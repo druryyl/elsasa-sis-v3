@@ -225,4 +225,239 @@ public static class FinanceIntegrationTestHelpers
 
         return policyId;
     }
+
+    public static async Task<Guid> SeedApplicantAsync(
+        SqlConnection connection,
+        string suffix)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var applicantId = Guid.NewGuid();
+        const string insertApplicantSql = """
+            INSERT INTO students.applicants (
+                id, first_name, last_name, full_name, date_of_birth, gender, nationality, created_at
+            ) VALUES (
+                @Id, @FirstName, @LastName, @FullName, '2016-04-10', 'Female', 'Indonesian', SYSUTCDATETIME()
+            );
+            """;
+
+        await connection.ExecuteAsync(insertApplicantSql, new
+        {
+            Id = applicantId,
+            FirstName = $"AppFirst{suffix}",
+            LastName = $"AppLast{suffix}",
+            FullName = $"Applicant {suffix}"
+        });
+
+        return applicantId;
+    }
+
+    public static async Task<Guid> SeedCandidateAccountAsync(
+        SqlConnection connection,
+        string suffix,
+        Guid? studentId = null,
+        Guid? applicantId = null)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var id = Guid.NewGuid();
+        const string sql = """
+            INSERT INTO finance.student_financial_accounts (
+                id, account_number, student_id, applicant_id, currency_code, account_status, opened_date, created_at, created_by
+            ) VALUES (
+                @Id, @AccountNumber, @StudentId, @ApplicantId, 'IDR', 'active', CAST(SYSUTCDATETIME() AS DATE), SYSUTCDATETIME(), 'TEST_SETUP'
+            );
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = id,
+            AccountNumber = $"ACC-2026-{suffix}",
+            StudentId = studentId,
+            ApplicantId = applicantId
+        });
+
+        return id;
+    }
+
+    public static async Task<Guid> SeedPayerAsync(
+        SqlConnection connection,
+        string payerNumber,
+        string payerName,
+        string payerType = "parent_guardian",
+        string? idNumber = null,
+        string? email = null,
+        string? phone = null)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var id = Guid.NewGuid();
+        const string sql = """
+            INSERT INTO finance.payers (
+                id, payer_number, payer_name, payer_type, identification_number,
+                email, phone_number, created_at, created_by
+            ) VALUES (
+                @Id, @PayerNumber, @PayerName, @PayerType, @IdNumber,
+                @Email, @Phone, SYSUTCDATETIME(), 'TEST_SETUP'
+            );
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = id,
+            PayerNumber = payerNumber,
+            PayerName = payerName,
+            PayerType = payerType,
+            IdNumber = idNumber,
+            Email = email,
+            Phone = phone
+        });
+
+        return id;
+    }
+
+    public static async Task<Guid> SeedObligationAsync(
+        SqlConnection connection,
+        Guid accountId,
+        Guid? studentId,
+        Guid? applicantId,
+        Guid policyId,
+        string chargeType,
+        string description,
+        long amount,
+        DateOnly dueDate,
+        Guid academicPeriodId,
+        bool isMandatory = true,
+        string status = "assessed")
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var id = Guid.NewGuid();
+        var obligationNumber = $"OBL-2026-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+
+        const string sql = """
+            INSERT INTO finance.financial_obligations (
+                id, obligation_number, student_account_id, student_id, applicant_id,
+                charge_rule_id, policy_id, description, charge_type, is_mandatory,
+                original_amount, currency_code, issue_date, due_date,
+                academic_period_id, academic_period_label, status, authorized_by, created_at, created_by
+            ) VALUES (
+                @Id, @ObligationNumber, @AccountId, @StudentId, @ApplicantId,
+                NULL, @PolicyId, @Description, @ChargeType, @IsMandatory,
+                @Amount, 'IDR', CAST(SYSUTCDATETIME() AS DATE), @DueDate,
+                @AcademicPeriodId, '2026/2027 Academic Year', @Status, 'TEST_FINANCE', SYSUTCDATETIME(), 'TEST_SETUP'
+            );
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = id,
+            ObligationNumber = obligationNumber,
+            AccountId = accountId,
+            StudentId = studentId,
+            ApplicantId = applicantId,
+            PolicyId = policyId,
+            Description = description,
+            ChargeType = chargeType,
+            IsMandatory = isMandatory ? 1 : 0,
+            Amount = amount,
+            DueDate = dueDate.ToDateTime(TimeOnly.MinValue),
+            AcademicPeriodId = academicPeriodId,
+            Status = status
+        });
+
+        return id;
+    }
+
+    public static async Task<Guid> SeedPaymentAsync(
+        SqlConnection connection,
+        Guid accountId,
+        Guid? studentId,
+        Guid? applicantId,
+        Guid payerId,
+        long amount,
+        string paymentMethod = "bank_transfer",
+        string status = "confirmed",
+        string? receiptNumber = null)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var id = Guid.NewGuid();
+        var paymentNumber = $"PAY-2026-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+
+        const string sql = """
+            INSERT INTO finance.payments (
+                id, payment_number, student_account_id, student_id, applicant_id, payer_id,
+                payment_amount, currency_code, payment_method, payment_date, submission_date,
+                confirmation_status, receipt_number, receipt_issued_at, confirmation_date, confirmed_by,
+                created_at, created_by
+            ) VALUES (
+                @Id, @PaymentNumber, @AccountId, @StudentId, @ApplicantId, @PayerId,
+                @Amount, 'IDR', @PaymentMethod, CAST(SYSUTCDATETIME() AS DATE), SYSUTCDATETIME(),
+                @Status, @ReceiptNumber, CASE WHEN @ReceiptNumber IS NOT NULL THEN SYSUTCDATETIME() ELSE NULL END,
+                CASE WHEN @Status = 'confirmed' THEN SYSUTCDATETIME() ELSE NULL END,
+                CASE WHEN @Status = 'confirmed' THEN 'TEST_CASHIER' ELSE NULL END,
+                SYSUTCDATETIME(), 'TEST_SETUP'
+            );
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = id,
+            PaymentNumber = paymentNumber,
+            AccountId = accountId,
+            StudentId = studentId,
+            ApplicantId = applicantId,
+            PayerId = payerId,
+            Amount = amount,
+            PaymentMethod = paymentMethod,
+            Status = status,
+            ReceiptNumber = receiptNumber
+        });
+
+        return id;
+    }
+
+    public static async Task<Guid> SeedAllocationAsync(
+        SqlConnection connection,
+        Guid accountId,
+        Guid obligationId,
+        Guid paymentId,
+        long amount,
+        string status = "active",
+        Guid? supersededById = null,
+        string? reversalReason = null)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var id = Guid.NewGuid();
+        var allocationNumber = $"ALC-2026-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+
+        const string sql = """
+            INSERT INTO finance.payment_allocations (
+                id, allocation_number, student_account_id, obligation_id, source_type,
+                payment_id, allocated_amount, currency_code, allocation_date, allocated_by,
+                status, superseded_by_id, reversal_reason, created_at, created_by
+            ) VALUES (
+                @Id, @AllocationNumber, @AccountId, @ObligationId, 'payment',
+                @PaymentId, @Amount, 'IDR', SYSUTCDATETIME(), 'TEST_CASHIER',
+                @Status, @SupersededById, @ReversalReason, SYSUTCDATETIME(), 'TEST_SETUP'
+            );
+            """;
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = id,
+            AllocationNumber = allocationNumber,
+            AccountId = accountId,
+            ObligationId = obligationId,
+            PaymentId = paymentId,
+            Amount = amount,
+            Status = status,
+            SupersededById = supersededById,
+            ReversalReason = reversalReason
+        });
+
+        return id;
+    }
 }

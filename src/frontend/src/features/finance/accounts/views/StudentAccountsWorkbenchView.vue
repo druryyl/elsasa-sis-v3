@@ -28,6 +28,8 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  CreditCard,
+  Layers,
 } from 'lucide-vue-next';
 import {
   PageHeader,
@@ -45,12 +47,22 @@ import {
   FINANCE_ACCOUNT_PERMISSIONS,
   FINANCE_OBLIGATION_PERMISSIONS,
   FINANCE_BILLING_PERMISSIONS,
+  FINANCE_PAYMENT_PERMISSIONS,
+  FINANCE_ALLOCATION_PERMISSIONS,
 } from '../constants/permissions';
 import {
   useStudentAccountQuery,
   useSearchStudentAccountsQuery,
 } from '../composables/useFinanceAccounts';
 import { useGenerateBillMutation } from '../../billing/composables/useFinanceBilling';
+import { usePaymentsQuery } from '../../payments/composables/useFinancePayments';
+import { useStudentReceivablesQuery } from '../../allocations/composables/useFinanceAllocations';
+import { getPaymentById } from '../../payments/api/payments.api';
+import type {
+  PaymentListItemDto,
+  PaymentAllocationSummaryDto,
+} from '../../payments/types/payments.types';
+import type { PaymentAllocationDto } from '../../allocations/types/allocations.types';
 import type {
   StudentFinancialAccountDto,
   AccountSummaryDto,
@@ -58,8 +70,12 @@ import type {
 import AccountBalanceCard from '../components/AccountBalanceCard.vue';
 import ObligationsTable from '../components/ObligationsTable.vue';
 import BillingDocumentsTable from '../components/BillingDocumentsTable.vue';
+import PaymentsHistoryTable from '../components/PaymentsHistoryTable.vue';
+import AllocationsTable from '../components/AllocationsTable.vue';
 import AssessAdHocFeeModal from '../components/AssessAdHocFeeModal.vue';
 import InvoiceDetailModal from '../components/InvoiceDetailModal.vue';
+import ReceiptVoucherViewer from '../../payments/components/ReceiptVoucherViewer.vue';
+import ReallocatePaymentModal from '../../payments/components/ReallocatePaymentModal.vue';
 
 // ---------------------------------------------------------------------------
 // 1. Navigation & Route Parameters
@@ -85,6 +101,10 @@ const canAssess = computed(() =>
 );
 const canGenerateBill = computed(() =>
   authStore.hasPermission(FINANCE_BILLING_PERMISSIONS.GENERATE),
+);
+const canReallocate = computed(() =>
+  authStore.hasPermission(FINANCE_ALLOCATION_PERMISSIONS.REALLOCATE) ||
+  authStore.hasRole(['FinanceOfficer', 'FinanceAuthority', 'Admin']),
 );
 
 // ---------------------------------------------------------------------------
@@ -231,6 +251,153 @@ async function handleConfirmGenerateBill() {
     // Handled by toast notification
   }
 }
+
+// ---------------------------------------------------------------------------
+// 7. Payments & Allocations Extensions (P6-S16, SCR-FIN-03)
+// ---------------------------------------------------------------------------
+// 7.1 Student Payments Query
+const paymentsParams = computed(() => ({
+  studentId: selectedStudentId.value || undefined,
+  pageSize: 100,
+}));
+
+const {
+  data: paymentsResponse,
+  isLoading: isLoadingPayments,
+  refetch: refetchPayments,
+} = usePaymentsQuery(paymentsParams, {
+  enabled: computed(() => Boolean(selectedStudentId.value)),
+});
+
+const studentPayments = computed<PaymentListItemDto[]>(
+  () => paymentsResponse.value?.items ?? [],
+);
+
+// 7.2 Student Receivables Query (finance.v_student_receivables)
+const {
+  data: receivablesResponse,
+  isLoading: isLoadingReceivables,
+  refetch: refetchReceivables,
+} = useStudentReceivablesQuery(selectedStudentId, undefined, {
+  enabled: computed(() => Boolean(selectedStudentId.value)),
+});
+
+// 7.3 Derived Total Paid and Unallocated Credit Balance Metrics (Criterion 3)
+const totalPaidAmount = computed<number>(() => {
+  const confirmedPaid = studentPayments.value
+    .filter((p) => p.confirmationStatus?.toLowerCase() === 'confirmed')
+    .reduce((sum, p) => sum + (p.paymentAmount || 0), 0);
+  return confirmedPaid > 0 ? confirmedPaid : (accountDossier.value?.totalSettled ?? 0);
+});
+
+const unallocatedCreditAmount = computed<number>(() => {
+  return studentPayments.value
+    .filter((p) => p.confirmationStatus?.toLowerCase() === 'confirmed')
+    .reduce((sum, p) => sum + (p.unallocatedAmount || 0), 0);
+});
+
+// 7.4 Student Allocations Aggregation & Lineage
+const studentAllocations = ref<
+  (PaymentAllocationSummaryDto & { dueDate?: string; paymentId?: string })[]
+>([]);
+const isLoadingAllocations = ref(false);
+
+async function syncStudentAllocations(payments: PaymentListItemDto[]) {
+  const allocatedPayments = payments.filter((p) => (p.totalAllocated || 0) > 0);
+  if (allocatedPayments.length === 0) {
+    studentAllocations.value = [];
+    return;
+  }
+
+  isLoadingAllocations.value = true;
+  try {
+    const details = await Promise.all(
+      allocatedPayments.map(async (p) => {
+        try {
+          return await getPaymentById(p.id);
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    const oblMap = new Map<string, string>();
+    accountDossier.value?.openObligations?.forEach((o) => {
+      if (o.dueDate) oblMap.set(o.id, o.dueDate);
+    });
+    receivablesResponse.value?.receivables?.forEach((r) => {
+      if (r.dueDate) oblMap.set(r.obligationId, r.dueDate);
+    });
+
+    const list: (PaymentAllocationSummaryDto & {
+      dueDate?: string;
+      paymentId?: string;
+    })[] = [];
+    for (const detail of details) {
+      if (!detail || !detail.allocations) continue;
+      for (const alloc of detail.allocations) {
+        list.push({
+          ...alloc,
+          dueDate: oblMap.get(alloc.obligationId),
+          paymentId: detail.id,
+        });
+      }
+    }
+    studentAllocations.value = list;
+  } catch {
+    // Preserve existing allocations on background fetch error
+  } finally {
+    isLoadingAllocations.value = false;
+  }
+}
+
+watch(
+  () => studentPayments.value,
+  (newPayments) => {
+    syncStudentAllocations(newPayments);
+  },
+  { immediate: true },
+);
+
+// 7.5 Modal State: Receipt Voucher Viewer
+const isReceiptModalOpen = ref(false);
+const selectedReceiptPaymentId = ref<string | null>(null);
+
+function openReceiptViewer(paymentId: string) {
+  selectedReceiptPaymentId.value = paymentId;
+  isReceiptModalOpen.value = true;
+}
+
+// 7.6 Modal State: Reallocate Payment Funds
+const isReallocateModalOpen = ref(false);
+const selectedAllocationForReallocate = ref<
+  (PaymentAllocationDto | PaymentAllocationSummaryDto) | null
+>(null);
+const selectedAllocationPaymentId = ref<string | null>(null);
+
+function openReallocateModal(
+  allocation: PaymentAllocationDto | PaymentAllocationSummaryDto,
+) {
+  selectedAllocationForReallocate.value = allocation;
+  selectedAllocationPaymentId.value = (allocation as any).paymentId || null;
+  isReallocateModalOpen.value = true;
+}
+
+function handleReallocated() {
+  refetchDossier();
+  refetchPayments();
+  refetchReceivables();
+}
+
+function handleRefreshAll() {
+  if (selectedStudentId.value) {
+    refetchDossier();
+    refetchPayments();
+    refetchReceivables();
+  } else {
+    refetchSearch();
+  }
+}
 </script>
 
 <template>
@@ -248,8 +415,8 @@ async function handleConfirmGenerateBill() {
             severity="secondary"
             outlined
             data-testid="refresh-workbench-btn"
-            :loading="isFetchingDossier"
-            @click="selectedStudentId ? refetchDossier() : refetchSearch()"
+            :loading="isFetchingDossier || isLoadingPayments || isLoadingReceivables"
+            @click="handleRefreshAll"
           >
             <template #icon>
               <RefreshCw class="w-4 h-4 mr-1.5" />
@@ -361,20 +528,22 @@ async function handleConfirmGenerateBill() {
 
     <!-- Case 2: Student is Selected & Dossier Loaded -->
     <div v-else-if="selectedStudentId && accountDossier" class="space-y-6">
-      <!-- 2.1 Ledger Balance Card (TD-02) -->
+      <!-- 2.1 Ledger Balance Card (TD-02, SCR-FIN-03) -->
       <AccountBalanceCard
         :account="accountDossier"
         :can-assess-fee="canAssess"
         :can-generate-bill="canGenerateBill"
+        :total-paid="totalPaidAmount"
+        :unallocated-credit="unallocatedCreditAmount"
         @assess-fee="openAssessFeeModal"
         @generate-bill="openGenerateBillDialog()"
       />
 
-      <!-- 2.2 Dossier Tabs: Obligations vs Billing Documents -->
+      <!-- 2.2 Dossier Tabs: Obligations, Invoices, Payments, Allocations (SCR-FIN-03) -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <Tabs v-model:value="activeTab">
           <TabList class="px-6 border-b border-slate-200">
-            <Tab value="obligations" class="flex items-center gap-2 py-3">
+            <Tab value="obligations" class="flex items-center gap-2 py-3" data-testid="tab-obligations">
               <Receipt class="w-4 h-4" />
               <span>Assessed Obligations</span>
               <span
@@ -383,13 +552,33 @@ async function handleConfirmGenerateBill() {
                 {{ accountDossier.openObligations?.length ?? 0 }}
               </span>
             </Tab>
-            <Tab value="documents" class="flex items-center gap-2 py-3">
+            <Tab value="documents" class="flex items-center gap-2 py-3" data-testid="tab-documents">
               <FileText class="w-4 h-4" />
               <span>Billing Documents &amp; Statements</span>
               <span
                 class="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold"
               >
                 {{ accountDossier.recentBillingDocuments?.length ?? 0 }}
+              </span>
+            </Tab>
+            <Tab value="payments" class="flex items-center gap-2 py-3" data-testid="tab-payments">
+              <CreditCard class="w-4 h-4" />
+              <span>Payments &amp; Receipts</span>
+              <span
+                class="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold"
+                data-testid="payments-tab-count"
+              >
+                {{ studentPayments.length }}
+              </span>
+            </Tab>
+            <Tab value="allocations" class="flex items-center gap-2 py-3" data-testid="tab-allocations">
+              <Layers class="w-4 h-4" />
+              <span>Allocations &amp; Lineage</span>
+              <span
+                class="ml-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold"
+                data-testid="allocations-tab-count"
+              >
+                {{ studentAllocations.length }}
               </span>
             </Tab>
           </TabList>
@@ -413,6 +602,25 @@ async function handleConfirmGenerateBill() {
                 :documents="accountDossier.recentBillingDocuments"
                 :loading="isLoadingDossier"
                 @view-invoice="openInvoiceDetailModal"
+              />
+            </TabPanel>
+
+            <!-- Payments Tab (Criterion 1) -->
+            <TabPanel value="payments" class="p-0">
+              <PaymentsHistoryTable
+                :payments="studentPayments"
+                :loading="isLoadingPayments"
+                @view-receipt="openReceiptViewer"
+              />
+            </TabPanel>
+
+            <!-- Allocations Tab (Criterion 2) -->
+            <TabPanel value="allocations" class="p-0">
+              <AllocationsTable
+                :allocations="studentAllocations"
+                :loading="isLoadingAllocations || isLoadingPayments"
+                :can-reallocate="canReallocate"
+                @reallocate="openReallocateModal"
               />
             </TabPanel>
           </TabPanels>
@@ -626,5 +834,20 @@ async function handleConfirmGenerateBill() {
         </div>
       </template>
     </Dialog>
+
+    <!-- 4. Receipt Voucher Viewer Modal (TD-04, SCR-FIN-02, SCR-FIN-03) -->
+    <ReceiptVoucherViewer
+      v-model:visible="isReceiptModalOpen"
+      :payment-id="selectedReceiptPaymentId"
+    />
+
+    <!-- 5. Reallocate Payment Modal (TD-05, SCR-FIN-03) -->
+    <ReallocatePaymentModal
+      v-model:visible="isReallocateModalOpen"
+      :allocation="selectedAllocationForReallocate"
+      :payment-id="selectedAllocationPaymentId"
+      :student-id="selectedStudentId"
+      @reallocated="handleReallocated"
+    />
   </div>
 </template>

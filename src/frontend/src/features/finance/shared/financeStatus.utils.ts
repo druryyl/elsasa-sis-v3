@@ -118,3 +118,53 @@ export function getAccountStatusSeverity(status?: string | null): StatusSeverity
 export function getAccountStatusLabel(status?: string | null): string {
   return getAccountStatusDescriptor(status).label;
 }
+
+/**
+ * Returns label and badge severity for Payment confirmation statuses (TD-04, SCR-FIN-02).
+ */
+export function getPaymentStatusDescriptor(status?: string | null): StatusDescriptor {
+  switch (status?.toLowerCase()) {
+    case 'confirmed':
+      return { label: 'Confirmed', severity: 'success' };
+    case 'submitted':
+      return { label: 'Submitted', severity: 'warn' };
+    case 'rejected':
+      return { label: 'Rejected', severity: 'danger' };
+    case 'reversed':
+      return { label: 'Reversed', severity: 'secondary' };
+    default:
+      return { label: status ?? 'Unknown', severity: 'secondary' };
+  }
+}
+
+export function getPaymentStatusSeverity(status?: string | null): StatusSeverity {
+  return getPaymentStatusDescriptor(status).severity;
+}
+
+export function getPaymentStatusLabel(status?: string | null): string {
+  return getPaymentStatusDescriptor(status).label;
+}
+
+/**
+ * Returns label and badge severity for Payment Allocation statuses (TD-05, SCR-FIN-03).
+ */
+export function getAllocationStatusDescriptor(status?: string | null): StatusDescriptor {
+  switch (status?.toLowerCase()) {
+    case 'active':
+      return { label: 'Active', severity: 'success' };
+    case 'superseded':
+      return { label: 'Superseded', severity: 'secondary' };
+    case 'reversed':
+      return { label: 'Reversed', severity: 'danger' };
+    default:
+      return { label: status ?? 'Unknown', severity: 'secondary' };
+  }
+}
+
+export function getAllocationStatusSeverity(status?: string | null): StatusSeverity {
+  return getAllocationStatusDescriptor(status).severity;
+}
+
+export function getAllocationStatusLabel(status?: string | null): string {
+  return getAllocationStatusDescriptor(status).label;
+}
