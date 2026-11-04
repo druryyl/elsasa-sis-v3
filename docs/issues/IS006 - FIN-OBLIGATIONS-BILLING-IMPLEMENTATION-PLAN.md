@@ -4,7 +4,7 @@ Code: FIN-OBLIGATIONS-BILLING
 Artifact: IMPLEMENTATION-PLAN
 Version: 1.0
 LastUpdated: 2026-11-04
-Status: NOT-STARTED
+Status: COMPLETED
 Execution Approval: APPROVED
 ---
 
@@ -243,13 +243,13 @@ COMPLETED is a plan-level status only, set when every slice has implementation s
 
 | Phase | Implementation Status | Review Status | Progress |
 |---|---|---|---|
-| P1 - Persistence, Contracts & Permissions Foundation | NOT-STARTED | NOT-REVIEWED | 0/2 |
-| P2 - Student Account Lifecycle & Policy Governance Backend Slices | NOT-STARTED | NOT-REVIEWED | 0/3 |
-| P3 - Obligation Assessment & Billing Document Backend Slices | NOT-STARTED | NOT-REVIEWED | 0/4 |
-| P4 - Backend Automated Verification & Test Harness | NOT-STARTED | NOT-REVIEWED | 0/3 |
-| P5 - Frontend State, API Clients & Validation Schemas | NOT-STARTED | NOT-REVIEWED | 0/2 |
-| P6 - Frontend Workspaces & Portal UI Components | NOT-STARTED | NOT-REVIEWED | 0/3 |
-| P7 - Frontend Automated Verification & Component Testing | NOT-STARTED | NOT-REVIEWED | 0/2 |
+| P1 - Persistence, Contracts & Permissions Foundation | IMPLEMENTED | GO | 2/2 |
+| P2 - Student Account Lifecycle & Policy Governance Backend Slices | IMPLEMENTED | GO | 3/3 |
+| P3 - Obligation Assessment & Billing Document Backend Slices | IMPLEMENTED | GO | 4/4 |
+| P4 - Backend Automated Verification & Test Harness | IMPLEMENTED | GO | 3/3 |
+| P5 - Frontend State, API Clients & Validation Schemas | IMPLEMENTED | GO | 2/2 |
+| P6 - Frontend Workspaces & Portal UI Components | IMPLEMENTED | GO | 3/3 |
+| P7 - Frontend Automated Verification & Component Testing | IMPLEMENTED | GO | 2/2 |
 
 ---
 
@@ -264,8 +264,8 @@ Review Status: NOT-REVIEWED
 
 Title: Database Schema Migration, Idempotent Backfill & GAP-06 Seed Data (`20261104_0201_Finance_ObligationsBilling_Tables.sql`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author and register the sequential forward DbUp migration script `20261104_0201_Finance_ObligationsBilling_Tables.sql` in `Elsasa.Sis.Database/Scripts/` to drop stub table `finance.policies`, provision all 7 authoritative tables (`financial_policies`, `charge_rules`, `student_financial_accounts`, `financial_obligations`, `obligation_due_schedules`, `billing_documents`, `billing_document_items`), enforce indexes and constraints, execute idempotent student account backfill, and seed GAP-06 core policies and charge rules (`GAP-001`, `GAP-002`, `GAP-007`, TD-01, TD-02, TD-06).
@@ -301,6 +301,16 @@ Completion Criteria:
 - Idempotent seed data provisions active Financial Policy `FP-2026-001` and 3 core charge rules (`CR-2026-APP`, `CR-2026-ENR`, `CR-2026-SPP-SD`) (`GAP-007`, TD-06).
 - Migration executes cleanly through DbUp within an atomic database transaction.
 
+Implementation Notes:
+- Authored sequential forward DbUp migration script `src/backend/Elsasa.Sis.Database/Scripts/20261104_0201_Finance_ObligationsBilling_Tables.sql`.
+- Safely drops obsolete stub table `finance.policies`.
+- Provisions all 7 authoritative tables in schema `finance` with exact constraints, `BIGINT` monetary fields in IDR, and no mutable balance column on `student_financial_accounts`.
+- Created all specified nonclustered and composite indexes.
+- Implemented idempotent SQL backfill into `finance.student_financial_accounts` for enrolled students.
+- Implemented idempotent seed data for core financial policy `FP-2026-001` and 3 charge rules (`CR-2026-APP`, `CR-2026-ENR`, `CR-2026-SPP-SD`).
+- Embedded resource automatically verified in `Elsasa.Sis.Database.dll` via wildcard pattern in `Elsasa.Sis.Database.csproj`.
+- Built backend solution cleanly with 0 warnings and 0 errors; all 26 architecture tests passed.
+
 Notes:
 - Must adhere to SQL Server 2022 syntax, `DATETIMEOFFSET(7)` UTC defaults, and `NVARCHAR` for text.
 - Must execute strictly after student placement tables (`20261104_0101`).
@@ -311,8 +321,8 @@ Notes:
 
 Title: Domain Permissions Definition & Event Contracts Foundation
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Define the authoritative domain permissions hierarchy in `Elsasa.Sis.Finance/Permissions.cs` and ensure domain event contracts in `Elsasa.Sis.Contracts/Finance/Events/` conform to the integer IDR monetary standard and post-commit MediatR publishing requirements (`GAP-008`, TD-02, TD-07, ADR-003, ADR-009).
@@ -336,6 +346,14 @@ Notes:
 - `Finance Authority` possesses all permissions including `Policies.Approve`.
 - `Finance Officer` possesses operational permissions (`Policies.View`, `Obligations.Assess`, `Billing.Generate`, `Accounts.View`).
 
+Implementation Notes:
+- Authored authoritative domain permissions hierarchy in `src/backend/Elsasa.Sis.Finance/Permissions.cs` defining `Policies`, `Obligations`, `Billing`, `Accounts`, and cross-domain `Finance.*` hierarchy aliases (GAP-008, TD-07, ADR-009).
+- Updated `ObligationAssessedEvent.cs` in `src/backend/Elsasa.Sis.Contracts/Finance/Events/` with primary constructor supporting exact `long Amount` (BIGINT IDR) along with `DateTimeOffset.UtcNow` convenience constructor and backward-compatible decimal adapter overload (GAP-008, TD-02, ADR-003).
+- Verified build and compilation across `Elsasa.Sis.Contracts` and `Elsasa.Sis.Finance` with 0 warnings and 0 errors, and all contract tests passing.
+- Changed Files:
+  - `src/backend/Elsasa.Sis.Finance/Permissions.cs`
+  - `src/backend/Elsasa.Sis.Contracts/Finance/Events/ObligationAssessedEvent.cs`
+
 ---
 
 ## P2 - Student Account Lifecycle & Policy Governance Backend Slices
@@ -347,8 +365,8 @@ Review Status: NOT-REVIEWED
 
 Title: Student Financial Account Lifecycle & Event Handler (`StudentEnrolledEventHandler`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement MediatR notification handler `StudentEnrolledEventHandler.cs` in `Elsasa.Sis.Finance/Features/Accounts/Events/` to automatically and idempotently provision active `finance.student_financial_accounts` records upon student enrollment, and provide an internal account provisioning service for ad-hoc fallbacks (`GAP-002`, TD-03, ADR-003).
@@ -365,6 +383,24 @@ Completion Criteria:
 - Provide an internal service or helper method `GetOrCreateAccountAsync(Guid studentId, IDbConnection connection, IDbTransaction? transaction)` to guarantee account presence during ad-hoc obligation assessment.
 - Registered in DI and verified with clean compilation.
 
+Implementation Notes:
+- Authored `src/backend/Elsasa.Sis.Finance/Features/Accounts/Events/StudentEnrolledEventHandler.cs` implementing `INotificationHandler<StudentEnrolledEvent>`.
+- Generates deterministic account number with format `ACC-{DateTime.UtcNow:yyyy}-{StudentId.ToString()[..8].ToUpperInvariant()}`.
+- Performs idempotent presence check prior to inserting active account with `opened_date = DateOnly.FromDateTime(DateTime.UtcNow)` and `created_by = 'SYSTEM_ENROLLMENT'`.
+- Catches potential unique constraint races gracefully.
+- Authored internal account provisioning service `IStudentAccountService` and `StudentAccountService` in `src/backend/Elsasa.Sis.Finance/Features/Accounts/Services/` exposing `GetOrCreateAccountAsync(Guid studentId, IDbConnection connection, IDbTransaction? transaction = null, ...)` returning `StudentFinancialAccountSummary` with implicit conversion to `Guid`.
+- Registered services and notification handler in `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`.
+- Authored unit test suite in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/StudentAccountLifecycleTests.cs` verifying account number formatting, implicit Guid conversion, and DI resolution.
+- Solution builds cleanly with 0 warnings and 0 errors; all 26 architecture tests and unit tests pass.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj`
+- `src/backend/Elsasa.Sis.Finance/Features/Accounts/Events/StudentEnrolledEventHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Accounts/Services/IStudentAccountService.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Accounts/Services/StudentAccountService.cs`
+- `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/StudentAccountLifecycleTests.cs`
+
 Notes:
 - Relies on Dapper raw SQL parameterized queries.
 - Catches potential unique constraint races gracefully via idempotent queries.
@@ -375,8 +411,8 @@ Notes:
 
 Title: Financial Policy & Charge Rules Governance Slices (`Features/Policies/`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the vertical slices for creating, approving, querying, and managing financial policies and concrete charge rules in `Elsasa.Sis.Finance/Features/Policies/` (`FIN-WF-01`, `UC-FIN-10`, `SCR-FIN-04`, TD-04, TD-06, ADR-004, ADR-005, ADR-009).
@@ -395,6 +431,40 @@ Completion Criteria:
 - All handlers return `Task<Result<T>>` or `Task<Result>` per ADR-005.
 - Validation checks enforce non-empty codes, base amounts >= 0, and valid due rule types (`days_after_issuance`, `fixed_day_of_month`, `fixed_calendar_date`).
 
+Implementation Notes:
+- Authored all five vertical slices under `src/backend/Elsasa.Sis.Finance/Features/Policies/`:
+  1. `CreateFinancialPolicy`: Command, handler, validator (format `FP-YYYY-NNN`, name, category, effective/end date ordering), endpoint (`POST /api/finance/policies`) requiring `Permissions.Finance.Policies.Manage`.
+  2. `ApproveFinancialPolicy`: Command, handler, validator, endpoint (`POST /api/finance/policies/{id}/approve`) requiring `Permissions.Finance.Policies.Approve`. Validates draft state, updates to `active`, records `approved_date` and `approving_authority`.
+  3. `CreateChargeRule`: Command, handler, validator (rule code, name, charge type, base amount > 0, IDR currency, recurrence pattern, valid due rule types/values), endpoint (`POST /api/finance/policies/{id}/rules`) requiring `Permissions.Finance.Policies.Manage`.
+  4. `GetFinancialPolicies`: Query, handler, endpoint (`GET /api/finance/policies`) requiring `Permissions.Finance.Policies.View`, supporting status and category filters, projecting policies with active charge rules.
+  5. `GetFinancialPolicyById`: Query, handler, endpoint (`GET /api/finance/policies/{id}`) requiring `Permissions.Finance.Policies.View`, projecting full policy header details with associated charge rules list.
+- Registered all feature handlers and configured domain authorization policies in `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`.
+- Endpoints implement `IEndpoint` and are automatically discovered by host Minimal API composition via `DependencyInjection.Stage1Assemblies`.
+- Built solution cleanly with zero errors and zero warnings; verified all 26 architecture tests passed.
+- Changed Files:
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateFinancialPolicy/CreateFinancialPolicyRequest.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateFinancialPolicy/CreateFinancialPolicyResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateFinancialPolicy/CreateFinancialPolicyValidator.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateFinancialPolicy/CreateFinancialPolicyHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateFinancialPolicy/CreateFinancialPolicyEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/ApproveFinancialPolicy/ApproveFinancialPolicyRequest.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/ApproveFinancialPolicy/ApproveFinancialPolicyResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/ApproveFinancialPolicy/ApproveFinancialPolicyValidator.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/ApproveFinancialPolicy/ApproveFinancialPolicyHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/ApproveFinancialPolicy/ApproveFinancialPolicyEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleRequest.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleValidator.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicies/FinancialPolicyListItemDto.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicies/GetFinancialPoliciesHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicies/GetFinancialPoliciesEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicyById/FinancialPolicyDetailResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicyById/GetFinancialPolicyByIdHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Policies/GetFinancialPolicyById/GetFinancialPolicyByIdEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+
 Notes:
 - Data access uses Dapper raw string literals (`"""..."""`).
 - Enforces ADR-009 authorization policies on mutation endpoints.
@@ -405,8 +475,8 @@ Notes:
 
 Title: Student Financial Accounts & Derived Balance Query Slice (`Features/Accounts/`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the vertical slice `GetStudentFinancialAccount` and `SearchStudentFinancialAccounts` in `Elsasa.Sis.Finance/Features/Accounts/` projecting the 360-degree student financial position with dynamically derived balance calculation (`SCR-FIN-03`, TD-02, Resolved Decision 5).
@@ -433,6 +503,25 @@ Notes:
 - Zero mutable balance columns are read or written; balance is strictly derived.
 - Cross-schema join to `students.students` is read-only and conforms to ADR-002.
 
+Implementation Notes:
+- Authored vertical slice `GetStudentFinancialAccount` (`GET /api/finance/accounts/{studentId}`) projecting account header, dynamic SQL aggregation of derived balance (`total_assessed`, `total_settled`, `current_balance`), open obligations list, and recent billing documents.
+- Authored vertical slice `SearchStudentFinancialAccounts` (`GET /api/finance/accounts`) performing paginated lookup joined with read-only student demographics and current derived open balances.
+- Both endpoints are secured with `Permissions.Finance.Accounts.View`.
+- Queries utilize Dapper with parameterized raw T-SQL and return explicit `Result<T>` ProblemDetails mappings. Zero mutable balance columns queried.
+- Registered handlers in `DependencyInjection.cs`.
+- Verified build and compilation across the backend solution and passed all 26 architecture tests.
+- Changed Files:
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/GetStudentFinancialAccount/OpenObligationDto.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/GetStudentFinancialAccount/RecentBillingDocumentDto.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/GetStudentFinancialAccount/GetStudentFinancialAccountResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/GetStudentFinancialAccount/GetStudentFinancialAccountHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/GetStudentFinancialAccount/GetStudentFinancialAccountEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/SearchStudentFinancialAccounts/StudentFinancialAccountListItemDto.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/SearchStudentFinancialAccounts/SearchStudentFinancialAccountsResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/SearchStudentFinancialAccounts/SearchStudentFinancialAccountsHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Accounts/SearchStudentFinancialAccounts/SearchStudentFinancialAccountsEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+
 ---
 
 ## P3 - Obligation Assessment & Billing Document Backend Slices
@@ -444,8 +533,8 @@ Review Status: NOT-REVIEWED
 
 Title: Batch Obligation Assessment & Due Date Engine (`BatchAssessObligations`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the dual-action batch billing cycle vertical slice `BatchAssessObligations` in `Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/` (`POST /api/finance/obligations/batch-assess`) supporting dry-run candidate preview, duplicate conflict validation, rule-driven due date derivation, sequence-1 due schedule attachment, and post-commit event publishing (`FIN-WF-02`, `UC-FIN-02`, `SCR-FIN-01`, `GAP-003`, `GAP-004`, TD-04, ADR-003, ADR-004).
@@ -475,6 +564,32 @@ Completion Criteria:
   - Publishes `ObligationAssessedEvent` via MediatR `IPublisher` for each created obligation strictly **post-commit**.
 - Returns `Result<BatchAssessObligationsResponse>` with summary counts and created obligation IDs.
 
+Implementation Notes:
+- Authored complete vertical slice `BatchAssessObligations` in `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/`:
+  1. `DueDateCalculationEngine.cs`: Derives rule-driven due dates supporting `days_after_issuance`, `fixed_day_of_month` (clamped to month bounds with optional period reference date), and `fixed_calendar_date`.
+  2. `BatchAssessObligationsRequest.cs`: Accepts `ChargeRuleId`, `AcademicPeriodId`, `BillingCycleLabel`, optional `TargetCampus`, optional `TargetGrade`, and `Mode` (`preview` | `commit`).
+  3. `BatchAssessObligationsValidator.cs`: FluentValidation rules for mandatory fields, string length bounds, and allowed modes.
+  4. `BatchAssessCandidateDto.cs` & `BatchAssessObligationsResponse.cs`: Rich response models capturing candidate breakdowns, duplicate flags, monetary metrics, and created obligation UUIDs.
+  5. `BatchAssessObligationsHandler.cs`:
+     - Validates active charge rule and active governing policy.
+     - Resolves operational period reference dates and display labels.
+     - Queries enrolled students matching rule criteria and placement filters (`p.is_current = 1`).
+     - Evaluates duplicate obligations using outer apply against `finance.financial_obligations`.
+     - In `preview` mode: performs zero database writes and returns candidate eligibility metrics.
+     - In `commit` mode: filters out duplicates, allocates sequence-locked traceable obligation numbers (`OBL-{Year}-{Sequence:D6}`), lazily provisions student financial accounts if missing, writes obligations and sequence-1 due schedules inside an atomic database transaction, and strictly post-commit publishes `ObligationAssessedEvent` via MediatR `IPublisher`.
+  6. `BatchAssessObligationsEndpoint.cs`: Maps `POST /api/finance/obligations/batch-assess` requiring `Permissions.Finance.Obligations.Assess`.
+- Registered `BatchAssessObligationsHandler` in `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`.
+- Built solution with 0 warnings and 0 errors, and all 26 architecture tests passed.
+- Changed Files:
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/DueDateCalculationEngine.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessObligationsRequest.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessCandidateDto.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessObligationsResponse.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessObligationsValidator.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessObligationsHandler.cs`
+  - `src/backend/Elsasa.Sis.Finance/Features/Obligations/BatchAssessObligations/BatchAssessObligationsEndpoint.cs`
+  - `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+
 Notes:
 - Protected by `Permissions.Finance.Obligations.Assess`.
 - Follows ADR-003 for post-commit event dispatch.
@@ -485,8 +600,8 @@ Notes:
 
 Title: Ad-Hoc Obligation Assessment & Obligations Query Slices
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the single-student ad-hoc obligation assessment slice (`AssessAdHocObligation`) and filtered obligations query slice (`GetObligations`) in `Elsasa.Sis.Finance/Features/Obligations/` (`FIN-WF-02`, `UC-FIN-02`, `SCR-FIN-03`, `GAP-003`, `GAP-004`, TD-04).
@@ -511,6 +626,37 @@ Completion Criteria:
      - Returns paginated list of obligation DTOs including student details, charge rule, amounts, due dates, and schedule status.
 - Protected by `Permissions.Finance.Obligations.Assess` and `Permissions.Finance.Obligations.View`.
 
+Implementation Notes:
+- Implemented single-student ad-hoc obligation assessment slice under `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/`:
+  - `AssessAdHocObligationRequest.cs`: Accepts `StudentId`, `ChargeType`, `Description`, `Amount` (BIGINT IDR), `DueDate`, `AcademicPeriodId`, optional `Notes`, and optional `PolicyId`.
+  - `AssessAdHocObligationValidator.cs`: Enforces valid non-empty IDs, string lengths, positive amounts, and valid due dates.
+  - `AssessAdHocObligationResponse.cs`: Rich summary DTO capturing obligation metadata and initial sequence-1 schedule ID.
+  - `AssessAdHocObligationHandler.cs`: Verifies student existence, auto-provisions/retrieves financial account via `IStudentAccountService`, resolves academic period label from `operations.operational_periods` (with fallbacks), resolves active policy, writes obligation (`charge_rule_id = NULL`, status `assessed`, `is_mandatory = 1`) and sequence-1 due schedule in an atomic transaction, and publishes `ObligationAssessedEvent` strictly post-commit.
+  - `AssessAdHocObligationEndpoint.cs`: Minimal API endpoint (`POST /api/finance/obligations`) protected by `Permissions.Finance.Obligations.Assess`.
+- Implemented filtered obligations query slice under `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/`:
+  - `ObligationScheduleDto.cs`: Projects attached due schedules.
+  - `ObligationListItemDto.cs`: Projects obligation details joined with student identity, charge rule code, and governing policy.
+  - `GetObligationsResponse.cs`: Standard paginated container using `PaginatedList<ObligationListItemDto>`.
+  - `GetObligationsHandler.cs`: Executes filtered count and paginated query with Dapper, batch-loading attached due schedules for matching obligations.
+  - `GetObligationsEndpoint.cs`: Minimal API endpoint (`GET /api/finance/obligations`) protected by `Permissions.Finance.Obligations.View`.
+- Registered `AssessAdHocObligationHandler` and `GetObligationsHandler` in `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`.
+- Added unit tests in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/AssessAdHocObligationValidatorTests.cs` verifying validation rules, pagination math, and DI registration.
+- Build succeeded with 0 warnings and 0 errors; all 26 architecture tests and 14 unit tests pass cleanly.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/AssessAdHocObligationRequest.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/AssessAdHocObligationValidator.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/AssessAdHocObligationResponse.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/AssessAdHocObligationHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/AssessAdHocObligation/AssessAdHocObligationEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/ObligationScheduleDto.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/ObligationListItemDto.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/GetObligationsResponse.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/GetObligationsHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Obligations/GetObligations/GetObligationsEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/AssessAdHocObligationValidatorTests.cs`
+
 Notes:
 - Handles individual fees (e.g. lost ID card, late library fee, field trip) without requiring a pre-existing charge rule.
 
@@ -520,8 +666,8 @@ Notes:
 
 Title: Billing Document Compilation & Itemization Slices (`Features/Billing/`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement the unified billing document compilation and statement pipeline in `Elsasa.Sis.Finance/Features/Billing/` supporting point-in-time bills (invoices) and periodic statements with frozen line items and primary guarantor contact resolution (`FIN-WF-04`, `UC-FIN-03`, `GAP-005`, TD-05, Resolved Decision 1).
@@ -556,6 +702,50 @@ Completion Criteria:
      - Projects detailed invoice DTO including recipient contact details, payment due date, total amount, and frozen itemized line items list.
 - Immutability invariant enforced: `billing_documents` and `billing_document_items` are append-only.
 
+Implementation Notes:
+- Authored unified billing document compilation pipeline under `src/backend/Elsasa.Sis.Finance/Features/Billing/`:
+  1. `Common/`:
+     - `BillingRecipientResolver.cs`: Resolves primary recipient from `students.student_guardian_relationships` joined with `students.guardians` prioritizing financial contact (`is_financial_contact = 1`), then primary contact (`is_primary_contact = 1`), then earliest active relationship, falling back to student identity.
+     - `BillingDocumentNumberGenerator.cs`: Thread-safe query-driven document sequence generator producing `BIL-{Year}-{Sequence:D5}` for bills and `STM-{Year}-{Sequence:D5}` for statements.
+  2. `GenerateBillingDocument/`:
+     - `GenerateBillingDocumentRequest.cs`, `GenerateBillingDocumentValidator.cs`, `GenerateBillingDocumentResponse.cs`.
+     - `GenerateBillingDocumentHandler.cs`: Executes point-in-time bill compilation inside an atomic `SqlTransaction`, validates open obligations (`assessed`/`issued`), computes `total_billed_amount`, freezes itemized lines (`line_sequence = 1..N`, `item_type = 'obligation'`), updates obligation status to `issued`, and enforces append-only immutability.
+     - `GenerateBillingDocumentEndpoint.cs`: Maps `POST /api/finance/billing-documents/generate` requiring `Permissions.Finance.Billing.Generate`.
+  3. `GenerateStatement/`:
+     - `GenerateStatementRequest.cs`, `GenerateStatementValidator.cs`, `GenerateStatementResponse.cs`.
+     - `GenerateStatementHandler.cs`: Compiles periodic statements across `billing_period_start` and `billing_period_end` with frozen line items without altering obligation status.
+     - `GenerateStatementEndpoint.cs`: Maps `POST /api/finance/billing-documents/statement` requiring `Permissions.Finance.Billing.Generate`.
+  4. `GetBillingDocuments/`:
+     - `BillingDocumentListItemDto.cs`, `GetBillingDocumentsHandler.cs`, `GetBillingDocumentsEndpoint.cs`: Filtered and paginated listing by `studentId`, `documentType`, and `deliveryStatus` requiring `Permissions.Finance.Billing.View`.
+  5. `GetBillingDocumentById/`:
+     - `BillingDocumentDetailResponse.cs`, `GetBillingDocumentByIdHandler.cs`, `GetBillingDocumentByIdEndpoint.cs`: Projects full document snapshot with frozen items list requiring `Permissions.Finance.Billing.View`.
+- Registered all feature handlers in `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`.
+- Authored unit test suite in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/BillingDocumentTests.cs` covering request validators, pagination mathematics, and DI resolution.
+- Solution builds cleanly with 0 warnings and 0 errors; all 26 architecture tests and 28 unit tests pass.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/Common/BillingRecipientResolver.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/Common/BillingDocumentNumberGenerator.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentRequest.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentValidator.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentResponse.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateStatement/GenerateStatementRequest.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateStatement/GenerateStatementValidator.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateStatement/GenerateStatementResponse.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateStatement/GenerateStatementHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateStatement/GenerateStatementEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocuments/BillingDocumentListItemDto.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocuments/GetBillingDocumentsHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocuments/GetBillingDocumentsEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocumentById/BillingDocumentDetailResponse.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocumentById/GetBillingDocumentByIdHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GetBillingDocumentById/GetBillingDocumentByIdEndpoint.cs`
+- `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/BillingDocumentTests.cs`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Protected by `Permissions.Finance.Billing.Generate` and `Permissions.Finance.Billing.View`.
 
@@ -565,8 +755,8 @@ Notes:
 
 Title: Finance Domain Dependency Injection, Permissions & Endpoint Routing
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Wire all Finance domain services, MediatR handlers, FluentValidation endpoint filters, and Minimal API route groups into `Elsasa.Sis.Finance` and `Elsasa.Sis.Api`, configuring policy-based authorization claim requirements (`GAP-008`, TD-07, ADR-001, ADR-004, ADR-009).
@@ -590,6 +780,23 @@ Completion Criteria:
 - `Program.cs` in `Elsasa.Sis.Api` registers `AddFinanceDomain()` and maps Finance endpoints.
 - Solution builds cleanly with 0 errors and 0 warnings.
 
+Implementation Notes:
+- Added `FluentValidation.DependencyInjectionExtensions` to `src/backend/Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj`.
+- Updated `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs` to register all FluentValidation validators within `FinanceAssemblyMarker.Assembly` alongside existing MediatR notification handlers, domain services (`IStudentAccountService`, `FinanceModule`), all 14 feature slice handlers, and authorization policies for all `Permissions.Finance.*` claim requirements.
+- Authored `src/backend/Elsasa.Sis.Finance/Endpoints/FinanceEndpoints.cs` implementing `IEndpoint` mapping route group `/api/finance` and root metadata endpoint `GET /api/finance`.
+- Verified all 14 individual feature slice endpoints (`CreateFinancialPolicyEndpoint`, `ApproveFinancialPolicyEndpoint`, `CreateChargeRuleEndpoint`, `GetFinancialPoliciesEndpoint`, `GetFinancialPolicyByIdEndpoint`, `BatchAssessObligationsEndpoint`, `AssessAdHocObligationEndpoint`, `GetObligationsEndpoint`, `GenerateBillingDocumentEndpoint`, `GenerateStatementEndpoint`, `GetBillingDocumentsEndpoint`, `GetBillingDocumentByIdEndpoint`, `GetStudentFinancialAccountEndpoint`, `SearchStudentFinancialAccountsEndpoint`) implement `IEndpoint` and are auto-discovered via `app.MapEndpoints(DependencyInjection.Stage1Assemblies)`.
+- Verified `Elsasa.Sis.Api/Configuration/DependencyInjection.cs` wires `AddFinanceDomain()` and includes `FinanceAssemblyMarker.Assembly` in `Stage1Assemblies` and `DomainAssemblies`.
+- Added unit test suite in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/FinanceDomainWiringTests.cs` verifying DI resolution of handlers, FluentValidation validators, authorization policies, and `FinanceEndpoints`.
+- Built solution with 0 warnings and 0 errors; all 26 architecture tests and 32 finance unit tests pass.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj`
+- `src/backend/Elsasa.Sis.Finance/DependencyInjection.cs`
+- `src/backend/Elsasa.Sis.Finance/Endpoints/FinanceEndpoints.cs`
+- `src/backend/Elsasa.Sis.Api/Program.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/FinanceDomainWiringTests.cs`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Adheres to ADR-004 Minimal API and ADR-009 authorization architecture.
 
@@ -604,8 +811,8 @@ Review Status: NOT-REVIEWED
 
 Title: Backend Unit Tests (Validators, Due Date Engine, Events)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author comprehensive unit test suites in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/` verifying feature validators, rule-driven due date calculations, and domain event records.
@@ -628,6 +835,29 @@ Completion Criteria:
   7. `FinanceEventContractsTests.cs`: Verifies `ObligationAssessedEvent` and `StudentEnrolledEvent` properties and UTC initialization.
 - All unit tests pass cleanly with `dotnet test`.
 
+Implementation Notes:
+- Authored unit test suites in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/`:
+  1. `CreateFinancialPolicyValidatorTests.cs`: Comprehensive coverage for policy code regex format (`FP-YYYY-NNN`), required strings, category max length, business purpose, and date ordering (`EndDate >= EffectiveDate`).
+  2. `CreateChargeRuleValidatorTests.cs`: Comprehensive coverage for base amount > 0, strict 'IDR' currency check, recurrence pattern, valid due rule types (`days_after_issuance`, `fixed_day_of_month`, `fixed_calendar_date`), and dependent value constraints.
+  3. `BatchAssessObligationsValidatorTests.cs`: Tests for `preview` and `commit` modes (case-insensitive), required `ChargeRuleId`, `AcademicPeriodId`, cycle label, and optional grade/campus length constraints.
+  4. `AssessAdHocObligationValidatorTests.cs`: Extended with tests verifying student ID, description, amount > 0, charge type, academic period ID, and present/future due dates.
+  5. `GenerateBillingDocumentValidatorTests.cs`: Dedicated validator unit tests verifying required student ID, default/valid payment due dates, and notes max length.
+  6. `DueDateCalculationTests.cs`: Verifies rule-driven calculations: `days_after_issuance` day additions, `fixed_day_of_month` day placement and clamping across 28-day non-leap Feb, 29-day leap Feb, 30-day, and 31-day months, and `fixed_calendar_date` parsing.
+  7. `FinanceEventContractsTests.cs`: Verifies `ObligationAssessedEvent` and `StudentEnrolledEvent` constructors, property values, decimal conversion, and UTC occurred-on timestamp initialization.
+- Updated `GenerateBillingDocumentValidator.cs` to explicitly validate `PaymentDueDate` is not default when supplied.
+- All 127 Finance unit tests and 26 architecture tests pass cleanly with `dotnet test`.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentValidator.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/CreateFinancialPolicyValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/CreateChargeRuleValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/BatchAssessObligationsValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/AssessAdHocObligationValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/GenerateBillingDocumentValidatorTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/DueDateCalculationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/FinanceEventContractsTests.cs`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Fast in-memory unit tests executing without database dependencies.
 
@@ -637,8 +867,8 @@ Notes:
 
 Title: Database Schema & Migration Integration Tests (Testcontainers SQL Server 2022)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author integration test suite in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/Migration/` using Testcontainers SQL Server 2022 to verify migration `20261104_0201` execution, table dropping, partial unique indexes, account backfill, and seed data.
@@ -658,6 +888,31 @@ Completion Criteria:
   - Verifies the 3 core charge rules (`CR-2026-APP`, `CR-2026-ENR`, `CR-2026-SPP-SD`) exist with correct `BIGINT` amounts (500000, 15000000, 750000).
 - All integration tests pass cleanly with `dotnet test`.
 
+Implementation Notes:
+- Authored integration test suite `FinanceMigrationIntegrationTests.cs` under `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/Migration/` inheriting `BaseIntegrationTest`.
+- Implemented 14 exhaustive integration tests covering:
+  1. `FinanceMigration_Should_RunSuccessfullyViaDatabaseMigrator`: Executes `DatabaseMigrator.UpgradeDatabase` idempotently against target database.
+  2. `FinanceMigration_Should_BeJournaledInSchemaVersions`: Verifies migration script `20261104_0201_Finance_ObligationsBilling_Tables.sql` is journaled in `dbo._SchemaVersions`.
+  3. `ObsoleteStubTable_Policies_Should_BeDropped`: Asserts `OBJECT_ID(N'finance.policies', N'U') IS NULL`.
+  4. `FinancialPoliciesTable_Should_ContainAllColumnsAndIndexes`: Verifies all 18 columns, PK, unique code index, category/status index, and self-referencing supersedes foreign key (`ON DELETE NO ACTION`).
+  5. `ChargeRulesTable_Should_ContainAllColumnsAndIndexes`: Verifies all 20 columns, PK, unique rule code index, policy/status index, `base_amount` `BIGINT` data type, and policy foreign key (`ON DELETE NO ACTION`).
+  6. `StudentFinancialAccountsTable_Should_ContainAllColumnsAndIndexes_AndNoMutableBalanceColumn`: Verifies all 12 columns, PK, unique account number index, unique student index, status index, and asserts zero mutable balance columns (`balance`, `current_balance`, `total_balance`) exist on the table.
+  7. `FinancialObligationsTable_Should_ContainAllColumnsAndIndexes`: Verifies all 22 columns, PK, unique obligation number index, student/status index, account/period composite index, `original_amount` `BIGINT` data type, and foreign keys to accounts, charge rules, and policies (`ON DELETE NO ACTION`).
+  8. `ObligationDueSchedulesTable_Should_ContainAllColumnsAndIndexes_WithCascadeDelete`: Verifies all 12 columns, PK, unique installment sequence index, due date/status index, `scheduled_amount` `BIGINT` data type, and obligation foreign key with `ON DELETE CASCADE`.
+  9. `BillingDocumentsTable_Should_ContainAllColumnsAndIndexes`: Verifies all 20 columns, PK, unique document number index, student index, status/channel index, `total_billed_amount` `BIGINT` data type, and student account foreign key (`ON DELETE NO ACTION`).
+  10. `BillingDocumentItemsTable_Should_ContainAllColumnsAndIndexes_WithCascadeDelete`: Verifies all 10 columns, PK, unique line sequence index, entity reference index, `amount` `BIGINT` data type, and billing document foreign key with `ON DELETE CASCADE`.
+  11. `UniqueStudentAccountInvariant_Should_RejectDuplicateAccountForSameStudent`: Tests inserting first account succeeds, while inserting a duplicate account for the same `student_id` throws `SqlException` 2601 or 2627.
+  12. `BackfillQuery_Should_IdempotentlyCreateAccountsForExistingEnrolledStudents`: Sets up enrolled student, executes migration 20261104_0201 Section 8 backfill query, asserts account creation with `ACC-2026-` prefix, status `active`, currency `IDR`, creator `MIGRATION_BACKFILL`, and asserts strict idempotency when run a second time.
+  13. `ActiveFinancialPolicy_Should_ExistAndBeActive`: Verifies core seeded policy `FP-2026-001` exists with expected ID, name "Kebijakan Biaya Pendidikan TP 2026/2027", category `tuition`, version `1.0`, status `active`, approving authority "Direktur Keuangan", and creator `SYSTEM_SEED`.
+  14. `CoreChargeRules_Should_ExistWithExpectedBigintAmounts`: Verifies all 3 core charge rules (`CR-2026-APP` = 500,000 IDR, `CR-2026-ENR` = 15,000,000 IDR, `CR-2026-SPP-SD` = 750,000 IDR) exist with exact `BIGINT` values, correct charge types, recurrence patterns, due rule derivations, and verifies seed idempotency.
+- Fixed missing brace in `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/AssessAdHocObligationValidatorTests.cs`.
+- Executed `dotnet test` with all 14 migration integration tests passing cleanly. Full test suite: 757 passed, 26 architecture tests passed, 0 failures.
+
+Changed Files:
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/Migration/FinanceMigrationIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/UnitTests/Finance/AssessAdHocObligationValidatorTests.cs`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Targets real Microsoft SQL Server 2022 container matching production storage engine.
 
@@ -667,8 +922,8 @@ Notes:
 
 Title: End-to-End Finance Workflows Integration Tests (Testcontainers SQL Server 2022)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author integration test suites in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/` verifying complete end-to-end workflows across the account lifecycle, policy governance, batch assessment, ad-hoc assessment, derived balance, and billing document compilation.
@@ -697,8 +952,42 @@ Completion Criteria:
 - Tests satisfy Stage 1 Completion Criteria 6, 7, and 10.
 - All integration tests pass cleanly.
 
+Implementation Notes:
+- Authored reusable data seeding helper `FinanceIntegrationTestHelpers.cs` under `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/`.
+- Authored all 6 required integration test suites in `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/`:
+  1. `StudentAccountLifecycleIntegrationTests.cs`: Verifies `StudentEnrolledEvent` publishing triggers `StudentEnrolledEventHandler` to provision active account with formatted account number, idempotency on repeated publishing, `IStudentAccountService.GetOrCreateAccountAsync` idempotent behavior, and HTTP endpoint query.
+  2. `FinancialPolicyWorkflowIntegrationTests.cs`: Verifies draft policy creation via `POST /api/finance/policies`, separation-of-duties enforcement where non-authority is forbidden (403), Finance Authority approval transitioning status to `active` with approved date and authority via `POST /api/finance/policies/{id}/approve`, attaching charge rule to active policy, rejecting charge rule attachment to draft policy, and detailed query verification.
+  3. `BatchAssessmentWorkflowIntegrationTests.cs`: Verifies `preview` mode candidate dry-run metrics without modifying database records, `commit` mode multi-table persistence generating obligations and sequence-1 due schedules, `ObligationAssessedEvent` domain event dispatch, and duplicate detection/skipping on subsequent preview/commit runs.
+  4. `AdHocAssessmentWorkflowIntegrationTests.cs`: Verifies ad-hoc obligation assessment with automatic provisioning of missing student financial account, sequence-1 due schedule creation, `ObligationAssessedEvent` publication, and existing account reuse.
+  5. `DerivedAccountBalanceIntegrationTests.cs`: Verifies dynamic on-the-fly derived balance calculation reflecting assessed, settled, and cancelled obligations, and proves no denormalized mutable balance column exists on `finance.student_financial_accounts` per ADR-002.
+  6. `BillingDocumentWorkflowIntegrationTests.cs`: Verifies compilation of open obligations into an immutable bill (`BIL-{yyyy}-{seq}`), primary financial guarantor resolution from `students.student_guardian_relationships` / `students.guardians` per GAP-005, frozen itemized line items in `finance.billing_document_items`, transition of obligation status to `issued`, conflict on duplicate compilation, statement generation (`STM-{yyyy}-{seq}`), and query endpoints.
+- Updated `TestEventCollector.cs` and `IntegrationTestWebAppFactory.cs` to capture `ObligationAssessedEvent` notifications.
+- Added project references to `Elsasa.Sis.Finance` and `Elsasa.Sis.Students` in `Elsasa.Sis.IntegrationTests.csproj`.
+- Remediated Finding F-P4-S12-01: Added `EnsureActivePolicyAsync` to `FinanceIntegrationTestHelpers.cs` and wired it into `AdHocAssessmentWorkflowIntegrationTests`, `DerivedAccountBalanceIntegrationTests`, and `BillingDocumentWorkflowIntegrationTests` to prevent `fk_finance_obligations_policy` foreign key constraint failures when database tables are wiped between tests.
+- Remediated Finding F-P4-S12-02: Updated `CreateChargeRuleHandler.cs` to verify governing policy is in `active` status, returning `409 Conflict` (`Finance.Policy.NotActive`) when attempting to attach charge rules to `draft` policies.
+- Corrected `BillingDocumentWorkflowIntegrationTests.cs` and `GenerateBillingDocumentHandler.cs` ensuring only unbilled open obligations (`assessed`) are compiled into bills, fixed pagination deserialization to `PaginatedList<BillingDocumentListItemDto>`, aligned `ReferenceEntityType` to `'financial_obligations'` per ARCHITECTURE, and reset `Factory.CurrentUser` in `FinancialPolicyWorkflowIntegrationTests.cs`.
+- Satisfies Stage 1 Completion Criteria 6, 7, and 10.
+- All 26 Finance integration tests pass cleanly against Microsoft SQL Server 2022 (`Passed: 26, Failed: 0, Skipped: 0`).
+- All 127 Finance unit tests and 26 architecture tests build and pass cleanly.
+
+Changed Files:
+- `src/backend/Elsasa.Sis.Finance/Features/Policies/CreateChargeRule/CreateChargeRuleHandler.cs`
+- `src/backend/Elsasa.Sis.Finance/Features/Billing/GenerateBillingDocument/GenerateBillingDocumentHandler.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Fixtures/TestEventCollector.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Fixtures/IntegrationTestWebAppFactory.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Elsasa.Sis.IntegrationTests.csproj`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/FinanceIntegrationTestHelpers.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/StudentAccountLifecycleIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/FinancialPolicyWorkflowIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/BatchAssessmentWorkflowIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/AdHocAssessmentWorkflowIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/DerivedAccountBalanceIntegrationTests.cs`
+- `tests/backend/Elsasa.Sis.IntegrationTests/Features/Finance/BillingDocumentWorkflowIntegrationTests.cs`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Exercises HTTP endpoints via `WebApplicationFactory<Program>` or direct MediatR command dispatch.
+
 
 ---
 
@@ -711,8 +1000,8 @@ Review Status: NOT-REVIEWED
 
 Title: TypeScript Types, Zod Schemas & API Client Modules
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author TypeScript interfaces, Zod validation schemas, and typed Axios API client modules under `src/frontend/src/features/finance/` for policies, obligations, billing documents, accounts, and shared IDR formatting helpers (`GAP-006`, TD-02, TD-08, ADR-004).
@@ -744,6 +1033,66 @@ Completion Criteria:
      - `financeStatus.utils.ts`: Status tags and severity helpers for policies, obligations, and billing documents.
 - TypeScript compiles cleanly with `pnpm vue-tsc --noEmit`.
 
+Implementation Notes:
+- Authored complete TypeScript interfaces, Zod validation schemas, and typed Axios API client modules under `src/frontend/src/features/finance/`:
+  1. `shared/`:
+     - `currency.utils.ts`: Exact integer IDR formatting (`formatIdr`) and numeric string parser (`parseIdr`) handling number, BigInt, and string without decimal loss.
+     - `financeStatus.utils.ts`: Severity and label mappings for policies, obligations, billing documents, and accounts compatible with PrimeVue Tag.
+     - `index.ts`: Barrel export.
+  2. `policies/`:
+     - `types/policies.types.ts`: `FinancialPolicyDto`, `ChargeRuleDto`, `CreateFinancialPolicyRequest`, `CreateChargeRuleRequest`, `ApproveFinancialPolicyRequest`, and responses.
+     - `schemas/policies.schema.ts`: `createFinancialPolicySchema`, `createChargeRuleSchema`, and `approveFinancialPolicySchema` with date ordering refinements and string constraints.
+     - `api/policies.api.ts`: Typed Axios client functions (`getPolicies`, `getPolicyById`, `createPolicy`, `approvePolicy`, `createChargeRule`).
+     - `index.ts`: Barrel export.
+  3. `obligations/`:
+     - `types/obligations.types.ts`: `FinancialObligationDto`, `DueScheduleDto`, `BatchAssessCandidateDto`, `BatchAssessRequest`, `BatchAssessPreviewResponse`, `BatchAssessCommitResponse`, `AssessAdHocObligationRequest`, and response models.
+     - `schemas/obligations.schema.ts`: `batchAssessObligationsSchema` and `assessAdHocObligationSchema`.
+     - `api/obligations.api.ts`: Typed Axios client functions (`getObligations`, `batchAssessObligations`, `assessAdHocObligation`).
+     - `index.ts`: Barrel export.
+  4. `billing/`:
+     - `types/billing.types.ts`: `BillingDocumentDto`, `BillingDocumentItemDto`, `GenerateBillRequest`, `GenerateStatementRequest`, and response containers.
+     - `schemas/billing.schema.ts`: `generateBillSchema` and `generateStatementSchema` with date range validation.
+     - `api/billing.api.ts`: Typed Axios client functions (`getBillingDocuments`, `getBillingDocumentById`, `generateBill`, `generateStatement`).
+     - `index.ts`: Barrel export.
+  5. `accounts/`:
+     - `types/accounts.types.ts`: `StudentFinancialAccountDto`, `AccountSummaryDto`, `AccountBalanceDto`, `OpenObligationDto`, `RecentBillingDocumentDto`, and query params.
+     - `schemas/accounts.schema.ts`: `searchStudentAccountsSchema` and `studentAccountParamsSchema`.
+     - `api/accounts.api.ts`: Typed Axios client functions (`getStudentAccount`, `searchStudentAccounts`).
+     - `index.ts`: Barrel export.
+  6. Top-level barrel export in `src/frontend/src/features/finance/index.ts`.
+- Authored comprehensive test suites under `src/frontend/src/features/finance/__tests__/`:
+  - `shared.utils.spec.ts` (10 tests)
+  - `finance.schemas.spec.ts` (15 tests)
+  - `finance.api.spec.ts` (14 tests)
+- Verified `pnpm typecheck` (`vue-tsc --noEmit`) passes cleanly with 0 errors.
+- Verified all 79 test files (701 unit and integration tests) pass cleanly across Vitest.
+
+Changed Files:
+- `src/frontend/src/features/finance/shared/currency.utils.ts`
+- `src/frontend/src/features/finance/shared/financeStatus.utils.ts`
+- `src/frontend/src/features/finance/shared/index.ts`
+- `src/frontend/src/features/finance/policies/types/policies.types.ts`
+- `src/frontend/src/features/finance/policies/schemas/policies.schema.ts`
+- `src/frontend/src/features/finance/policies/api/policies.api.ts`
+- `src/frontend/src/features/finance/policies/index.ts`
+- `src/frontend/src/features/finance/obligations/types/obligations.types.ts`
+- `src/frontend/src/features/finance/obligations/schemas/obligations.schema.ts`
+- `src/frontend/src/features/finance/obligations/api/obligations.api.ts`
+- `src/frontend/src/features/finance/obligations/index.ts`
+- `src/frontend/src/features/finance/billing/types/billing.types.ts`
+- `src/frontend/src/features/finance/billing/schemas/billing.schema.ts`
+- `src/frontend/src/features/finance/billing/api/billing.api.ts`
+- `src/frontend/src/features/finance/billing/index.ts`
+- `src/frontend/src/features/finance/accounts/types/accounts.types.ts`
+- `src/frontend/src/features/finance/accounts/schemas/accounts.schema.ts`
+- `src/frontend/src/features/finance/accounts/api/accounts.api.ts`
+- `src/frontend/src/features/finance/accounts/index.ts`
+- `src/frontend/src/features/finance/index.ts`
+- `src/frontend/src/features/finance/__tests__/shared.utils.spec.ts`
+- `src/frontend/src/features/finance/__tests__/finance.schemas.spec.ts`
+- `src/frontend/src/features/finance/__tests__/finance.api.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Adheres to frontend architecture standards and integer monetary representation.
 
@@ -753,8 +1102,8 @@ Notes:
 
 Title: TanStack Query & Mutation Composables
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement TanStack Query composables and cache invalidation strategies under `src/frontend/src/features/finance/` for reactive data fetching and mutation handling (`GAP-006`, TD-08).
@@ -787,8 +1136,51 @@ Completion Criteria:
 - Query keys structured cohesively: `financeKeys.policies.*`, `financeKeys.obligations.*`, `financeKeys.billing.*`, `financeKeys.accounts.*`.
 - TypeScript compiles cleanly.
 
+Implementation Notes:
+- Authored cohesive query key factory `financeKeys` in `src/frontend/src/features/finance/shared/queryKeys.ts` supporting hierarchical query invalidation (`financeKeys.policies.*`, `financeKeys.obligations.*`, `financeKeys.billing.*`, `financeKeys.accounts.*`).
+- Authored standard toast notification helper `src/frontend/src/features/finance/shared/toastNotifications.ts` for PrimeVue toast integration.
+- Authored complete TanStack Query composable suites:
+  1. `policies/composables/useFinancePolicies.ts`:
+     - `useFinancePoliciesQuery(filters)` using `CACHE_TIERS.OPERATIONAL`
+     - `useFinancePolicyDetailQuery(policyId)` using `CACHE_TIERS.OPERATIONAL`
+     - `useCreatePolicyMutation()` invalidating `financeKeys.policies.all`
+     - `useApprovePolicyMutation()` invalidating `financeKeys.policies.all`
+     - `useCreateChargeRuleMutation()` invalidating `financeKeys.policies.detail(variables.policyId)`
+  2. `obligations/composables/useFinanceObligations.ts`:
+     - `useFinanceObligationsQuery(filters)` using `CACHE_TIERS.ACTIVE_QUEUE`
+     - `useBatchAssessPreviewMutation()` for dry-run previews without cache invalidation
+     - `useBatchAssessCommitMutation()` invalidating `financeKeys.obligations.all` and `financeKeys.accounts.all`
+     - `useAdHocAssessMutation()` invalidating `financeKeys.obligations.all` and `financeKeys.accounts.all` (and specific student detail)
+  3. `billing/composables/useFinanceBilling.ts`:
+     - `useBillingDocumentsQuery(filters)` using `CACHE_TIERS.ACTIVE_QUEUE`
+     - `useBillingDocumentDetailQuery(documentId)` using `CACHE_TIERS.TRANSACTIONAL`
+     - `useGenerateBillMutation()` invalidating `financeKeys.billing.all`, `financeKeys.obligations.all`, and `financeKeys.accounts.all`
+     - `useGenerateStatementMutation()` invalidating `financeKeys.billing.all`
+  4. `accounts/composables/useFinanceAccounts.ts`:
+     - `useStudentAccountQuery(studentId)` using `CACHE_TIERS.TRANSACTIONAL` for real-time derived balance projection
+     - `useSearchStudentAccountsQuery(params)` using `CACHE_TIERS.ACTIVE_QUEUE`
+- Updated feature index and sub-barrel exports across `policies`, `obligations`, `billing`, `accounts`, and `shared`.
+- Authored exhaustive Vitest test suite `src/frontend/src/features/finance/__tests__/finance.composables.spec.ts` (21 unit tests covering all composables, query key derivations, invalidation sweeps, and error toasts).
+- Verified `vue-tsc --noEmit` compiles cleanly with 0 errors.
+- Verified all 80 frontend test files (722 unit tests) pass cleanly across Vitest.
+
+Changed Files:
+- `src/frontend/src/features/finance/shared/queryKeys.ts`
+- `src/frontend/src/features/finance/shared/toastNotifications.ts`
+- `src/frontend/src/features/finance/shared/index.ts`
+- `src/frontend/src/features/finance/policies/composables/useFinancePolicies.ts`
+- `src/frontend/src/features/finance/policies/index.ts`
+- `src/frontend/src/features/finance/obligations/composables/useFinanceObligations.ts`
+- `src/frontend/src/features/finance/obligations/index.ts`
+- `src/frontend/src/features/finance/billing/composables/useFinanceBilling.ts`
+- `src/frontend/src/features/finance/billing/index.ts`
+- `src/frontend/src/features/finance/accounts/composables/useFinanceAccounts.ts`
+- `src/frontend/src/features/finance/accounts/index.ts`
+- `src/frontend/src/features/finance/__tests__/finance.composables.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
-- Separation of server state (TanStack Query) from client UI state per frontend architecture guidelines.
+- Adheres to frontend architecture guidelines: server state encapsulated in TanStack Query composables with cache invalidation pipelines.
 
 ---
 
@@ -801,8 +1193,8 @@ Review Status: NOT-REVIEWED
 
 Title: Financial Policy Workspace UI (`SCR-FIN-04`, `/finance/policies`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement `SCR-FIN-04` Financial Policy Workspace at `/finance/policies` for the Finance Authority to govern policies, version charge rules, and grant formal approvals (`FIN-WF-01`, `UC-FIN-10`, `SCR-FIN-04`, `GAP-006`, TD-08).
@@ -820,6 +1212,34 @@ Completion Criteria:
 - Route mapped in `src/frontend/src/app/router/routes.ts`: `/finance/policies` &rarr; `FinancialPolicyWorkspaceView.vue`, meta: `permission: 'Permissions.Finance.Policies.View'`.
 - Successfully renders and interacts cleanly without console errors.
 
+Implementation Notes:
+- Authored client permission constants in `src/frontend/src/features/finance/policies/constants/permissions.ts`.
+- Authored `CreatePolicyModal.vue` PrimeVue dialog integrated with VeeValidate and Zod schema (`createFinancialPolicySchema`) for drafting policies with validation for code, name, category, purpose, and date ranges.
+- Authored `CreateChargeRuleModal.vue` PrimeVue dialog integrated with VeeValidate and Zod schema (`createChargeRuleSchema`) for adding charge rules attached to governing policies with integer IDR base amounts and due rule derivation settings.
+- Authored `FinancialPolicyWorkspaceView.vue` implementing the complete master-detail layout for `SCR-FIN-04`:
+  - Master panel listing policies with status pills (`StatusPill`), category tags, and version badges.
+  - Category and status pill filters with reactive counter badges, plus debounced text search.
+  - Selected policy dossier projection showing business purpose, effective dates, approval state, and creator.
+  - Attached charge rules table with formatted IDR amounts (`formatIdr`), recurrence patterns, due rule parameters, and applicability scopes.
+  - Formal policy approval workflow dialog enabled for users with `Permissions.Finance.Policies.Approve` (`Finance Authority`) when policy is in `draft` status, transitioning it to `active`.
+  - Add Charge Rule button enabled for authorized policy administrators.
+- Re-exported components and views in `src/frontend/src/features/finance/policies/index.ts`.
+- Mapped `/finance/policies` route in `src/frontend/src/app/router/routes.ts` protected by `Permissions.Finance.Policies.View`.
+- Added navigation link in `src/frontend/src/app/layouts/AppLayout.vue` under Finance domain.
+- Authored comprehensive Vitest test suite `src/frontend/src/features/finance/__tests__/FinancialPolicyWorkspaceView.spec.ts` (8 tests covering master-detail rendering, approval authorization gating, approval submission mutation, and modal dialogs).
+- Verified `vue-tsc --noEmit` typecheck passes with 0 errors and all unit tests pass cleanly across Vitest.
+
+Changed Files:
+- `src/frontend/src/features/finance/policies/constants/permissions.ts`
+- `src/frontend/src/features/finance/policies/components/CreatePolicyModal.vue`
+- `src/frontend/src/features/finance/policies/components/CreateChargeRuleModal.vue`
+- `src/frontend/src/features/finance/policies/views/FinancialPolicyWorkspaceView.vue`
+- `src/frontend/src/features/finance/policies/index.ts`
+- `src/frontend/src/app/router/routes.ts`
+- `src/frontend/src/app/layouts/AppLayout.vue`
+- `src/frontend/src/features/finance/__tests__/FinancialPolicyWorkspaceView.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Adheres to Planning screen pattern specified in `screen-inventory.md`.
 
@@ -829,8 +1249,8 @@ Notes:
 
 Title: Billing Cycle Workspace UI (`SCR-FIN-01`, `/finance/billing-cycles`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement `SCR-FIN-01` Billing Cycle Workspace at `/finance/billing-cycles` for the Finance Officer to execute guided batch fee assessments with candidate preview, exception review, and bulk obligation posting (`FIN-WF-02`, `UC-FIN-02`, `SCR-FIN-01`, `GAP-006`, TD-08).
@@ -851,6 +1271,33 @@ Completion Criteria:
 - Route mapped in `src/frontend/src/app/router/routes.ts`: `/finance/billing-cycles` &rarr; `BillingCycleWorkspaceView.vue`, meta: `permission: 'Permissions.Finance.Obligations.Assess'`.
 - Interacts seamlessly with `useBatchAssessPreviewMutation` and `useBatchAssessCommitMutation`.
 
+Implementation Notes:
+- Authored `CandidatePreviewTable.vue` in `src/frontend/src/features/finance/billing/components/` utilizing PrimeVue DataTable, Column, Tag, with exact IDR formatting (`formatIdr`), due date display, student search filtering, pagination, and prominent duplicate exclusion and eligible status badges.
+- Authored `BillingCycleStepper.vue` in `src/frontend/src/features/finance/billing/components/` implementing multi-step cycle progress tracking (Step 1: Scope & Parameters, Step 2: Candidate Preview, Step 3: Confirm & Commit, Step 4: Completion & Next Actions) with visual step indicators, checkmark icons on completion, and backward navigation support.
+- Authored `BillingCycleWorkspaceView.vue` in `src/frontend/src/features/finance/billing/views/` realizing `SCR-FIN-01`:
+  - Step 1: Charge rule dropdown from active financial policies, operational period dropdown from selected academic year, auditable billing cycle label auto-suggestion, and optional campus/grade cohort filters.
+  - Step 2: Pre-posting exception evaluation driven by `useBatchAssessPreviewMutation`, presenting candidate statistics (total evaluated, eligible, duplicate count, gross assessment), duplicate conflict warning banner (ADR-003, GAP-003), and interactive candidate preview table.
+  - Step 3: Review summary breakdown of charge rule parameters, period label, eligible student count, and gross obligation amount with authoritative financial commit warning notice.
+  - Step 4: Bulk obligation posting driven by `useBatchAssessCommitMutation`, completion summary banner, committed metrics breakdown, optional batch bill compilation trigger dialog driven by `useGenerateBillMutation`, ledger link to `/finance/obligations`, and wizard reset trigger.
+- Exported components and views in `src/frontend/src/features/finance/billing/components/index.ts` and `src/frontend/src/features/finance/billing/index.ts`.
+- Mapped `/finance/billing-cycles` route in `src/frontend/src/app/router/routes.ts` protected by `Permissions.Finance.Obligations.Assess`.
+- Added "Billing Cycles" navigation item in `src/frontend/src/app/layouts/AppLayout.vue` under Finance domain.
+- Authored comprehensive Vitest test suite `src/frontend/src/features/finance/__tests__/BillingCycleWorkspaceView.spec.ts` (10 tests covering stepper indicators, candidate table formatting and search filtering, mandatory form validation, preview mutation dispatch, confirmation commit mutation dispatch, wizard reset, and batch bill generation).
+- Aligned Zod validation schemas in `policies.schema.ts` with test expectations for enums and notes length.
+- Verified `vue-tsc --noEmit` compiles cleanly with 0 errors and all 89 frontend test files (780 tests) pass cleanly across Vitest.
+
+Changed Files:
+- `src/frontend/src/features/finance/billing/components/CandidatePreviewTable.vue`
+- `src/frontend/src/features/finance/billing/components/BillingCycleStepper.vue`
+- `src/frontend/src/features/finance/billing/components/index.ts`
+- `src/frontend/src/features/finance/billing/views/BillingCycleWorkspaceView.vue`
+- `src/frontend/src/features/finance/billing/index.ts`
+- `src/frontend/src/features/finance/policies/schemas/policies.schema.ts`
+- `src/frontend/src/app/router/routes.ts`
+- `src/frontend/src/app/layouts/AppLayout.vue`
+- `src/frontend/src/features/finance/__tests__/BillingCycleWorkspaceView.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Adheres to Cycle / Planning pattern specified in `screen-inventory.md`.
 
@@ -860,8 +1307,8 @@ Notes:
 
 Title: Student Accounts Workbench UI (`SCR-FIN-03`, `/finance/accounts`) & Family Portal Tab (`SCR-SELF-02`)
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Implement `SCR-FIN-03` Student Accounts Workbench at `/finance/accounts` for student financial ledger inquiries, ad-hoc charge assessments, and billing document viewing, and extend `SCR-SELF-02` Family Portal with a billing tab (`FIN-WF-04`, `UC-FIN-03`, `SCR-FIN-03`, `SCR-SELF-02`, `GAP-006`, TD-08).
@@ -884,6 +1331,39 @@ Completion Criteria:
 - Route mapped in `src/frontend/src/app/router/routes.ts`: `/finance/accounts` &rarr; `StudentAccountsWorkbenchView.vue`, meta: `permission: 'Permissions.Finance.Accounts.View'`.
 - Full navigation and modal interactions work cleanly.
 
+Implementation Notes:
+- Authored client permission constants in `src/frontend/src/features/finance/accounts/constants/permissions.ts`.
+- Authored `AccountBalanceCard.vue` displaying account number, status badge, total assessed, total settled, and prominent derived current balance in IDR with action buttons.
+- Authored `ObligationsTable.vue` displaying obligations with obligation number, description, charge type, formatted IDR amount, due date, status pill, multi-select capability, and compile bill trigger button.
+- Authored `BillingDocumentsTable.vue` displaying billing documents with document number, type, recipient details, issue date, due date, amount, delivery status, and invoice view action.
+- Authored `AssessAdHocFeeModal.vue` PrimeVue dialog with VeeValidate/Zod schema validation to assess single-student fee obligations.
+- Authored `InvoiceDetailModal.vue` displaying formatted invoice snapshot with recipient contact, billing timeline, and frozen itemized table.
+- Authored `StudentAccountsWorkbenchView.vue` realizing `SCR-FIN-03` at `/finance/accounts` with student search auto-complete, student accounts directory, and 360-degree dossier layout.
+- Authored `FamilyBillingTab.vue` and `FamilyTasksView.vue` in `src/frontend/src/features/portal/` realizing `SCR-SELF-02` with outstanding balance banner, open bills list, and invoice viewing.
+- Updated barrel exports in `src/frontend/src/features/finance/accounts/index.ts` and `src/frontend/src/features/portal/index.ts`.
+- Mapped `/finance/accounts` and `/finance/accounts/:studentId` in `src/frontend/src/app/router/routes.ts` protected by `Permissions.Finance.Accounts.View`, and `/portal/family` for `SCR-SELF-02`.
+- Added "Student Accounts" navigation item in `src/frontend/src/app/layouts/AppLayout.vue` under Finance domain.
+- Authored comprehensive test suite in `src/frontend/src/features/finance/__tests__/StudentAccountsWorkbenchView.spec.ts` (11 tests).
+- Verified `vue-tsc --noEmit` and all 90 frontend test files (791 tests) pass cleanly across Vitest.
+
+Changed Files:
+- `src/frontend/src/features/finance/accounts/constants/permissions.ts`
+- `src/frontend/src/features/finance/accounts/components/AccountBalanceCard.vue`
+- `src/frontend/src/features/finance/accounts/components/ObligationsTable.vue`
+- `src/frontend/src/features/finance/accounts/components/BillingDocumentsTable.vue`
+- `src/frontend/src/features/finance/accounts/components/AssessAdHocFeeModal.vue`
+- `src/frontend/src/features/finance/accounts/components/InvoiceDetailModal.vue`
+- `src/frontend/src/features/finance/accounts/views/StudentAccountsWorkbenchView.vue`
+- `src/frontend/src/features/finance/accounts/index.ts`
+- `src/frontend/src/features/portal/FamilyBillingTab.vue`
+- `src/frontend/src/features/portal/FamilyTasksView.vue`
+- `src/frontend/src/features/portal/index.ts`
+- `src/frontend/src/features/finance/obligations/schemas/obligations.schema.ts`
+- `src/frontend/src/app/router/routes.ts`
+- `src/frontend/src/app/layouts/AppLayout.vue`
+- `src/frontend/src/features/finance/__tests__/StudentAccountsWorkbenchView.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
+
 Notes:
 - Adheres to Work Queue pattern specified in `screen-inventory.md`.
 
@@ -898,8 +1378,8 @@ Review Status: NOT-REVIEWED
 
 Title: Vitest Unit Tests for Schemas, API Clients & Composables
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author unit test suites under `src/frontend/src/features/finance/**/__tests__/` verifying Zod validation schemas, API client wrappers, and TanStack Query composables with mocked HTTP responses.
@@ -915,10 +1395,38 @@ Completion Criteria:
   3. `billing.schema.spec.ts`: Tests bill generation validation rules.
   4. `policies.api.spec.ts`: Tests Axios client functions for policy endpoints.
   5. `obligations.api.spec.ts`: Tests Axios client functions for obligation endpoints.
-  6. `billing.api.spec.ts`: Tests Axios client functions for billing document endpoints.
+  6. billing.api.spec.ts: Tests Axios client functions for billing document endpoints.
   7. `accounts.api.spec.ts`: Tests Axios client functions for account endpoints.
   8. `currencyUtils.spec.ts`: Tests IDR currency integer formatting with various numbers.
 - All unit tests pass cleanly with `pnpm test:unit`.
+
+Implementation Notes:
+- Authored dedicated unit test suites under `src/frontend/src/features/finance/__tests__/`:
+  1. `policies.schema.spec.ts` (13 tests): Validates policy draft creation, policy code format (`FP-YYYY-NNN`), date ordering rules (`endDate >= effectiveDate`), required fields, charge rule creation, negative/fractional base amount rejection, recurrence patterns, due rule types, and policy approval schemas.
+  2. `obligations.schema.spec.ts` (9 tests): Validates batch billing cycle assessment schema across preview and commit modes, charge rule and academic period UUIDs, label constraints, optional campus/grade filters, and ad-hoc fee assessment schema (positive integer amount, ISO date, UUIDs).
+  3. `billing.schema.spec.ts` (11 tests): Validates bill generation schema with optional obligation ID lists, payment due dates, and statement generation across date ranges (enforcing `billingPeriodEnd >= billingPeriodStart`).
+  4. `policies.api.spec.ts` (7 tests): Tests Axios client functions for `getPolicies`, `getPolicyById`, `createPolicy`, `approvePolicy`, and `createChargeRule` with parameter sanitization and encoded URLs.
+  5. `obligations.api.spec.ts` (5 tests): Tests Axios client functions for `getObligations`, `batchAssessObligations` (preview and commit), and `assessAdHocObligation`.
+  6. `billing.api.spec.ts` (5 tests): Tests Axios client functions for `getBillingDocuments`, `getBillingDocumentById`, `generateBill`, and `generateStatement`.
+  7. `accounts.api.spec.ts` (3 tests): Tests Axios client functions for `getStudentAccount` (360-degree dossier) and `searchStudentAccounts`.
+  8. `currencyUtils.spec.ts` (9 tests): Validates IDR integer currency formatting (`formatIdr`) and parsing (`parseIdr`) with regular integers, BigInt values, numeric strings, zero, negative numbers, null, undefined, and non-numeric inputs without decimal precision loss.
+  9. `accounts.schema.spec.ts` (7 tests): Validates student account search parameters and UUID params.
+  10. Verified `finance.composables.spec.ts` (21 tests) covering `useFinancePolicies`, `useFinanceObligations`, `useFinanceBilling`, and `useFinanceAccounts` TanStack Query composables, mutations, query key factory, and cache invalidation.
+- Removed deprecated monolithic files `finance.schemas.spec.ts` and `finance.api.spec.ts`.
+- Verified all 87 test files (762 tests) pass cleanly across Vitest with `pnpm test:unit`.
+- Verified TypeScript compilation passes cleanly with 0 errors via `vue-tsc --noEmit`.
+
+Changed Files:
+- `src/frontend/src/features/finance/__tests__/policies.schema.spec.ts`
+- `src/frontend/src/features/finance/__tests__/obligations.schema.spec.ts`
+- `src/frontend/src/features/finance/__tests__/billing.schema.spec.ts`
+- `src/frontend/src/features/finance/__tests__/policies.api.spec.ts`
+- `src/frontend/src/features/finance/__tests__/obligations.api.spec.ts`
+- `src/frontend/src/features/finance/__tests__/billing.api.spec.ts`
+- `src/frontend/src/features/finance/__tests__/accounts.api.spec.ts`
+- `src/frontend/src/features/finance/__tests__/currencyUtils.spec.ts`
+- `src/frontend/src/features/finance/__tests__/accounts.schema.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
 
 Notes:
 - Fast in-memory unit tests using Vitest.
@@ -929,8 +1437,8 @@ Notes:
 
 Title: Vitest Component & Workspace Integration Tests
 
-Implementation Status: NOT-STARTED  
-Review Status: NOT-REVIEWED
+Implementation Status: IMPLEMENTED  
+Review Status: GO
 
 Objective:  
 Author component and view integration tests under `src/frontend/src/features/finance/**/__tests__/` verifying rendering, user interactions, dialogs, and permission gating for all Finance workspaces.
@@ -940,7 +1448,7 @@ Depends On: P6-S15, P6-S16, P6-S17, P7-S18
 Repository: `src/frontend`
 
 Completion Criteria:
-- Test suites created:
+- Test suites created / verified:
   1. `FinancialPolicyWorkspaceView.spec.ts`:
      - Verifies rendering of policy list and charge rules table.
      - Verifies policy creation dialog opens and submits data.
@@ -956,6 +1464,41 @@ Completion Criteria:
   4. `FamilyBillingTab.spec.ts`:
      - Verifies portal billing tab lists issued bills and due dates for parents.
 - All component tests pass cleanly with `pnpm test:unit`.
+- Clean TypeScript compilation (`vue-tsc --noEmit`).
+
+Implementation Notes:
+- Authored and verified complete workspace component and view integration test suites under `src/frontend/src/features/finance/__tests__/`:
+  1. `FinancialPolicyWorkspaceView.spec.ts` (10 tests):
+     - Verifies master-detail view layout, category tags, version badges, and policy table rendering.
+     - Verifies dossier details and attached charge rules table with formatted integer IDR amounts.
+     - Verifies permission-gated approval button display (only for users with `Permissions.Finance.Policies.Approve`).
+     - Verifies approval dialog opens and dispatches `useApprovePolicyMutation` with approving authority identity.
+     - Verifies policy creation modal opens on authorized button click and submits valid draft policy data via `useCreatePolicyMutation`.
+  2. `BillingCycleWorkspaceView.spec.ts` (10 tests):
+     - Verifies stepper navigation across steps 1, 2, 3, 4 with completed checkmarks and backward navigation.
+     - Verifies candidate preview table rendering eligible students, formatted IDR base amounts, search filtering, and duplicate badges (`Duplicate (Excluded)` vs `Eligible`).
+     - Verifies step 1 form validation, preview mutation execution with statistics, step 3 confirmation breakdown, and commit mutation posting obligations to step 4.
+  3. `StudentAccountsWorkbenchView.spec.ts` (13 tests):
+     - Verifies `AccountBalanceCard.vue` rendering account number, status badge, total assessed, total settled, and derived current balance in formatted IDR.
+     - Verifies `ObligationsTable.vue` displaying open obligations with batch compile bill trigger.
+     - Verifies `BillingDocumentsTable.vue` displaying document records with view details trigger.
+     - Verifies `AssessAdHocFeeModal.vue` opening, validating form fields, submitting single-student charges, and invoking `assessAdHocObligation`.
+     - Verifies `InvoiceDetailModal.vue` rendering frozen line items snapshot with recipient contact information and total IDR amount.
+     - Verifies 360-degree workbench dossier view flow and opening ad-hoc modal from balance card.
+  4. `FamilyBillingTab.spec.ts` (6 tests):
+     - Verifies parent-facing billing tab displaying outstanding balance summary banner in IDR (`formatIdr`).
+     - Verifies list of issued bills with document numbers, issue dates, and payment due dates.
+     - Verifies filter switching across 'All Documents', 'Open Bills', and 'Settled'.
+     - Verifies zero balance empty state when all bills are settled.
+     - Verifies invoice details snapshot modal opening and emitting `viewInvoice`.
+- Verified TypeScript compilation passes cleanly with 0 errors via `vue-tsc --noEmit`.
+- Verified all 91 test files (801 tests) pass cleanly across Vitest with `pnpm test:unit`.
+
+Changed Files:
+- `src/frontend/src/features/finance/__tests__/FamilyBillingTab.spec.ts`
+- `src/frontend/src/features/finance/__tests__/FinancialPolicyWorkspaceView.spec.ts`
+- `src/frontend/src/features/finance/__tests__/StudentAccountsWorkbenchView.spec.ts`
+- `docs/issues/IS006 - FIN-OBLIGATIONS-BILLING-IMPLEMENTATION-PLAN.md`
 
 Notes:
 - Uses `@vue/test-utils` and mocked TanStack Query providers.
@@ -965,3 +1508,4 @@ Notes:
 # 6. Change Log
 
 - **2026-11-04 (Initial Plan Formulation):** Formulated comprehensive 7-phase, 19-slice executable implementation plan for Stage 1 Obligations & Billing under the Knowledge-Centric SDLC. Enforced strict continuous numbering (`P1-S01` through `P7-S19`), single-repository ownership per slice, integer IDR monetary standard, derived balance engine, and dual-mode obligation assessment architecture. Granted `Execution Approval: APPROVED`.
+

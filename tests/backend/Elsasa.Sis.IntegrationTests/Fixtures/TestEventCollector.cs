@@ -1,6 +1,7 @@
 namespace Elsasa.Sis.IntegrationTests.Fixtures;
 
 using System.Collections.Concurrent;
+using Elsasa.Sis.Contracts.Finance.Events;
 using Elsasa.Sis.Contracts.Students.Events;
 using MediatR;
 
@@ -10,11 +11,13 @@ using MediatR;
 public sealed class TestEventCollector :
     INotificationHandler<ApplicantAcceptedEvent>,
     INotificationHandler<StudentEnrolledEvent>,
-    INotificationHandler<PlacementChangedEvent>
+    INotificationHandler<PlacementChangedEvent>,
+    INotificationHandler<ObligationAssessedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
     private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
+    private readonly ConcurrentBag<ObligationAssessedEvent> _obligationAssessedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -32,6 +35,11 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<PlacementChangedEvent> PlacementChangedEvents => _placementChangedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="ObligationAssessedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<ObligationAssessedEvent> ObligationAssessedEvents => _obligationAssessedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -39,6 +47,7 @@ public sealed class TestEventCollector :
         _applicantAcceptedEvents.Clear();
         _studentEnrolledEvents.Clear();
         _placementChangedEvents.Clear();
+        _obligationAssessedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -64,4 +73,13 @@ public sealed class TestEventCollector :
         _placementChangedEvents.Add(notification);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task Handle(ObligationAssessedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _obligationAssessedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
 }
+

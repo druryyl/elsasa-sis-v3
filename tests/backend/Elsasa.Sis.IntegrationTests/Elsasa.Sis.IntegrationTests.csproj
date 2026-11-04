@@ -20,6 +20,8 @@
     <ProjectReference Include="../../../src/backend/Elsasa.Sis.Database/Elsasa.Sis.Database.csproj" />
     <ProjectReference Include="../../../src/backend/Elsasa.Sis.Contracts/Elsasa.Sis.Contracts.csproj" />
     <ProjectReference Include="../../../src/backend/Elsasa.Sis.Operations/Elsasa.Sis.Operations.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Students/Elsasa.Sis.Students.csproj" />
+    <ProjectReference Include="../../../src/backend/Elsasa.Sis.Finance/Elsasa.Sis.Finance.csproj" />
   </ItemGroup>
 
   <ItemGroup>

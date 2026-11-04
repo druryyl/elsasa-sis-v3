@@ -116,6 +116,26 @@ export const routes: RouteRecordRaw[] = [
         component: RouterView,
         children: [
           {
+            path: 'policies',
+            name: 'finance.policies.workspace',
+            component: () =>
+              import('@/features/finance/policies/views/FinancialPolicyWorkspaceView.vue'),
+            meta: {
+              permission: 'Permissions.Finance.Policies.View',
+              title: 'Financial Policy Workspace',
+            },
+          },
+          {
+            path: 'billing-cycles',
+            name: 'finance.billing-cycles.workspace',
+            component: () =>
+              import('@/features/finance/billing/views/BillingCycleWorkspaceView.vue'),
+            meta: {
+              permission: 'Permissions.Finance.Obligations.Assess',
+              title: 'Billing Cycle Workspace',
+            },
+          },
+          {
             path: 'obligations',
             name: 'finance.obligations.list',
             component: () => import('@/features/finance/obligations/views/ObligationsListView.vue'),
@@ -125,12 +145,47 @@ export const routes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'accounts',
+            name: 'finance.accounts.workbench',
+            component: () =>
+              import('@/features/finance/accounts/views/StudentAccountsWorkbenchView.vue'),
+            meta: {
+              permission: 'Permissions.Finance.Accounts.View',
+              title: 'Student Accounts Workbench',
+            },
+          },
+          {
+            path: 'accounts/:studentId',
+            name: 'finance.accounts.detail',
+            component: () =>
+              import('@/features/finance/accounts/views/StudentAccountsWorkbenchView.vue'),
+            meta: {
+              permission: 'Permissions.Finance.Accounts.View',
+              title: 'Student Accounts Workbench',
+            },
+          },
+          {
             path: 'payments',
             name: 'finance.payments.desk',
             component: () => import('@/features/finance/payments/views/PaymentDeskView.vue'),
             meta: {
               permission: 'Permissions.Finance.Payments.Receive',
               title: 'Payment Receipt Desk',
+            },
+          },
+        ],
+      },
+      // STAGE 1: FAMILY PORTAL (SCR-SELF-02)
+      {
+        path: 'portal',
+        component: RouterView,
+        children: [
+          {
+            path: 'family',
+            name: 'portal.family',
+            component: () => import('@/features/portal/FamilyTasksView.vue'),
+            meta: {
+              title: 'Family Portal',
             },
           },
         ],

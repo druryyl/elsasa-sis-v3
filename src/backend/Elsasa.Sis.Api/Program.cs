@@ -11,7 +11,10 @@ builder.ConfigureSerilog();
 
 if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
 {
-    var connectionString = builder.Configuration.GetConnectionString(DependencyInjection.DefaultConnectionKey);
+    var overrideArg = args.FirstOrDefault(a => a.StartsWith("--ConnectionStrings:DefaultConnection=", StringComparison.OrdinalIgnoreCase));
+    var connectionString = overrideArg is not null
+        ? overrideArg["--ConnectionStrings:DefaultConnection=".Length..]
+        : builder.Configuration.GetConnectionString(DependencyInjection.DefaultConnectionKey);
     return Program.RunMigration(connectionString);
 }
 

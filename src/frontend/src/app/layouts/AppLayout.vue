@@ -25,6 +25,7 @@ import {
   LogOut,
   Shield,
   Layers,
+  Wallet,
 } from 'lucide-vue-next';
 
 interface NavChildItem {
@@ -147,6 +148,27 @@ const masterNavItems: NavParentItem[] = [
     label: 'Finance',
     icon: DollarSign,
     children: [
+      {
+        id: 'finance-policies',
+        label: 'Financial Policies',
+        to: '/finance/policies',
+        icon: Shield,
+        permission: 'Permissions.Finance.Policies.View',
+      },
+      {
+        id: 'finance-billing-cycles',
+        label: 'Billing Cycles',
+        to: '/finance/billing-cycles',
+        icon: Layers,
+        permission: 'Permissions.Finance.Obligations.Assess',
+      },
+      {
+        id: 'finance-accounts',
+        label: 'Student Accounts',
+        to: '/finance/accounts',
+        icon: Wallet,
+        permission: 'Permissions.Finance.Accounts.View',
+      },
       {
         id: 'finance-obligations',
         label: 'Obligations & Billing',
