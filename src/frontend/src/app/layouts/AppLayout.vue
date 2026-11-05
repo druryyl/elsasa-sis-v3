@@ -365,6 +365,23 @@ function selectCampus(campusId: string) {
   appContextStore.setActiveCampus(campusId);
   isCampusSelectorOpen.value = false;
 }
+
+function getDomainBadgeColor(groupId: string): string {
+  switch (groupId) {
+    case 'operations':
+      return 'bg-amber-500';
+    case 'academics':
+      return 'bg-indigo-500';
+    case 'students':
+      return 'bg-teal-500';
+    case 'finance':
+      return 'bg-emerald-500';
+    case 'portal':
+      return 'bg-rose-500';
+    default:
+      return 'bg-slate-400';
+  }
+}
 </script>
 
 <template>
@@ -414,10 +431,10 @@ function selectCampus(campusId: string) {
             v-if="item.to && !item.children"
             :to="item.to"
             :class="[
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
               isItemActive(item.to)
-                ? 'bg-elsasa-teal-50 text-elsasa-teal-600 font-semibold'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                ? 'bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 font-semibold border-l-2 border-teal-600 shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
               uiStore.isSidebarCollapsed ? 'justify-center' : '',
             ]"
             :title="uiStore.isSidebarCollapsed ? item.label : undefined"
@@ -428,7 +445,7 @@ function selectCampus(campusId: string) {
               :class="[item.icon, 'text-base shrink-0']"
               aria-hidden="true"
             />
-            <component v-else :is="item.icon" class="w-5 h-5 shrink-0" aria-hidden="true" />
+            <component :is="item.icon" v-else class="w-5 h-5 shrink-0" aria-hidden="true" />
             <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ item.label }}</span>
           </RouterLink>
 
@@ -438,17 +455,18 @@ function selectCampus(campusId: string) {
             <button
               v-if="!uiStore.isSidebarCollapsed"
               type="button"
-              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-800 transition-colors focus:outline-none"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-800 hover:bg-slate-50 transition-colors focus:outline-none"
               :data-testid="`nav-group-${item.id}`"
               @click="toggleGroup(item.id)"
             >
               <span class="flex items-center gap-2 truncate">
+                <span :class="['w-1.5 h-1.5 rounded-full shrink-0', getDomainBadgeColor(item.id)]" aria-hidden="true" />
                 <i
                   v-if="typeof item.icon === 'string'"
                   :class="[item.icon, 'text-base shrink-0']"
                   aria-hidden="true"
                 />
-                <component v-else :is="item.icon" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <component :is="item.icon" v-else class="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
                 <span class="truncate">{{ item.label }}</span>
               </span>
               <ChevronDown
@@ -477,8 +495,8 @@ function selectCampus(campusId: string) {
                 aria-hidden="true"
               />
               <component
-                v-else
                 :is="item.icon"
+                v-else
                 :class="[
                   'w-5 h-5',
                   isGroupActive(item) ? 'text-elsasa-teal-600' : 'text-slate-400',
@@ -498,10 +516,10 @@ function selectCampus(campusId: string) {
                 :key="child.id"
                 :to="child.to"
                 :class="[
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
                   isItemActive(child.to)
-                    ? 'bg-elsasa-teal-50 text-elsasa-teal-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                    ? 'bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 font-semibold border-l-2 border-teal-600 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
                   uiStore.isSidebarCollapsed ? 'justify-center' : '',
                 ]"
                 :title="uiStore.isSidebarCollapsed ? child.label : undefined"
@@ -512,7 +530,7 @@ function selectCampus(campusId: string) {
                   :class="[child.icon, 'text-base shrink-0']"
                   aria-hidden="true"
                 />
-                <component v-else :is="child.icon ?? Layers" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <component :is="child.icon ?? Layers" v-else class="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ child.label }}</span>
               </RouterLink>
             </div>
