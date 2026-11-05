@@ -125,5 +125,33 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
     }
 
     /// <inheritdoc />
+    public Guid? StudentId
+    {
+        get
+        {
+            var user = Principal;
+            if (user?.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            var studentId = user.FindFirstValue("student_id")
+                         ?? user.FindFirstValue("studentId");
+
+            if (Guid.TryParse(studentId, out var guid))
+            {
+                return guid;
+            }
+
+            if (Roles.Any(r => string.Equals(r, "Student", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Id;
+            }
+
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;
 }

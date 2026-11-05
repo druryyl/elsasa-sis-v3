@@ -1,9 +1,11 @@
+using Elsasa.Sis.Academics;
 using Elsasa.Sis.Api.Configuration;
 using Elsasa.Sis.Api.Middleware;
 using Elsasa.Sis.Database;
 using Elsasa.Sis.Shared.Endpoints;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using DependencyInjection = Elsasa.Sis.Api.Configuration.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,10 +20,18 @@ if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
     return Program.RunMigration(connectionString);
 }
 
+// Configure physical storage path for coursework submissions (TD-07, P5-S13)
+var submissionStorageDir = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "Submissions");
+if (!Directory.Exists(submissionStorageDir))
+{
+    Directory.CreateDirectory(submissionStorageDir);
+}
+
 builder.Services.AddGlobalExceptionHandler();
 builder.Services.AddHostComposition(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddSwaggerDocumentation();
+builder.Services.AddAcademicsDomain(builder.Configuration);
 
 var app = builder.Build();
 
@@ -53,6 +63,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapEndpoints(DependencyInjection.Stage1Assemblies);
+app.MapAcademicsEndpoints();
 new Elsasa.Sis.Api.Features.Auth.LoginEndpoint().MapEndpoint(app);
 
 // Provide a landing page so the default browser URL (root path) does not return 404.

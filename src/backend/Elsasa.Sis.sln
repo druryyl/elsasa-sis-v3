@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elsasa.Sis.ArchitectureTest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elsasa.Sis.IntegrationTests", "..\..\tests\backend\Elsasa.Sis.IntegrationTests\Elsasa.Sis.IntegrationTests.csproj", "{A60747C0-7740-495A-85BF-805788F05147}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Elsasa.Sis.Academics", "Elsasa.Sis.Academics\Elsasa.Sis.Academics.csproj", "{561E1998-D269-4F09-A363-230453A891D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +76,10 @@ Global
 		{A60747C0-7740-495A-85BF-805788F05147}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A60747C0-7740-495A-85BF-805788F05147}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A60747C0-7740-495A-85BF-805788F05147}.Release|Any CPU.Build.0 = Release|Any CPU
+		{561E1998-D269-4F09-A363-230453A891D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{561E1998-D269-4F09-A363-230453A891D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{561E1998-D269-4F09-A363-230453A891D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{561E1998-D269-4F09-A363-230453A891D1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{05A1F191-3CBE-4BB5-BCB5-CF63057452E2} = {E137C425-6F7D-4B20-96A9-965594C896F1}
@@ -87,5 +93,6 @@ Global
 		{5A083B3C-A67A-44DA-AF18-637507C383C5} = {1AE76DB1-FC83-4316-9DB1-0DA29CC35352}
 		{36650F21-8253-47F8-89C8-BB4B106D2BC6} = {5A083B3C-A67A-44DA-AF18-637507C383C5}
 		{A60747C0-7740-495A-85BF-805788F05147} = {5A083B3C-A67A-44DA-AF18-637507C383C5}
+		{561E1998-D269-4F09-A363-230453A891D1} = {05A1F191-3CBE-4BB5-BCB5-CF63057452E2}
 	EndGlobalSection
 EndGlobal

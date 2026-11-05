@@ -24,6 +24,7 @@ TestResults/
 *.trx
 *.coverage
 *.coveragexml
+.vite/
 
 # User and environment specific
 *.userprefs

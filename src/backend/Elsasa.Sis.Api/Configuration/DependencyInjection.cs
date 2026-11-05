@@ -1,6 +1,7 @@
 namespace Elsasa.Sis.Api.Configuration;
 
 using System.Reflection;
+using Elsasa.Sis.Academics;
 using Elsasa.Sis.Api.Services;
 using Elsasa.Sis.Contracts;
 using Elsasa.Sis.Finance;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Root dependency injection composition for the ASP.NET Core host and Stage 1 domain assemblies (ADR-001).
+/// Root dependency injection composition for the ASP.NET Core host and Stage 1/2 domain assemblies (ADR-001).
 /// </summary>
 public static class DependencyInjection
 {
@@ -28,6 +29,7 @@ public static class DependencyInjection
         typeof(OperationsAssemblyMarker).Assembly,
         typeof(StudentsAssemblyMarker).Assembly,
         typeof(FinanceAssemblyMarker).Assembly,
+        typeof(AcademicsAssemblyMarker).Assembly,
         typeof(ContractsAssemblyMarker).Assembly,
         typeof(Program).Assembly,
     ];
@@ -40,6 +42,14 @@ public static class DependencyInjection
         typeof(OperationsAssemblyMarker).Assembly,
         typeof(StudentsAssemblyMarker).Assembly,
         typeof(FinanceAssemblyMarker).Assembly,
+    ];
+
+    /// <summary>
+    /// The Stage 2 domain assemblies participating in endpoint discovery and Minimal API route mapping.
+    /// </summary>
+    public static readonly Assembly[] Stage2Assemblies =
+    [
+        typeof(AcademicsAssemblyMarker).Assembly,
     ];
 
     /// <summary>

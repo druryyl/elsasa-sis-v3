@@ -144,7 +144,8 @@ public sealed class DependencyInjectionTests
     public void DomainAssemblies_Should_IncludeExpectedAssemblies()
     {
         // Assert
-        Assert.Equal(5, DependencyInjection.DomainAssemblies.Length);
+        Assert.Equal(6, DependencyInjection.DomainAssemblies.Length);
         Assert.Equal(3, DependencyInjection.Stage1Assemblies.Length);
+        Assert.Single(DependencyInjection.Stage2Assemblies);
     }
 }

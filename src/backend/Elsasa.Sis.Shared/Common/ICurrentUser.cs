@@ -28,4 +28,7 @@ public interface ICurrentUser
 
     /// <summary>Gets the optional campus identifier associated with the authenticated user.</summary>
     Guid? CampusId => null;
+
+    /// <summary>Gets the optional student identifier associated with the authenticated user.</summary>
+    Guid? StudentId => null;
 }

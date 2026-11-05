@@ -55,6 +55,59 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/features/dashboard/views/DashboardView.vue'),
         meta: { title: 'Dashboard' },
       },
+      // STAGE 2: ACADEMICS DOMAIN (SCR-ACD-03, SCR-ACD-05, SCR-ACD-01, SCR-ACD-02)
+      {
+        path: 'academics',
+        component: RouterView,
+        children: [
+          {
+            path: 'curriculum',
+            name: 'curriculum-workspace',
+            component: () =>
+              import('@/features/academics/curriculum/views/CurriculumWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.curriculum.view',
+              title: 'Curriculum & Learning Structures',
+            },
+          },
+          {
+            path: 'participation',
+            name: 'academics.participation',
+            component: () =>
+              import(
+                '@/features/academics/participation/views/ParticipationWorkbenchView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.participations.view',
+              title: 'Participation & Rosters',
+            },
+          },
+          {
+            path: 'sessions',
+            name: 'academics.sessions',
+            component: () =>
+              import('@/features/academics/sessions/views/ClassSessionWorkbenchView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.activities.view',
+              title: 'Class Sessions',
+            },
+          },
+          {
+            path: 'coursework',
+            name: 'academics.coursework',
+            component: () =>
+              import('@/features/academics/coursework/views/CourseworkWorkbenchView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.assignments.view',
+              title: 'Coursework',
+            },
+          },
+        ],
+      },
       // STAGE 1: STUDENTS DOMAIN
       {
         path: 'students',
@@ -176,7 +229,7 @@ export const routes: RouteRecordRaw[] = [
           },
         ],
       },
-      // STAGE 1: FAMILY PORTAL (SCR-SELF-02)
+      // STAGE 1 & 2: PORTAL DOMAIN (SCR-SELF-02, SCR-SELF-03)
       {
         path: 'portal',
         component: RouterView,
@@ -187,6 +240,17 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/portal/FamilyTasksView.vue'),
             meta: {
               title: 'Family Portal',
+            },
+          },
+          {
+            path: 'learning',
+            name: 'portal.learning',
+            component: () =>
+              import('@/features/portal/learning/views/StudentLearningWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              roles: ['Student'],
+              title: 'My Learning & Coursework',
             },
           },
         ],

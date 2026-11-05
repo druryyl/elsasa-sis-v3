@@ -24,6 +24,8 @@ public sealed class TestCurrentUser : ICurrentUser
 
     public Guid? CampusId { get; set; }
 
+    public Guid? StudentId { get; set; }
+
     public bool IsAuthenticated { get; set; } = true;
 
     /// <summary>
@@ -37,6 +39,7 @@ public sealed class TestCurrentUser : ICurrentUser
         Roles = ["Admin"];
         Permissions = ["*"];
         CampusId = null;
+        StudentId = null;
         IsAuthenticated = true;
     }
 
@@ -51,6 +54,7 @@ public sealed class TestCurrentUser : ICurrentUser
         Roles = [];
         Permissions = [];
         CampusId = null;
+        StudentId = null;
         IsAuthenticated = false;
     }
 

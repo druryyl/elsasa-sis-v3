@@ -1,0 +1,12 @@
+export { default as CurriculumContextBar } from './CurriculumContextBar.vue';
+export type { AcademicPeriodOption } from './CurriculumContextBar.vue';
+export { default as StructureOverviewTab } from './StructureOverviewTab.vue';
+export { default as LearningUnitsTab } from './LearningUnitsTab.vue';
+export { default as AcademicRequirementsTab } from './AcademicRequirementsTab.vue';
+export { default as CreateLearningUnitModal } from './CreateLearningUnitModal.vue';
+export { default as EditLearningUnitModal } from './EditLearningUnitModal.vue';
+export { default as CreateStructureModal } from './CreateStructureModal.vue';
+export { default as EditStructureModal } from './EditStructureModal.vue';
+export { default as SupersedeStructureModal } from './SupersedeStructureModal.vue';
+export { default as CreateRequirementModal } from './CreateRequirementModal.vue';
+export { default as EditRequirementModal } from './EditRequirementModal.vue';
