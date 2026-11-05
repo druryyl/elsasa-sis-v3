@@ -1,5 +1,6 @@
 namespace Elsasa.Sis.Students;
 
+using Elsasa.Sis.Contracts.Students;
 using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.AddAssessmentEvidence;
 using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.DeleteAssessmentEvidence;
 using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.UpdateAssessmentEvidence;
@@ -27,6 +28,7 @@ using Elsasa.Sis.Students.Features.Records.Placements.ChangeAdministrativePlacem
 using Elsasa.Sis.Students.Features.Records.SearchStudents;
 using Elsasa.Sis.Students.Features.Records.Status.ChangeStudentStatus;
 using Elsasa.Sis.Students.Features.Records.UpdateStudentIdentity;
+using Elsasa.Sis.Students.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -71,6 +73,9 @@ public static class DependencyInjection
         // Enrollment domain services & handlers (P2-S03, P3-S04)
         services.AddScoped<IStudentNumberGenerator, SqlStudentNumberGenerator>();
         services.AddScoped<EnrollAcceptedApplicantHandler>();
+
+        // Cross-domain query services (ADR-003)
+        services.AddScoped<IStudentsModule, StudentsModule>();
 
         // Student records query handlers (P4-S05, P4-S06)
         services.AddScoped<SearchStudentsHandler>();
