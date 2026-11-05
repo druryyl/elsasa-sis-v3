@@ -39,4 +39,32 @@ public interface IAcademicsModule
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A result containing the read-only list of academic requirements.</returns>
     Task<Result<IReadOnlyList<AcademicRequirementDto>>> GetAcademicRequirementsByStructureAsync(Guid learningStructureId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks whether a student is actively participating in a specific learning unit for an academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="learningUnitId">The unique identifier of the learning unit.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing <see langword="true"/> if actively participating; otherwise <see langword="false"/>.</returns>
+    Task<Result<bool>> IsStudentParticipatingAsync(Guid studentId, Guid learningUnitId, Guid academicPeriodId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves attendance summary aggregates for a student in an academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the student attendance summary DTO.</returns>
+    Task<Result<StudentAttendanceSummaryDto>> GetStudentAttendanceSummaryAsync(Guid studentId, Guid academicPeriodId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves all completed learning units for a student across their academic history.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the read-only list of completed participation DTOs.</returns>
+    Task<Result<IReadOnlyList<CompletedParticipationDto>>> GetStudentCompletedUnitsAsync(Guid studentId, CancellationToken ct = default);
 }
+

@@ -20,6 +20,7 @@ export interface NavigationItem {
   to?: string | undefined;
   icon?: string | unknown;
   permission?: string | undefined;
+  roles?: string[] | undefined;
   badge?: string | number | undefined;
   badgeSeverity?: 'info' | 'success' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined;
   children?: NavigationItem[] | undefined;
@@ -34,6 +35,7 @@ export interface NavigationItem {
 export interface AppRouteMeta {
   requiresAuth?: boolean | undefined;
   permission?: string | undefined;
+  roles?: string[] | undefined;
   title?: string | undefined;
   layout?: 'app' | 'auth' | 'empty' | string | undefined;
   breadcrumb?: string | undefined;

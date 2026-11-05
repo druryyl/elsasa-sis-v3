@@ -197,4 +197,176 @@ public sealed class AcademicsModule(ISqlConnectionFactory connectionFactory) : I
                     $"Failed to query academic requirements for structure '{learningStructureId}': {ex.Message}"));
         }
     }
+
+    private const string _checkStudentParticipatingSql = """
+        SELECT COUNT(1)
+        FROM academics.academic_participations
+        WHERE student_id = @StudentId
+          AND learning_unit_id = @LearningUnitId
+          AND academic_period_id = @AcademicPeriodId
+          AND status = 'in_progress';
+        """;
+
+    private const string _selectStudentCompletedUnitsSql = """
+        SELECT
+            p.id AS ParticipationId,
+            p.student_id AS StudentId,
+            p.learning_unit_id AS LearningUnitId,
+            u.code AS LearningUnitCode,
+            u.name AS LearningUnitName,
+            u.credit_weight AS CreditWeight,
+            COALESCE(p.completion_date, p.end_date, p.start_date) AS CompletionDate,
+            p.participation_type AS ParticipationType
+        FROM academics.academic_participations p
+        INNER JOIN academics.learning_units u ON u.id = p.learning_unit_id
+        WHERE p.student_id = @StudentId
+          AND p.status = 'completed'
+        ORDER BY p.completion_date DESC, u.code ASC;
+        """;
+
+    /// <inheritdoc />
+    public async Task<Result<bool>> IsStudentParticipatingAsync(
+        Guid studentId,
+        Guid learningUnitId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                _checkStudentParticipatingSql,
+                new
+                {
+                    StudentId = studentId,
+                    LearningUnitId = learningUnitId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct));
+
+            return Result.Success(count > 0);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<bool>(
+                DomainError.Failure(
+                    "Academics.ParticipationQueryFailed",
+                    $"Failed to check participation for student '{studentId}' in unit '{learningUnitId}': {ex.Message}"));
+        }
+    }
+
+    private const string _selectStudentAttendanceSummaryForPeriodSql = """
+        SELECT
+            COUNT(1) AS TotalSessions,
+            ISNULL(SUM(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END), 0) AS TotalPresent,
+            ISNULL(SUM(CASE WHEN r.status = 'absent' THEN 1 ELSE 0 END), 0) AS TotalAbsent,
+            ISNULL(SUM(CASE WHEN r.status = 'late' THEN 1 ELSE 0 END), 0) AS TotalLate,
+            ISNULL(SUM(CASE WHEN r.status = 'excused_absence' THEN 1 ELSE 0 END), 0) AS TotalExcused
+        FROM academics.attendance_records r
+        INNER JOIN academics.learning_activities a ON a.id = r.learning_activity_id
+        INNER JOIN academics.learning_units u ON u.id = a.learning_unit_id
+        INNER JOIN academics.learning_structures ls ON ls.id = u.learning_structure_id
+        WHERE r.student_id = @StudentId
+          AND (ls.academic_period_id = @AcademicPeriodId OR EXISTS (
+              SELECT 1 FROM academics.academic_participations p
+              WHERE p.student_id = r.student_id
+                AND p.learning_unit_id = a.learning_unit_id
+                AND p.academic_period_id = @AcademicPeriodId
+          ));
+        """;
+
+    private sealed record AttendanceSummaryRow(
+        int TotalSessions,
+        int TotalPresent,
+        int TotalAbsent,
+        int TotalLate,
+        int TotalExcused);
+
+    /// <inheritdoc />
+    public async Task<Result<StudentAttendanceSummaryDto>> GetStudentAttendanceSummaryAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var row = await connection.QuerySingleOrDefaultAsync<AttendanceSummaryRow>(new CommandDefinition(
+                _selectStudentAttendanceSummaryForPeriodSql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct));
+
+            var totalSessions = row?.TotalSessions ?? 0;
+            var totalPresent = row?.TotalPresent ?? 0;
+            var totalAbsent = row?.TotalAbsent ?? 0;
+            var totalLate = row?.TotalLate ?? 0;
+            var totalExcused = row?.TotalExcused ?? 0;
+
+            var percentage = totalSessions > 0
+                ? Math.Round((decimal)(totalPresent + totalLate) * 100m / totalSessions, 2)
+                : 0.00m;
+
+            var summary = new StudentAttendanceSummaryDto(
+                studentId,
+                academicPeriodId,
+                totalSessions,
+                totalPresent,
+                totalAbsent,
+                totalLate,
+                totalExcused,
+                percentage);
+
+            return Result.Success(summary);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<StudentAttendanceSummaryDto>(
+                DomainError.Failure(
+                    "Academics.AttendanceSummaryQueryFailed",
+                    $"Failed to query attendance summary for student '{studentId}' in period '{academicPeriodId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<CompletedParticipationDto>>> GetStudentCompletedUnitsAsync(
+        Guid studentId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var completedUnits = (await connection.QueryAsync<CompletedParticipationDto>(new CommandDefinition(
+                _selectStudentCompletedUnitsSql,
+                new { StudentId = studentId },
+                cancellationToken: ct))).AsList();
+
+            return Result.Success<IReadOnlyList<CompletedParticipationDto>>(completedUnits);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IReadOnlyList<CompletedParticipationDto>>(
+                DomainError.Failure(
+                    "Academics.CompletedUnitsQueryFailed",
+                    $"Failed to query completed units for student '{studentId}': {ex.Message}"));
+        }
+    }
 }

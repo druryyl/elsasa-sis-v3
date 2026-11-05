@@ -324,6 +324,80 @@ describe('AppLayout.vue', () => {
       }
     });
 
+    it('renders expanded Academics navigation items (Participation, Sessions, Coursework) for AcademicCoordinator', () => {
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AcademicCoordinator'],
+          permissions: [],
+        }),
+      );
+
+      const wrapper = mountLayout();
+
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
+
+      const curriculumItem = wrapper.find('[data-testid="nav-item-academics-curriculum"]');
+      expect(curriculumItem.exists()).toBe(true);
+      expect(curriculumItem.attributes('href')).toBe('/academics/curriculum');
+
+      const participationItem = wrapper.find('[data-testid="nav-item-academics-participation"]');
+      expect(participationItem.exists()).toBe(true);
+      expect(participationItem.text()).toContain('Participation & Rosters');
+      expect(participationItem.attributes('href')).toBe('/academics/participation');
+
+      const sessionsItem = wrapper.find('[data-testid="nav-item-academics-sessions"]');
+      expect(sessionsItem.exists()).toBe(true);
+      expect(sessionsItem.text()).toContain('Class Sessions');
+      expect(sessionsItem.attributes('href')).toBe('/academics/sessions');
+
+      const courseworkItem = wrapper.find('[data-testid="nav-item-academics-coursework"]');
+      expect(courseworkItem.exists()).toBe(true);
+      expect(courseworkItem.text()).toContain('Coursework');
+      expect(courseworkItem.attributes('href')).toBe('/academics/coursework');
+    });
+
+    it('renders Teacher navigation showing Class Sessions and Coursework while hiding coordinator-only items and portal', () => {
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Teacher'],
+          permissions: [],
+        }),
+      );
+
+      const wrapper = mountLayout();
+
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-sessions"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-coursework"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-participation"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="nav-group-portal"]').exists()).toBe(false);
+    });
+
+    it('renders Student Portal navigation with My Learning & Coursework for Student role and hides Academics', () => {
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Student'],
+          permissions: [],
+        }),
+      );
+
+      const wrapper = mountLayout();
+
+      expect(wrapper.find('[data-testid="nav-group-portal"]').exists()).toBe(true);
+      const learningItem = wrapper.find('[data-testid="nav-item-portal-learning"]');
+      expect(learningItem.exists()).toBe(true);
+      expect(learningItem.text()).toContain('My Learning & Coursework');
+      expect(learningItem.attributes('href')).toBe('/portal/learning');
+
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(false);
+    });
+
     it('toggles group accordion in expanded sidebar mode', async () => {
       const authStore = useAuthStore();
       authStore.setSession('test-token', createTestUser());
@@ -373,6 +447,48 @@ describe('AppLayout.vue', () => {
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Operations');
       expect(breadcrumbs.text()).toContain('Academic Calendar');
+    });
+
+    it('resolves breadcrumbs correctly for Submodule 2 routes', async () => {
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['SuperAdmin'],
+        }),
+      );
+
+      // 1. Academics Participation
+      await router.push('/academics/participation');
+      let wrapper = mountLayout();
+      let breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Participation & Rosters');
+
+      // 2. Academics Sessions
+      await router.push('/academics/sessions');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Class Sessions');
+
+      // 3. Academics Coursework
+      await router.push('/academics/coursework');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Coursework');
+
+      // 4. Portal Learning
+      await router.push('/portal/learning');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Student Portal');
+      expect(breadcrumbs.text()).toContain('My Learning & Coursework');
     });
   });
 

@@ -261,6 +261,143 @@ describe('Navigation Guards & Router Integration', () => {
       expect(router.currentRoute.value.name).toBe('curriculum-workspace');
     });
 
+    it('enforces permissions on Academics participation workspace route', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // User lacking participation permission
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: ['Permissions.Operations.Calendar.Manage'],
+        }),
+      );
+
+      await router.push('/academics/participation');
+      expect(router.currentRoute.value.path).toBe('/403');
+
+      // User with academics.participations.view permission
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics.participations.view'],
+        }),
+      );
+
+      await router.push('/academics/participation');
+      expect(router.currentRoute.value.path).toBe('/academics/participation');
+      expect(router.currentRoute.value.name).toBe('academics.participation');
+      expect(document.title).toBe('Participation & Rosters — Elsasa SIS');
+
+      // User with AcademicCoordinator role
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['AcademicCoordinator'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/participation');
+      expect(router.currentRoute.value.path).toBe('/academics/participation');
+      expect(router.currentRoute.value.name).toBe('academics.participation');
+    });
+
+    it('enforces permissions on Academics sessions workspace route', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // Denied user
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/sessions');
+      expect(router.currentRoute.value.path).toBe('/403');
+
+      // Teacher role allowed
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Teacher'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/sessions');
+      expect(router.currentRoute.value.path).toBe('/academics/sessions');
+      expect(router.currentRoute.value.name).toBe('academics.sessions');
+      expect(document.title).toBe('Class Sessions — Elsasa SIS');
+    });
+
+    it('enforces permissions on Academics coursework workspace route', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // Denied user
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/coursework');
+      expect(router.currentRoute.value.path).toBe('/403');
+
+      // Teacher role allowed
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Teacher'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/academics/coursework');
+      expect(router.currentRoute.value.path).toBe('/academics/coursework');
+      expect(router.currentRoute.value.name).toBe('academics.coursework');
+      expect(document.title).toBe('Coursework — Elsasa SIS');
+    });
+
+    it('enforces role barrier on Student learning workspace route (/portal/learning)', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // Non-student role denied
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['AdmissionOfficer'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/portal/learning');
+      expect(router.currentRoute.value.path).toBe('/403');
+
+      // Student role allowed
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Student'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/portal/learning');
+      expect(router.currentRoute.value.path).toBe('/portal/learning');
+      expect(router.currentRoute.value.name).toBe('portal.learning');
+      expect(document.title).toBe('My Learning & Coursework — Elsasa SIS');
+    });
+
     it('matches catch-all not-found route when authenticated', async () => {
       const router = createAppRouter({ history: createMemoryHistory() });
       const authStore = useAuthStore();

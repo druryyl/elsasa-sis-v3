@@ -66,6 +66,7 @@ const openGroups = ref<Record<string, boolean>>({
   academics: true,
   students: true,
   finance: true,
+  portal: true,
 });
 
 function isGroupOpen(groupId: string): boolean {
@@ -131,6 +132,30 @@ const masterNavItems: NavParentItem[] = [
         icon: 'pi pi-book',
         permission: 'academics.curriculum.view',
         roles: ['AcademicCoordinator', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-participation',
+        label: 'Participation & Rosters',
+        to: '/academics/participation',
+        icon: 'pi pi-users',
+        permission: 'academics.participations.view',
+        roles: ['AcademicCoordinator', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-sessions',
+        label: 'Class Sessions',
+        to: '/academics/sessions',
+        icon: 'pi pi-calendar',
+        permission: 'academics.activities.view',
+        roles: ['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-coursework',
+        label: 'Coursework',
+        to: '/academics/coursework',
+        icon: 'pi pi-file-edit',
+        permission: 'academics.assignments.view',
+        roles: ['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'],
       },
     ],
   },
@@ -204,21 +229,40 @@ const masterNavItems: NavParentItem[] = [
       },
     ],
   },
+  {
+    id: 'portal',
+    label: 'Student Portal',
+    icon: GraduationCap,
+    roles: ['Student'],
+    children: [
+      {
+        id: 'portal-learning',
+        label: 'My Learning & Coursework',
+        to: '/portal/learning',
+        icon: 'pi pi-book',
+        roles: ['Student'],
+      },
+    ],
+  },
 ];
 
 function checkPermission(permission: string): boolean {
   if (authStore.hasPermission(permission)) return true;
-  if (
-    permission === 'academics.curriculum.view' &&
-    authStore.hasPermission('Permissions.Academics.Curriculum.View')
-  ) {
-    return true;
-  }
-  if (
-    permission === 'Permissions.Academics.Curriculum.View' &&
-    authStore.hasPermission('academics.curriculum.view')
-  ) {
-    return true;
+
+  const permissionAliases: Record<string, string[]> = {
+    'academics.curriculum.view': ['Permissions.Academics.Curriculum.View'],
+    'Permissions.Academics.Curriculum.View': ['academics.curriculum.view'],
+    'academics.participations.view': ['Permissions.Academics.Participations.View'],
+    'Permissions.Academics.Participations.View': ['academics.participations.view'],
+    'academics.activities.view': ['Permissions.Academics.Activities.View'],
+    'Permissions.Academics.Activities.View': ['academics.activities.view'],
+    'academics.assignments.view': ['Permissions.Academics.Assignments.View'],
+    'Permissions.Academics.Assignments.View': ['academics.assignments.view'],
+  };
+
+  const aliases = permissionAliases[permission];
+  if (aliases) {
+    return aliases.some((alias) => authStore.hasPermission(alias));
   }
   return false;
 }

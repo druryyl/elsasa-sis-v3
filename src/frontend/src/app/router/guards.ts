@@ -48,14 +48,30 @@ export function setupNavigationGuards(router: Router): void {
         authStore.hasPermission(to.meta.permission) ||
         (to.meta.permission === 'academics.curriculum.view' &&
           (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
-            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin'])));
+            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        (to.meta.permission === 'academics.participations.view' &&
+          (authStore.hasPermission('Permissions.Academics.Participations.View') ||
+            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        (to.meta.permission === 'academics.activities.view' &&
+          (authStore.hasPermission('Permissions.Academics.Activities.View') ||
+            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        (to.meta.permission === 'academics.assignments.view' &&
+          (authStore.hasPermission('Permissions.Academics.Assignments.View') ||
+            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'])));
 
       if (!isAllowed) {
         return '/403';
       }
     }
 
-    // 3. Document title resolution
+    // 3. Role barrier: Route requires specific role(s)
+    if (to.meta.roles && Array.isArray(to.meta.roles) && to.meta.roles.length > 0) {
+      if (!authStore.hasAnyRole(to.meta.roles as string[])) {
+        return '/403';
+      }
+    }
+
+    // 4. Document title resolution
     if (typeof document !== 'undefined') {
       document.title = resolveDocumentTitle(to.meta.title);
     }

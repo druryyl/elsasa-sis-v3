@@ -20,11 +20,18 @@ if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
     return Program.RunMigration(connectionString);
 }
 
+// Configure physical storage path for coursework submissions (TD-07, P5-S13)
+var submissionStorageDir = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "Submissions");
+if (!Directory.Exists(submissionStorageDir))
+{
+    Directory.CreateDirectory(submissionStorageDir);
+}
+
 builder.Services.AddGlobalExceptionHandler();
 builder.Services.AddHostComposition(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddSwaggerDocumentation();
-builder.Services.AddAcademicsDomain();
+builder.Services.AddAcademicsDomain(builder.Configuration);
 
 var app = builder.Build();
 
