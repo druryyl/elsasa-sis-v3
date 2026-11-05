@@ -19,8 +19,8 @@ const mockActiveStructure: LearningStructure = {
   id: 'struct-100',
   name: 'Kurikulum Merdeka SMA 2024',
   description: 'Senior High curriculum framework for national accreditation.',
-  academicPeriodId: 'ay-2024',
-  academicPeriodLabel: 'TP 2024/2025',
+  academicPeriodId: 'period-2024-1',
+  academicPeriodLabel: 'Semester 1 (Ganjil)',
   version: '2024.1',
   effectiveDate: '2024-07-01',
   endDate: null,
@@ -35,9 +35,10 @@ const mockActiveStructure: LearningStructure = {
   updatedBy: null,
 };
 
+// Operational periods (not academic years)
 const mockPeriodOptions = [
-  { id: 'ay-2024', label: 'TP 2024/2025', code: 'AY-2425' },
-  { id: 'ay-2025', label: 'TP 2025/2026', code: 'AY-2526' },
+  { id: 'period-2024-1', label: 'Semester 1 (Ganjil)', code: 'SEM-2024-1' },
+  { id: 'period-2024-2', label: 'Semester 2 (Genap)', code: 'SEM-2024-2' },
 ];
 
 describe('SupersedeStructureModal.spec.ts (Deep Clone Mutation)', () => {
@@ -144,6 +145,7 @@ describe('SupersedeStructureModal.spec.ts (Deep Clone Mutation)', () => {
       expect.objectContaining({
         newVersion: '2024.2',
         effectiveDate: '2025-01-01',
+        academicPeriodId: expect.any(String),
       }),
     );
 

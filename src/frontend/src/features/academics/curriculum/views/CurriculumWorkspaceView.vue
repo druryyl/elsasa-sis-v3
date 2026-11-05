@@ -28,7 +28,10 @@ import {
   useApproveStructure,
   useArchiveStructure,
 } from '../composables/useCurriculum';
-import { useAcademicYearsQuery } from '@/features/operations/calendar/composables/useAcademicYearsQuery';
+import {
+  useAcademicYearsQuery,
+  useOperationalPeriodsQuery,
+} from '@/features/operations/calendar/composables';
 import CurriculumContextBar from '../components/CurriculumContextBar.vue';
 import type { AcademicPeriodOption } from '../components/CurriculumContextBar.vue';
 import StructureOverviewTab from '../components/StructureOverviewTab.vue';
@@ -61,16 +64,19 @@ const canApprove = computed(() => authStore.hasPermission(CURRICULUM_PERMISSIONS
 // 3. Ephemeral UI State (Tabs & Active Context)
 // --------------------------------------------------------------------------
 const activeTab = ref<string>('overview');
+const selectedAcademicYearId = ref<string | null>(null);
 const selectedPeriodId = ref<string | null>(null);
 const selectedStructureId = ref<string | null>(null);
 
 // --------------------------------------------------------------------------
 // 4. Reactive TanStack Queries
 // --------------------------------------------------------------------------
-// Query periods via academic years or fallback options
-const { data: academicYears, isLoading: isLoadingPeriods } = useAcademicYearsQuery();
+// A learning structure must be anchored to an OPERATIONAL PERIOD
+// (operations.operational_periods), never to an academic year. The period
+// combo-box therefore lists periods, driven by a selected academic year.
+const { data: academicYears, isLoading: isLoadingAcademicYears } = useAcademicYearsQuery();
 
-const periodOptions = computed<AcademicPeriodOption[]>(() => {
+const yearOptions = computed<AcademicPeriodOption[]>(() => {
   if (!academicYears.value || academicYears.value.length === 0) {
     return [];
   }
@@ -79,6 +85,41 @@ const periodOptions = computed<AcademicPeriodOption[]>(() => {
     label: `${ay.name} (${ay.code})`,
     code: ay.code,
   }));
+});
+
+// Auto-select the active academic year (or the first available) when loaded
+watch(
+  () => academicYears.value,
+  (years) => {
+    if (!years || years.length === 0) return;
+    if (!selectedAcademicYearId.value) {
+      selectedAcademicYearId.value =
+        years.find((y) => y.status === 'active')?.id ?? years[0].id;
+    }
+  },
+  { immediate: true },
+);
+
+// Operational periods belong to an academic year; query them for the selected year.
+const { data: operationalPeriods, isLoading: isLoadingPeriods } = useOperationalPeriodsQuery(
+  selectedAcademicYearId,
+  { enabled: computed(() => Boolean(selectedAcademicYearId.value)) },
+);
+
+const periodOptions = computed<AcademicPeriodOption[]>(() => {
+  if (!operationalPeriods.value || operationalPeriods.value.length === 0) {
+    return [];
+  }
+  return operationalPeriods.value.map((p) => ({
+    id: p.id,
+    label: `${p.name} (${p.periodCode})`,
+    code: p.periodCode,
+  }));
+});
+
+// Reset the selected period when the academic year changes (periods are re-fetched)
+watch(selectedAcademicYearId, () => {
+  selectedPeriodId.value = null;
 });
 
 // Auto-select first period when options load
@@ -176,8 +217,17 @@ function handleOpenSupersedeModal() {
   isSupersedeModalOpen.value = true;
 }
 
+function syncYearFromPeriod(periodId: string | null) {
+  if (!periodId) return;
+  const period = operationalPeriods.value?.find((p) => p.id === periodId);
+  if (period) {
+    selectedAcademicYearId.value = period.academicYearId;
+  }
+}
+
 function handleStructureCreated(structure: LearningStructure) {
   selectedPeriodId.value = structure.academicPeriodId;
+  syncYearFromPeriod(structure.academicPeriodId);
   selectedStructureId.value = structure.id;
 }
 
@@ -187,6 +237,7 @@ function handleStructureUpdated(structure: LearningStructure) {
 
 function handleStructureSuperseded(structure: LearningStructure) {
   selectedPeriodId.value = structure.academicPeriodId;
+  syncYearFromPeriod(structure.academicPeriodId);
   selectedStructureId.value = structure.id;
 }
 
@@ -214,8 +265,10 @@ function handleOpenEditRequirementModal(req: AcademicRequirement) {
       :breadcrumbs="breadcrumbs"
     />
 
-    <!-- Top Context Bar (Period selector, Structure dropdown, Version pill, Status badge, Action Bar) -->
+    <!-- Top Context Bar (Year/Period selectors, Structure dropdown, Version pill, Status badge, Action Bar) -->
     <CurriculumContextBar
+      :years="yearOptions"
+      :selected-year-id="selectedAcademicYearId"
       :periods="periodOptions"
       :selected-period-id="selectedPeriodId"
       :structures="structures"
@@ -223,6 +276,7 @@ function handleOpenEditRequirementModal(req: AcademicRequirement) {
       :selected-structure="selectedStructureSummary"
       :is-loading-periods="isLoadingPeriods"
       :is-loading-structures="isLoadingStructures"
+      @update:selected-year-id="selectedAcademicYearId = $event"
       @update:selected-period-id="selectedPeriodId = $event"
       @update:selected-structure-id="selectedStructureId = $event"
       @create-structure="handleOpenCreateModal"

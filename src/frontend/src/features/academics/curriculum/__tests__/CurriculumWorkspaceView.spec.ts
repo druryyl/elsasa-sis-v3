@@ -10,6 +10,7 @@ import CurriculumContextBar from '../components/CurriculumContextBar.vue';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { CURRICULUM_PERMISSIONS } from '../constants/permissions';
 import * as academicYearApi from '@/features/operations/calendar/api/academicYear.api';
+import * as operationalPeriodApi from '@/features/operations/calendar/api/operationalPeriod.api';
 import * as curriculumApi from '../api/curriculumApi';
 import type { LearningStructure, LearningStructureSummary } from '../types/curriculum.types';
 
@@ -42,12 +43,42 @@ const mockAcademicYears: academicYearApi.AcademicYearDto[] = [
   },
 ];
 
+// Operational periods nested under the active academic year. A learning
+// structure must be anchored to a PERIOD (not an academic year), so the
+// mock structures reference a period id.
+const mockOperationalPeriods: operationalPeriodApi.OperationalPeriodDto[] = [
+  {
+    id: 'period-2024-1',
+    academicYearId: 'ay-2024-2025',
+    periodCode: 'SEM-2024-1',
+    name: 'Semester 1 (Ganjil)',
+    periodType: 'semester',
+    startDate: '2024-07-01',
+    endDate: '2024-12-31',
+    parentPeriodId: null,
+    campusContext: 'All',
+    status: 'active',
+  },
+  {
+    id: 'period-2024-2',
+    academicYearId: 'ay-2024-2025',
+    periodCode: 'SEM-2024-2',
+    name: 'Semester 2 (Genap)',
+    periodType: 'semester',
+    startDate: '2025-01-01',
+    endDate: '2025-06-30',
+    parentPeriodId: null,
+    campusContext: 'All',
+    status: 'approved',
+  },
+];
+
 const mockStructures: LearningStructureSummary[] = [
   {
     id: 'struct-1',
     name: 'Kurikulum Merdeka SD 2024',
-    academicPeriodId: 'ay-2024-2025',
-    academicPeriodLabel: 'Tahun Pelajaran 2024/2025',
+    academicPeriodId: 'period-2024-1',
+    academicPeriodLabel: 'Semester 1 (Ganjil)',
     version: '2024.1',
     status: 'active',
     effectiveDate: '2024-07-01',
@@ -61,8 +92,8 @@ const mockStructures: LearningStructureSummary[] = [
   {
     id: 'struct-2',
     name: 'Kurikulum Merdeka SD 2024 Draft',
-    academicPeriodId: 'ay-2024-2025',
-    academicPeriodLabel: 'Tahun Pelajaran 2024/2025',
+    academicPeriodId: 'period-2024-1',
+    academicPeriodLabel: 'Semester 1 (Ganjil)',
     version: '2024.2-draft',
     status: 'draft',
     effectiveDate: '2024-07-01',
@@ -79,8 +110,8 @@ const mockStructureDetail: LearningStructure = {
   id: 'struct-1',
   name: 'Kurikulum Merdeka SD 2024',
   description: 'Primary curriculum framework for academic year 2024/2025',
-  academicPeriodId: 'ay-2024-2025',
-  academicPeriodLabel: 'Tahun Pelajaran 2024/2025',
+  academicPeriodId: 'period-2024-1',
+  academicPeriodLabel: 'Semester 1 (Ganjil)',
   version: '2024.1',
   effectiveDate: '2024-07-01',
   endDate: null,
@@ -134,6 +165,7 @@ describe('CurriculumWorkspaceView.vue (SCR-ACD-03 Master View & Context Bar)', (
     });
 
     vi.spyOn(academicYearApi, 'getAcademicYears').mockResolvedValue(mockAcademicYears);
+    vi.spyOn(operationalPeriodApi, 'getPeriods').mockResolvedValue(mockOperationalPeriods);
     vi.spyOn(curriculumApi, 'getLearningStructures').mockResolvedValue({
       items: mockStructures,
       totalCount: mockStructures.length,

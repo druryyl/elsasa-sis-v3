@@ -29,6 +29,8 @@ export interface AcademicPeriodOption {
 }
 
 const props = defineProps<{
+  years: AcademicPeriodOption[];
+  selectedYearId: string | null;
   periods: AcademicPeriodOption[];
   selectedPeriodId: string | null;
   structures: LearningStructureSummary[];
@@ -39,6 +41,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (e: 'update:selectedYearId', value: string | null): void;
   (e: 'update:selectedPeriodId', value: string | null): void;
   (e: 'update:selectedStructureId', value: string | null): void;
   (e: 'createStructure'): void;
@@ -66,6 +69,10 @@ const canArchive = computed(() =>
 );
 
 // Model bindings
+const yearModel = computed({
+  get: () => props.selectedYearId,
+  set: (val) => emit('update:selectedYearId', val),
+});
 const periodModel = computed({
   get: () => props.selectedPeriodId,
   set: (val) => emit('update:selectedPeriodId', val),
@@ -142,7 +149,22 @@ const canArchiveAction = computed(() => {
       <div class="px-5 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <!-- Selectors Group -->
         <div class="flex items-center gap-4 flex-wrap">
-          <!-- Academic Period Selector -->
+          <!-- Academic Year Selector (drives the operational-period query) -->
+          <div class="flex items-center gap-2">
+            <Calendar class="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+            <span class="text-xs font-medium text-slate-600">Year:</span>
+            <Select
+              v-model="yearModel"
+              :options="years"
+              option-label="label"
+              option-value="id"
+              placeholder="Select Academic Year"
+              data-testid="academic-year-select"
+              class="w-56 text-sm"
+            />
+          </div>
+
+          <!-- Academic Period Selector (operational periods nested under the year) -->
           <div class="flex items-center gap-2">
             <Calendar class="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
             <span class="text-xs font-medium text-slate-600">Period:</span>
@@ -155,6 +177,7 @@ const canArchiveAction = computed(() => {
               data-testid="academic-period-select"
               class="w-56 text-sm"
               :loading="isLoadingPeriods"
+              :disabled="!selectedYearId || periods.length === 0"
             />
           </div>
 
