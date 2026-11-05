@@ -52,5 +52,47 @@ public static class Permissions
             public const string Exception = "academics.submissions.exception";
             public const string View = "academics.submissions.view";
         }
+
+        public static class Assessments
+        {
+            public const string View = "academics.assessments.view";
+            public const string Manage = "academics.assessments.manage";
+            public const string Conduct = "academics.assessments.conduct";
+        }
+
+        public static class Evidence
+        {
+            public const string Record = "academics.evidence.record";
+            public const string View = "academics.evidence.view";
+        }
+
+        public static class Results
+        {
+            public const string Evaluate = "academics.results.evaluate";
+            public const string Approve = "academics.results.approve";
+            public const string Publish = "academics.results.publish";
+            public const string View = "academics.results.view";
+        }
+
+        public static class ReportCards
+        {
+            public const string Compile = "academics.reportcards.compile";
+            public const string Approve = "academics.reportcards.approve";
+            public const string Publish = "academics.reportcards.publish";
+            public const string View = "academics.reportcards.view";
+        }
+
+        public static class Transcripts
+        {
+            public const string Generate = "academics.transcripts.generate";
+            public const string Issue = "academics.transcripts.issue";
+            public const string View = "academics.transcripts.view";
+        }
+
+        public static class Corrections
+        {
+            public const string Correct = "academics.corrections.correct";
+            public const string ViewHistory = "academics.corrections.viewhistory";
+        }
     }
 }

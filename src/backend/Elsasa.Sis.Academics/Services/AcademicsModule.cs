@@ -1,5 +1,6 @@
 namespace Elsasa.Sis.Academics.Services;
 
+using System.Text.Json;
 using Dapper;
 using Elsasa.Sis.Contracts.Academics;
 using Elsasa.Sis.Shared.Common;
@@ -369,4 +370,166 @@ public sealed class AcademicsModule(ISqlConnectionFactory connectionFactory) : I
                     $"Failed to query completed units for student '{studentId}': {ex.Message}"));
         }
     }
+
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new(JsonSerializerDefaults.Web);
+
+    private const string _selectStudentApprovedResultsSql = """
+        SELECT
+            r.id AS ResultId,
+            r.assessment_id AS AssessmentId,
+            a.title AS AssessmentTitle,
+            u.id AS LearningUnitId,
+            u.name AS LearningUnitTitle,
+            r.score_numeric AS ScoreNumeric,
+            COALESCE(r.score_max, a.max_score) AS ScoreMax,
+            r.grade_letter AS GradeLetter,
+            r.grade_label AS GradeLabel,
+            r.narrative_feedback AS NarrativeFeedback,
+            CAST(r.evaluated_date AS DATETIME2) AS EvaluatedDate
+        FROM academics.academic_results r
+        INNER JOIN academics.assessments a ON a.id = r.assessment_id
+        INNER JOIN academics.learning_units u ON u.id = a.learning_unit_id
+        INNER JOIN academics.learning_structures ls ON ls.id = u.learning_structure_id
+        WHERE r.student_id = @StudentId
+          AND r.is_final = 1
+          AND r.result_status IN ('approved', 'published')
+          AND (ls.academic_period_id = @AcademicPeriodId OR EXISTS (
+              SELECT 1 FROM academics.academic_participations p
+              WHERE p.student_id = r.student_id
+                AND p.learning_unit_id = a.learning_unit_id
+                AND p.academic_period_id = @AcademicPeriodId
+          ))
+        ORDER BY u.name ASC, a.title ASC, r.evaluated_date DESC;
+        """;
+
+    private const string _selectApplicantAssessmentScoreSql = """
+        SELECT
+            r.id AS ResultId,
+            r.assessment_id AS AssessmentId,
+            a.title AS AssessmentTitle,
+            r.applicant_id AS ApplicantId,
+            r.score_numeric AS ScoreNumeric,
+            COALESCE(r.score_max, a.max_score) AS ScoreMax,
+            r.grade_letter AS GradeLetter,
+            r.grade_label AS GradeLabel,
+            r.evaluation_model AS EvaluationModel,
+            r.result_status AS ResultStatus,
+            r.evaluated_by AS EvaluatedBy,
+            CAST(r.evaluated_date AS DATETIME2) AS EvaluatedDate
+        FROM academics.academic_results r
+        INNER JOIN academics.assessments a ON a.id = r.assessment_id
+        WHERE r.applicant_id = @ApplicantId
+          AND r.assessment_id = @AssessmentId
+          AND r.is_final = 1;
+        """;
+
+    private const string _selectReportCardSnapshotSql = """
+        SELECT content_snapshot
+        FROM academics.report_cards
+        WHERE id = @ReportCardId;
+        """;
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<StudentApprovedResultDto>>> GetStudentApprovedResultsAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var results = (await connection.QueryAsync<StudentApprovedResultDto>(new CommandDefinition(
+                _selectStudentApprovedResultsSql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct))).AsList();
+
+            return Result.Success<IReadOnlyList<StudentApprovedResultDto>>(results);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IReadOnlyList<StudentApprovedResultDto>>(
+                DomainError.Failure(
+                    "Academics.StudentApprovedResultsQueryFailed",
+                    $"Failed to query approved results for student '{studentId}' in period '{academicPeriodId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<ApplicantAssessmentScoreDto?>> GetApplicantAssessmentScoreAsync(
+        Guid applicantId,
+        Guid assessmentId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var score = await connection.QuerySingleOrDefaultAsync<ApplicantAssessmentScoreDto>(new CommandDefinition(
+                _selectApplicantAssessmentScoreSql,
+                new
+                {
+                    ApplicantId = applicantId,
+                    AssessmentId = assessmentId
+                },
+                cancellationToken: ct));
+
+            return Result.Success(score);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<ApplicantAssessmentScoreDto?>(
+                DomainError.Failure(
+                    "Academics.ApplicantAssessmentScoreQueryFailed",
+                    $"Failed to query assessment score for applicant '{applicantId}' in assessment '{assessmentId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<ReportCardSnapshotDto?>> GetStudentReportCardSnapshotAsync(
+        Guid reportCardId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var jsonSnapshot = await connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
+                _selectReportCardSnapshotSql,
+                new { ReportCardId = reportCardId },
+                cancellationToken: ct));
+
+            if (string.IsNullOrWhiteSpace(jsonSnapshot))
+            {
+                return Result.Success<ReportCardSnapshotDto?>(null);
+            }
+
+            var snapshot = JsonSerializer.Deserialize<ReportCardSnapshotDto>(jsonSnapshot, _jsonSerializerOptions);
+            return Result.Success(snapshot);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<ReportCardSnapshotDto?>(
+                DomainError.Failure(
+                    "Academics.ReportCardSnapshotQueryFailed",
+                    $"Failed to query report card snapshot for '{reportCardId}': {ex.Message}"));
+        }
+    }
 }
+

@@ -22,7 +22,12 @@ public sealed class TestEventCollector :
     INotificationHandler<AttendanceRecordedEvent>,
     INotificationHandler<AttendanceCorrectedEvent>,
     INotificationHandler<AssignmentReleasedEvent>,
-    INotificationHandler<CourseworkSubmittedEvent>
+    INotificationHandler<CourseworkSubmittedEvent>,
+    INotificationHandler<AcademicResultApprovedEvent>,
+    INotificationHandler<AcademicResultPublishedEvent>,
+    INotificationHandler<AcademicResultCorrectedEvent>,
+    INotificationHandler<ReportCardPublishedEvent>,
+    INotificationHandler<TranscriptIssuedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
@@ -37,6 +42,11 @@ public sealed class TestEventCollector :
     private readonly ConcurrentBag<AttendanceCorrectedEvent> _attendanceCorrectedEvents = [];
     private readonly ConcurrentBag<AssignmentReleasedEvent> _assignmentReleasedEvents = [];
     private readonly ConcurrentBag<CourseworkSubmittedEvent> _courseworkSubmittedEvents = [];
+    private readonly ConcurrentBag<AcademicResultApprovedEvent> _academicResultApprovedEvents = [];
+    private readonly ConcurrentBag<AcademicResultPublishedEvent> _academicResultPublishedEvents = [];
+    private readonly ConcurrentBag<AcademicResultCorrectedEvent> _academicResultCorrectedEvents = [];
+    private readonly ConcurrentBag<ReportCardPublishedEvent> _reportCardPublishedEvents = [];
+    private readonly ConcurrentBag<TranscriptIssuedEvent> _transcriptIssuedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -104,6 +114,31 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<CourseworkSubmittedEvent> CourseworkSubmittedEvents => _courseworkSubmittedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="AcademicResultApprovedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicResultApprovedEvent> AcademicResultApprovedEvents => _academicResultApprovedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicResultPublishedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicResultPublishedEvent> AcademicResultPublishedEvents => _academicResultPublishedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicResultCorrectedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicResultCorrectedEvent> AcademicResultCorrectedEvents => _academicResultCorrectedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="ReportCardPublishedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<ReportCardPublishedEvent> ReportCardPublishedEvents => _reportCardPublishedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="TranscriptIssuedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<TranscriptIssuedEvent> TranscriptIssuedEvents => _transcriptIssuedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -121,6 +156,11 @@ public sealed class TestEventCollector :
         _attendanceCorrectedEvents.Clear();
         _assignmentReleasedEvents.Clear();
         _courseworkSubmittedEvents.Clear();
+        _academicResultApprovedEvents.Clear();
+        _academicResultPublishedEvents.Clear();
+        _academicResultCorrectedEvents.Clear();
+        _reportCardPublishedEvents.Clear();
+        _transcriptIssuedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -224,6 +264,46 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _courseworkSubmittedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicResultApprovedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicResultApprovedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicResultPublishedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicResultPublishedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicResultCorrectedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicResultCorrectedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(ReportCardPublishedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _reportCardPublishedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TranscriptIssuedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _transcriptIssuedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

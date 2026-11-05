@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
@@ -55,6 +56,8 @@ import SubmissionDetailDrawer from '../components/SubmissionDetailDrawer.vue';
 // ---------------------------------------------------------------------------
 // 1. Navigation & Breadcrumbs
 // ---------------------------------------------------------------------------
+const router = useRouter();
+
 const breadcrumbs: BreadcrumbItem[] = [
   { label: 'Dashboard', to: '/dashboard' },
   { label: 'Academics', to: '/academics' },
@@ -286,6 +289,18 @@ function onExceptionSaved() {
     >
       <template #actions>
         <div class="flex items-center gap-2">
+          <!-- Switch to Assessments Desk Button -->
+          <Button
+            type="button"
+            label="Assessments Desk"
+            icon="pi pi-table"
+            severity="secondary"
+            variant="outlined"
+            size="small"
+            data-testid="header-switch-to-assessments-btn"
+            @click="router.push('/academics/assessment')"
+          />
+
           <!-- Release Button -->
           <Button
             v-if="selectedAssignment?.status === 'draft'"
@@ -326,6 +341,24 @@ function onExceptionSaved() {
         </div>
       </template>
     </PageHeader>
+
+    <!-- Subheader Navigation / Tab Switcher (SCR-ACD-02 Unified Workbench) -->
+    <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <button
+        type="button"
+        class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-teal-600 text-white shadow-xs cursor-default"
+      >
+        Coursework Assignments (UC-ACD-04)
+      </button>
+      <button
+        type="button"
+        class="text-xs font-medium px-3 py-1.5 rounded-lg border border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+        data-testid="tab-switch-to-assessments"
+        @click="router.push('/academics/assessment')"
+      >
+        Assessment Planning & Rubric Scoring (UC-ACD-05, UC-ACD-06)
+      </button>
+    </div>
 
     <!-- 2. Main Workbench Layout Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

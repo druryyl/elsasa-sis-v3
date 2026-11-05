@@ -106,6 +106,17 @@ export const routes: RouteRecordRaw[] = [
               title: 'Coursework',
             },
           },
+          {
+            path: 'assessment',
+            name: 'academics.assessment',
+            component: () =>
+              import('@/features/academics/assessment/views/AssessmentWorkbenchView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.assessments.view',
+              title: 'Assessment & Scoring',
+            },
+          },
         ],
       },
       // STAGE 1: STUDENTS DOMAIN

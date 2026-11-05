@@ -4,19 +4,24 @@ using Elsasa.Sis.Shared.Endpoints;
 using Microsoft.AspNetCore.Routing;
 
 /// <summary>
-/// Minimal API route registration for the Academics domain (ADR-004, ADR-005, P3-S10, P5-S13).
+/// Minimal API route registration for the Academics domain (ADR-004, ADR-005, P3-S10, P5-S13, P6-S15).
 /// Maps endpoints for:
 /// - Learning Structures, Units &amp; Requirements (/api/v1/academics/learning-structures/*, learning-units/*, academic-requirements/*)
 /// - Academic Participations (/api/v1/academics/participations/*)
 /// - Learning Activities (/api/v1/academics/learning-activities/*, /api/v1/academics/teacher/activities)
 /// - Student Attendance &amp; Corrections (/api/v1/academics/learning-activities/{id}/attendance, /api/v1/academics/attendance-records/*, /api/v1/academics/students/{id}/attendance-summary)
 /// - Coursework Assignments &amp; Submissions (/api/v1/academics/assignments/*, /api/v1/academics/submissions/*)
-/// - Student Coursework Portal (/api/v1/portal/learning/*)
+/// - Assessment Planning &amp; Evidence (/api/v1/academics/assessments/*)
+/// - Academic Results Evaluation, Moderation &amp; Publication (/api/v1/academics/assessments/{id}/results/*)
+/// - Auditable Record Corrections (/api/v1/academics/academic-results/{id}/correct, /corrections)
+/// - Report Cards Compilation, Approval &amp; Inquiries (/api/v1/academics/report-cards/*)
+/// - Interim Transcripts Generation &amp; Issuance (/api/v1/academics/transcripts/*)
+/// - Student Learning Self-Service Workspace (/api/v1/portal/learning/*)
 /// </summary>
 public static class AcademicsEndpoints
 {
     /// <summary>
-    /// Maps all Academics domain endpoints across Submodule 1 and Submodule 2.
+    /// Maps all Academics domain endpoints across Submodule 1, Submodule 2, and Submodule 3.
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>
     /// <returns>The route builder for fluent chaining.</returns>

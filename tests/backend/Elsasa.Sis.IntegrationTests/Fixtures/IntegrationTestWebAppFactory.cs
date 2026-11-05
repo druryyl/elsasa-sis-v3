@@ -97,6 +97,11 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AttendanceCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AssignmentReleasedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.CourseworkSubmittedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultApprovedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultPublishedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.ReportCardPublishedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.TranscriptIssuedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
 
             // Register TestFinanceModule for simulating IFinanceModule verification
             services.RemoveAll<Elsasa.Sis.Contracts.Finance.IFinanceModule>();
