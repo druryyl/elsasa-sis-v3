@@ -89,6 +89,20 @@ using Elsasa.Sis.Academics.Features.CohortReview.EvaluateCohortStanding;
 using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetCohortPromotionRecommendations;
 using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetStudentPromotionRecommendations;
 using Elsasa.Sis.Academics.Features.LearningUnits.UpdateLearningUnit;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.AddAcademicPlanAdjustment;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.AddSlpLearningUnit;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ArchiveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.CreateStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetActiveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetStudentLearningPlanById;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetStudentLearningPlans;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ApproveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.RemoveAcademicPlanAdjustment;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.RemoveSlpLearningUnit;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ReviseStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.SubmitStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.SyncSlpParticipations;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.UpdateStudentLearningPlan;
 using Elsasa.Sis.Academics.Features.DemoData;
 using Elsasa.Sis.Academics.Services;
 using Elsasa.Sis.Academics.Services.Reassessment;
@@ -268,6 +282,22 @@ public static class DependencyInjection
         services.AddScoped<UpdateInterventionStatusHandler>();
         services.AddScoped<GetActiveInterventionsHandler>();
         services.AddScoped<GetInterventionByIdHandler>();
+
+        // Student Learning Plans feature handlers (P2-S04, P2-S05, P3-S07, UC-ACD-09)
+        services.AddScoped<CreateStudentLearningPlanHandler>();
+        services.AddScoped<UpdateStudentLearningPlanHandler>();
+        services.AddScoped<ArchiveStudentLearningPlanHandler>();
+        services.AddScoped<AddSlpLearningUnitHandler>();
+        services.AddScoped<RemoveSlpLearningUnitHandler>();
+        services.AddScoped<AddAcademicPlanAdjustmentHandler>();
+        services.AddScoped<RemoveAcademicPlanAdjustmentHandler>();
+        services.AddScoped<SubmitStudentLearningPlanHandler>();
+        services.AddScoped<ApproveStudentLearningPlanHandler>();
+        services.AddScoped<ReviseStudentLearningPlanHandler>();
+        services.AddScoped<SyncSlpParticipationsHandler>();
+        services.AddScoped<GetStudentLearningPlanByIdHandler>();
+        services.AddScoped<GetStudentLearningPlansHandler>();
+        services.AddScoped<GetActiveStudentLearningPlanHandler>();
 
         // Demo Data Purger & Structure Seeder (P1-S03, ADR-002, ADR-004, TD-02, TD-05)
         // Register purger against the shared IDemoDataDomainPurger contract so the
@@ -691,6 +721,34 @@ public static class DependencyInjection
 
             AddPermissionPolicy(
                 Permissions.Academics.Corrections.CorrectProgression,
+                "AcademicAuthority", "Academic Authority");
+
+            // Student Learning Plans permissions (ADR-009, IS013 Section 9)
+            // View: Academic Coordinator, Academic Authority, Teacher, Student Development Officer
+            // Manage: Academic Coordinator
+            // Approve: Academic Authority (Curriculum Lead, Academic Head, VP Academics)
+            // Revise: Academic Coordinator, Academic Authority
+            AddPermissionPolicy(
+                Permissions.Academics.LearningPlans.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher",
+                "StudentDevelopmentOfficer", "Student Development Officer");
+
+            AddPermissionPolicy(
+                Permissions.Academics.LearningPlans.Manage,
+                "AcademicCoordinator", "Academic Coordinator");
+
+            AddPermissionPolicy(
+                Permissions.Academics.LearningPlans.Approve,
+                "AcademicAuthority", "Academic Authority",
+                "CurriculumLead", "Curriculum Lead",
+                "AcademicHead", "Academic Head",
+                "VPAcademics", "VP Academics");
+
+            AddPermissionPolicy(
+                Permissions.Academics.LearningPlans.Revise,
+                "AcademicCoordinator", "Academic Coordinator",
                 "AcademicAuthority", "Academic Authority");
         });
 

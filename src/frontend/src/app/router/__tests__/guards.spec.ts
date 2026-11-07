@@ -261,6 +261,73 @@ describe('Navigation Guards & Router Integration', () => {
       expect(router.currentRoute.value.name).toBe('curriculum-workspace');
     });
 
+    it('enforces permissions on Academics learning-plans workspace route (P7-S25)', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      // 1. Unauthorized user lacking learning-plans permission redirected to /403
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: ['Permissions.Operations.Calendar.Manage'],
+        }),
+      );
+
+      await router.push('/academics/learning-plans');
+      expect(router.currentRoute.value.path).toBe('/403');
+      expect(router.currentRoute.value.name).toBe('forbidden');
+
+      // 2. User with permission 'academics:learning-plans:view'
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics:learning-plans:view'],
+        }),
+      );
+
+      await router.push('/academics/learning-plans');
+      expect(router.currentRoute.value.path).toBe('/academics/learning-plans');
+      expect(router.currentRoute.value.name).toBe('academics.learning-plans');
+      expect(document.title).toBe('Learning Plans — Elsasa SIS');
+
+      // 3. User with PascalCase permission 'Permissions.Academics.LearningPlans.View'
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['Permissions.Academics.LearningPlans.View'],
+        }),
+      );
+
+      await router.push('/academics/learning-plans');
+      expect(router.currentRoute.value.path).toBe('/academics/learning-plans');
+
+      // 4. Authorized roles (AcademicCoordinator, AcademicAuthority, Teacher, StudentDevelopmentOfficer, Admin)
+      for (const role of [
+        'AcademicCoordinator',
+        'AcademicAuthority',
+        'Teacher',
+        'StudentDevelopmentOfficer',
+        'Admin',
+      ]) {
+        authStore.setSession(
+          'valid-token',
+          createTestUser({
+            roles: [role],
+            permissions: [],
+          }),
+        );
+
+        await router.push('/academics/learning-plans');
+        expect(
+          router.currentRoute.value.path,
+          `Expected /academics/learning-plans to be accessible for role ${role}`,
+        ).toBe('/academics/learning-plans');
+      }
+    });
+
     it('enforces permissions on Academics participation workspace route', async () => {
       const router = createAppRouter({ history: createMemoryHistory() });
       const authStore = useAuthStore();

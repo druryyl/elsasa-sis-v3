@@ -35,7 +35,11 @@ public sealed class TestEventCollector :
     INotificationHandler<AcademicInterventionConcludedEvent>,
     INotificationHandler<AcademicAchievementConferredEvent>,
     INotificationHandler<AcademicStandingCorrectedEvent>,
-    INotificationHandler<PromotionRecommendationCorrectedEvent>
+    INotificationHandler<PromotionRecommendationCorrectedEvent>,
+    INotificationHandler<StudentLearningPlanCreatedEvent>,
+    INotificationHandler<StudentLearningPlanApprovedEvent>,
+    INotificationHandler<StudentLearningPlanRevisedEvent>,
+    INotificationHandler<StudentLearningPlanParticipationsSyncedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
@@ -63,6 +67,10 @@ public sealed class TestEventCollector :
     private readonly ConcurrentBag<AcademicAchievementConferredEvent> _academicAchievementConferredEvents = [];
     private readonly ConcurrentBag<AcademicStandingCorrectedEvent> _academicStandingCorrectedEvents = [];
     private readonly ConcurrentBag<PromotionRecommendationCorrectedEvent> _promotionRecommendationCorrectedEvents = [];
+    private readonly ConcurrentBag<StudentLearningPlanCreatedEvent> _studentLearningPlanCreatedEvents = [];
+    private readonly ConcurrentBag<StudentLearningPlanApprovedEvent> _studentLearningPlanApprovedEvents = [];
+    private readonly ConcurrentBag<StudentLearningPlanRevisedEvent> _studentLearningPlanRevisedEvents = [];
+    private readonly ConcurrentBag<StudentLearningPlanParticipationsSyncedEvent> _studentLearningPlanParticipationsSyncedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -195,6 +203,26 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<PromotionRecommendationCorrectedEvent> PromotionRecommendationCorrectedEvents => _promotionRecommendationCorrectedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="StudentLearningPlanCreatedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<StudentLearningPlanCreatedEvent> StudentLearningPlanCreatedEvents => _studentLearningPlanCreatedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="StudentLearningPlanApprovedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<StudentLearningPlanApprovedEvent> StudentLearningPlanApprovedEvents => _studentLearningPlanApprovedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="StudentLearningPlanRevisedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<StudentLearningPlanRevisedEvent> StudentLearningPlanRevisedEvents => _studentLearningPlanRevisedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="StudentLearningPlanParticipationsSyncedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<StudentLearningPlanParticipationsSyncedEvent> StudentLearningPlanParticipationsSyncedEvents => _studentLearningPlanParticipationsSyncedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -225,6 +253,10 @@ public sealed class TestEventCollector :
         _academicAchievementConferredEvents.Clear();
         _academicStandingCorrectedEvents.Clear();
         _promotionRecommendationCorrectedEvents.Clear();
+        _studentLearningPlanCreatedEvents.Clear();
+        _studentLearningPlanApprovedEvents.Clear();
+        _studentLearningPlanRevisedEvents.Clear();
+        _studentLearningPlanParticipationsSyncedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -432,6 +464,38 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _promotionRecommendationCorrectedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(StudentLearningPlanCreatedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _studentLearningPlanCreatedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(StudentLearningPlanApprovedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _studentLearningPlanApprovedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(StudentLearningPlanRevisedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _studentLearningPlanRevisedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(StudentLearningPlanParticipationsSyncedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _studentLearningPlanParticipationsSyncedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

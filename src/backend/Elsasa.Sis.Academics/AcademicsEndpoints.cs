@@ -22,12 +22,13 @@ using Microsoft.AspNetCore.Routing;
 /// - Academic Interventions &amp; At-Risk Query Engine (/api/v1/academics/interventions/*)
 /// - Academic Achievements Conferral &amp; Inquiries (/api/v1/academics/achievements, /api/v1/academics/students/{studentId}/achievements, /api/v1/academics/cohort-review/achievements)
 /// - Cohort Academic Review &amp; Dynamic Evaluations (/api/v1/academics/cohort-review/*)
+/// - Student Learning Plans (/api/v1/academics/learning-plans/*, /api/v1/academics/students/{studentId}/learning-plans/active)
 /// - Student Learning Self-Service Workspace (/api/v1/portal/learning/*)
 /// </summary>
 public static class AcademicsEndpoints
 {
     /// <summary>
-    /// Maps all Academics domain endpoints across Submodules 1, 2, 3, and 4 (Standing &amp; Progression).
+    /// Maps all Academics domain endpoints across Submodules 1, 2, 3, 4 (Standing &amp; Progression), and 5 (Student Learning Plans).
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>
     /// <returns>The route builder for fluent chaining.</returns>

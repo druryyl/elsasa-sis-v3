@@ -125,11 +125,13 @@ public sealed class DependencyInjectionTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(inMemorySettings).Build();
         var services = new ServiceCollection();
 
-        // EndpointDataSource is normally supplied by the web host's routing services.
+        // EndpointDataSource and IHostEnvironment are normally supplied by the web host's routing and hosting services.
         services.AddRouting();
+        services.AddSingleton<Microsoft.Extensions.Hosting.IHostEnvironment>(new TestHostEnvironment());
 
         // Act
         services.AddHostComposition(configuration);
+        Elsasa.Sis.Academics.DependencyInjection.AddAcademicsDomain(services, configuration);
 
         // Assert: ValidateOnBuild reproduces the host's startup service validation,
         // catching missing registrations such as IFinanceModule.
@@ -138,6 +140,14 @@ public sealed class DependencyInjectionTests
             ValidateOnBuild = true,
             ValidateScopes = true,
         });
+    }
+
+    private sealed class TestHostEnvironment : Microsoft.Extensions.Hosting.IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "Elsasa.Sis.Api";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
     [Fact]

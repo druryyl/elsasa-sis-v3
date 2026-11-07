@@ -132,5 +132,13 @@ public static class Permissions
             public const string View = "academics.achievements.view";
             public const string Confer = "academics.achievements.confer";
         }
+
+        public static class LearningPlans
+        {
+            public const string View = "academics:learning-plans:view";
+            public const string Manage = "academics:learning-plans:manage";
+            public const string Approve = "academics:learning-plans:approve";
+            public const string Revise = "academics:learning-plans:revise";
+        }
     }
 }

@@ -31,6 +31,10 @@ public sealed class AcademicsDemoDataPurger(
         DELETE FROM academics.attendance_records;
         DELETE FROM academics.learning_activities;
         DELETE FROM academics.academic_participations;
+        DELETE FROM academics.slp_approvals;
+        DELETE FROM academics.academic_plan_adjustments;
+        DELETE FROM academics.slp_learning_units;
+        DELETE FROM academics.student_learning_plans;
         DELETE FROM academics.academic_requirements;
         DELETE FROM academics.learning_units WHERE parent_unit_id IS NOT NULL;
         DELETE FROM academics.learning_units WHERE parent_unit_id IS NULL;

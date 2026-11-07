@@ -12,6 +12,7 @@ import * as transcriptsComposables from '../composables/useTranscripts';
 import * as resultsComposables from '@/features/academics/assessment/composables/useAcademicResults';
 import * as assessmentsComposables from '@/features/academics/assessment/composables/useAssessments';
 import * as curriculumComposables from '@/features/academics/curriculum/composables/useCurriculum';
+import * as learningPlansApi from '@/features/academics/learning-plans/api/learningPlansApi';
 import { ref } from 'vue';
 import type { AcademicResult, ReportCard } from '../types';
 
@@ -378,6 +379,43 @@ describe('AcademicRecordsWorkbenchView.vue (SCR-ACD-07)', () => {
       expect(wrapper.text()).toContain('Carol Williams');
     });
 
+    it('displays active adjustment badges in the grading roster when student has active adjustments', async () => {
+      const mockSlpFn = async (studentId: string) => {
+        if (studentId === 'stu-1') {
+          return {
+            planId: 'plan-1',
+            studentId: 'stu-1',
+            academicPeriodId: '2026-ganjil',
+            academicPeriodLabel: 'Semester Ganjil 2026/2027',
+            version: 1,
+            status: 'active' as const,
+            constituentUnits: [],
+            adjustments: [
+              {
+                id: 'adj-roster-1',
+                adjustmentType: 'accommodation' as const,
+                description: '50% Extra Exam Time',
+                rationale: 'Extended time required for written assessments',
+                effectiveDate: '2026-08-01',
+                approvedBy: 'Ibu Ratna (VP Academics)',
+                approvedDate: '2026-08-05',
+              },
+            ],
+          };
+        }
+        return null;
+      };
+      vi.spyOn(learningPlansApi, 'getActiveLearningPlan').mockImplementation(mockSlpFn as any);
+      vi.spyOn(learningPlansApi.learningPlansApi, 'getActiveLearningPlan').mockImplementation(mockSlpFn as any);
+
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      const badge = wrapper.find('[data-testid="badge-adjustment-adj-roster-1"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toContain('⚡ Accommodation: 50% Extra Exam Time');
+    });
+
     it('displays batch approve and batch publish buttons for authority users', () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-testid="btn-batch-approve"]').exists()).toBe(true);
@@ -498,6 +536,61 @@ describe('AcademicRecordsWorkbenchView.vue (SCR-ACD-07)', () => {
       await flushPromises();
 
       expect(wrapper.findComponent({ name: 'GenerateInterimTranscriptModal' }).exists()).toBe(true);
+    });
+
+    it('displays active adjustment badges in student transcript header', async () => {
+      vi.spyOn(transcriptsComposables, 'useStudentTranscriptQuery').mockReturnValue({
+        data: ref({
+          id: 'tr-1',
+          studentId: 'stu-budi',
+          studentName: 'Budi Santoso',
+          studentNisn: '0012345678',
+          status: 'draft',
+          transcriptType: 'official',
+          periodStart: '2024-07-01',
+          periodEnd: '2026-06-30',
+          completedPeriods: [],
+        }),
+        isLoading: ref(false),
+        isError: ref(false),
+        error: ref(null),
+        refetch: vi.fn(),
+      } as any);
+
+      const mockTranscriptSlpFn = async (studentId: string) => {
+        if (studentId === 'stu-budi') {
+          return {
+            planId: 'plan-budi',
+            studentId: 'stu-budi',
+            academicPeriodId: '2026-ganjil',
+            academicPeriodLabel: 'Semester Ganjil 2026/2027',
+            version: 2,
+            status: 'active' as const,
+            constituentUnits: [],
+            adjustments: [
+              {
+                id: 'adj-tr-1',
+                adjustmentType: 'substitution' as const,
+                description: 'Adaptive PJOK',
+                rationale: 'Adapted physical education per medical note',
+                effectiveDate: '2026-08-01',
+                approvedBy: 'Dr. Hendra (Curriculum Lead)',
+                approvedDate: '2026-08-06',
+              },
+            ],
+          };
+        }
+        return null;
+      };
+      vi.spyOn(learningPlansApi, 'getActiveLearningPlan').mockImplementation(mockTranscriptSlpFn as any);
+      vi.spyOn(learningPlansApi.learningPlansApi, 'getActiveLearningPlan').mockImplementation(mockTranscriptSlpFn as any);
+
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      const badge = wrapper.find('[data-testid="badge-adjustment-adj-tr-1"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toContain('🔄 Substitution: Adaptive PJOK');
     });
   });
 

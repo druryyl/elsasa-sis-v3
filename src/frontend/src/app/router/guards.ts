@@ -49,6 +49,19 @@ export function setupNavigationGuards(router: Router): void {
         (to.meta.permission === 'academics.curriculum.view' &&
           (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
             authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        ((to.meta.permission === 'academics:learning-plans:view' ||
+          to.meta.permission === 'academics.learning_plans.view' ||
+          to.meta.permission === 'Permissions.Academics.LearningPlans.View') &&
+          (authStore.hasPermission('Permissions.Academics.LearningPlans.View') ||
+            authStore.hasPermission('academics:learning-plans:view') ||
+            authStore.hasPermission('academics.learning_plans.view') ||
+            authStore.hasAnyRole([
+              'AcademicCoordinator',
+              'AcademicAuthority',
+              'Teacher',
+              'StudentDevelopmentOfficer',
+              'Admin',
+            ]))) ||
         (to.meta.permission === 'academics.participations.view' &&
           (authStore.hasPermission('Permissions.Academics.Participations.View') ||
             authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||

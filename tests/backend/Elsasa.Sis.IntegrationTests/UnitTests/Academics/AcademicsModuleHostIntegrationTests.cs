@@ -46,11 +46,26 @@ using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetCohortPromotionR
 using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetStudentPromotionRecommendations;
 using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectAcademicStanding;
 using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectPromotionRecommendation;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.AddAcademicPlanAdjustment;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.AddSlpLearningUnit;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ApproveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ArchiveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.CreateStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetActiveStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetStudentLearningPlanById;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.GetStudentLearningPlans;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.RemoveAcademicPlanAdjustment;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.RemoveSlpLearningUnit;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.ReviseStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.SubmitStudentLearningPlan;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.SyncSlpParticipations;
+using Elsasa.Sis.Academics.Features.StudentLearningPlans.UpdateStudentLearningPlan;
 using Elsasa.Sis.Academics.Services;
 using Elsasa.Sis.Academics.Services.Reassessment;
 using Elsasa.Sis.Api.Configuration;
 using Elsasa.Sis.Contracts;
 using Elsasa.Sis.Contracts.Academics;
+using Elsasa.Sis.Contracts.Operations;
 using Elsasa.Sis.Contracts.Students;
 using Elsasa.Sis.IntegrationTests.Fixtures;
 using Elsasa.Sis.Shared.Common;
@@ -78,6 +93,30 @@ public sealed class AcademicsModuleHostIntegrationTests
         }
     }
 
+    private sealed class TestOperationsCalendarQueryService : IOperationsCalendarQueryService
+    {
+        public Task<Result<ActiveAcademicYearDto?>> GetActiveAcademicYearAsync(CancellationToken ct = default) =>
+            Task.FromResult(Result.Success<ActiveAcademicYearDto?>(null));
+
+        public Task<Result<OperationalPeriodDto?>> GetOperationalPeriodByIdAsync(Guid periodId, CancellationToken ct = default) =>
+            Task.FromResult(Result.Success<OperationalPeriodDto?>(new OperationalPeriodDto(
+                periodId,
+                Guid.NewGuid(),
+                "SEM-1-2029-2030",
+                "Semester 1 2029/2030",
+                "academic_semester",
+                new DateOnly(2029, 7, 15),
+                new DateOnly(2029, 12, 20),
+                null,
+                "active")));
+
+        public Task<Result<IReadOnlyList<OperationalPeriodDto>>> GetActiveAdmissionWindowsAsync(DateOnly date, CancellationToken ct = default) =>
+            Task.FromResult(Result.Success<IReadOnlyList<OperationalPeriodDto>>(Array.Empty<OperationalPeriodDto>()));
+
+        public Task<Result<bool>> IsInstructionalDayAsync(DateOnly date, string campus = "All", CancellationToken ct = default) =>
+            Task.FromResult(Result.Success(true));
+    }
+
     [Fact]
     public void AddAcademicsDomain_Should_RegisterAllSubmodule3ServicesAndHandlers()
     {
@@ -87,6 +126,7 @@ public sealed class AcademicsModuleHostIntegrationTests
         services.AddSingleton<ISqlConnectionFactory>(new FaultyConnectionFactory());
         services.AddScoped<ICurrentUser, TestCurrentUser>();
         services.AddSingleton<IStudentsModule>(new TestStudentsModule());
+        services.AddSingleton<IOperationsCalendarQueryService>(new TestOperationsCalendarQueryService());
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(
             typeof(AcademicsAssemblyMarker).Assembly,
             typeof(ContractsAssemblyMarker).Assembly));
@@ -174,6 +214,22 @@ public sealed class AcademicsModuleHostIntegrationTests
         // Assert - Submodule 4: Non-Grade Corrections Handlers (P5-S12)
         sp.GetService<CorrectAcademicStandingHandler>().Should().NotBeNull();
         sp.GetService<CorrectPromotionRecommendationHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 5: Student Learning Plans Handlers (P2-S04, P2-S05, P2-S06, P3-S07, P3-S08, P3-S09, P4-S10, P4-S11)
+        sp.GetService<CreateStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<UpdateStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<ArchiveStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<AddSlpLearningUnitHandler>().Should().NotBeNull();
+        sp.GetService<RemoveSlpLearningUnitHandler>().Should().NotBeNull();
+        sp.GetService<AddAcademicPlanAdjustmentHandler>().Should().NotBeNull();
+        sp.GetService<RemoveAcademicPlanAdjustmentHandler>().Should().NotBeNull();
+        sp.GetService<SubmitStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<ApproveStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<ReviseStudentLearningPlanHandler>().Should().NotBeNull();
+        sp.GetService<SyncSlpParticipationsHandler>().Should().NotBeNull();
+        sp.GetService<GetStudentLearningPlanByIdHandler>().Should().NotBeNull();
+        sp.GetService<GetStudentLearningPlansHandler>().Should().NotBeNull();
+        sp.GetService<GetActiveStudentLearningPlanHandler>().Should().NotBeNull();
     }
 
     [Fact]
@@ -217,6 +273,9 @@ public sealed class AcademicsModuleHostIntegrationTests
         routePatterns.Should().Contain(p => p!.Contains("interventions"));
         routePatterns.Should().Contain(p => p!.Contains("achievements"));
         routePatterns.Should().Contain(p => p!.Contains("cohort-review"));
+
+        // Submodule 5 route patterns (P4-S11)
+        routePatterns.Should().Contain(p => p!.Contains("learning-plans"));
     }
 
     [Fact]
@@ -256,6 +315,9 @@ public sealed class AcademicsModuleHostIntegrationTests
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/interventions"));
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/achievements"));
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/cohort-review"));
+
+            // Submodule 5 routes in Swagger (P4-S11)
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/learning-plans"));
         }
         finally
         {
@@ -361,6 +423,34 @@ public sealed class AcademicsModuleHostIntegrationTests
         // Assert
         result.IsFailure.Should().BeTrue();
         result.Error!.Code.Should().Be("Academics.StudentLearningProgressSummaryQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetActiveStudentLearningPlanAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetActiveStudentLearningPlanAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Academics.ActiveStudentLearningPlanQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetActiveStudentLearningPlanAsync_Should_ReturnSuccessNull_When_IdsAreEmpty()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetActiveStudentLearningPlanAsync(Guid.Empty, Guid.Empty);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeNull();
     }
 
     [Fact]

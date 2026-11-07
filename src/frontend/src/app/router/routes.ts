@@ -72,6 +72,19 @@ export const routes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'learning-plans',
+            name: 'academics.learning-plans',
+            component: () =>
+              import(
+                '@/features/academics/learning-plans/views/LearningPlanWorkspaceView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics:learning-plans:view',
+              title: 'Learning Plans',
+            },
+          },
+          {
             path: 'participation',
             name: 'academics.participation',
             component: () =>

@@ -14,6 +14,7 @@ import {
   Layers,
   Repeat,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -24,6 +25,7 @@ import {
 } from '../schemas/participation.schema';
 import { useRegisterParticipationMutation } from '../composables/useAcademicParticipation';
 import { useStudentSearchQuery } from '@/features/students/records/composables/useStudentRecordsQueries';
+import { useActiveLearningPlan } from '@/features/academics/learning-plans/composables/useLearningPlans';
 import type { RegisterParticipationResponse } from '../types';
 
 export interface AcademicPeriodOption {
@@ -89,18 +91,24 @@ const sourceOptions = [
   { label: 'Personalized Learning Plan (SLP)', value: 'learning_plan' },
 ];
 
+const defaultPeriod =
+  props.periods.find((p) => p.id === props.initialPeriodId) ??
+  props.periods[0] ??
+  null;
+
 const { handleSubmit, errors, defineField, resetForm, setFieldValue } =
   useForm<RegisterParticipationFormValues>({
     validationSchema: toTypedSchema(registerParticipationSchema),
     initialValues: {
       studentId: '',
-      learningUnitId: props.initialUnitId ?? '',
-      academicPeriodId: props.initialPeriodId ?? '',
-      academicPeriodLabel: '',
+      learningUnitId: props.initialUnitId ?? (props.units[0]?.id ?? ''),
+      academicPeriodId: defaultPeriod?.id ?? '',
+      academicPeriodLabel: defaultPeriod?.label ?? '',
       sectionLabel: null,
       participationType: 'standard',
       source: 'assigned',
       startDate: todayIso,
+      studentLearningPlanId: null,
     },
   });
 
@@ -112,6 +120,28 @@ const [sectionLabel] = defineField('sectionLabel');
 const [participationType] = defineField('participationType');
 const [source] = defineField('source');
 const [startDate] = defineField('startDate');
+const [studentLearningPlanId] = defineField('studentLearningPlanId');
+
+// Query active student learning plan for the selected student & period (SCR-ACD-05, P7-S24)
+const { data: activeLearningPlan, isLoading: isLoadingActivePlan } = useActiveLearningPlan(
+  studentId,
+  academicPeriodId,
+  {
+    enabled: computed(() => Boolean(studentId.value && academicPeriodId.value)),
+  },
+);
+
+// When an active SLP is detected for the student, pre-select source = 'learning_plan' and pre-link active plan ID
+watch(
+  () => activeLearningPlan.value,
+  (plan) => {
+    if (plan && plan.planId) {
+      setFieldValue('source', 'learning_plan');
+      setFieldValue('studentLearningPlanId', plan.planId);
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   academicPeriodId,
@@ -143,6 +173,7 @@ watch(
           participationType: 'standard',
           source: 'assigned',
           startDate: todayIso,
+          studentLearningPlanId: null,
         },
       });
       studentSearchTerm.value = '';
@@ -160,6 +191,7 @@ function selectStudent(student: { id: string; name: string; studentNumber?: stri
 function clearSelectedStudent() {
   selectedStudentDisplay.value = null;
   setFieldValue('studentId', '');
+  setFieldValue('studentLearningPlanId', null);
 }
 
 const registerMutation = useRegisterParticipationMutation();
@@ -183,6 +215,7 @@ const onSubmit = handleSubmit(async (values) => {
       participationType: values.participationType,
       source: values.source,
       startDate: values.startDate,
+      studentLearningPlanId: values.studentLearningPlanId || activeLearningPlan.value?.planId || null,
     });
 
     emit('registered', result);
@@ -305,6 +338,21 @@ const onSubmit = handleSubmit(async (values) => {
           <p v-if="errors.studentId" class="text-xs text-rose-500">
             {{ errors.studentId }}
           </p>
+        </div>
+      </div>
+
+      <!-- Active Student Learning Plan Context Banner (SCR-ACD-05, P7-S24) -->
+      <div
+        v-if="activeLearningPlan"
+        class="flex items-start gap-2.5 rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-900 dark:border-indigo-800/60 dark:bg-indigo-950/30 dark:text-indigo-200"
+        data-testid="modal-active-slp-callout"
+      >
+        <Sparkles class="size-4 shrink-0 text-indigo-600 dark:text-indigo-400 mt-0.5" />
+        <div>
+          <div class="font-semibold">Governed by Active Student Learning Plan (v{{ activeLearningPlan.version }})</div>
+          <div class="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+            Registration source automatically pre-selected to <strong>learning_plan</strong> and pre-linked to Plan ID <span class="font-mono font-medium">{{ activeLearningPlan.planId.slice(0, 8) }}</span>.
+          </div>
         </div>
       </div>
 

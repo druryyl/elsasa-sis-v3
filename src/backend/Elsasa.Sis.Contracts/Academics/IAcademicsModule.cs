@@ -148,4 +148,16 @@ public interface IAcademicsModule
         Guid studentId,
         Guid academicPeriodId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves the active learning plan for a student within a specific academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the active student learning plan DTO, or <see langword="null"/> if none is active.</returns>
+    Task<Result<ActiveStudentLearningPlanDto?>> GetActiveStudentLearningPlanAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default);
 }

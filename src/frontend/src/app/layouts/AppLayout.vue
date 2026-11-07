@@ -144,6 +144,14 @@ const masterNavItems: NavParentItem[] = [
         roles: ['AcademicCoordinator', 'AcademicAuthority', 'Admin'],
       },
       {
+        id: 'academics-learning-plans',
+        label: 'Learning Plans',
+        to: '/academics/learning-plans',
+        icon: 'pi pi-id-card',
+        permission: 'academics:learning-plans:view',
+        roles: ['AcademicCoordinator', 'AcademicAuthority', 'Teacher', 'StudentDevelopmentOfficer', 'Admin'],
+      },
+      {
         id: 'academics-participation',
         label: 'Participation & Rosters',
         to: '/academics/participation',
@@ -278,6 +286,8 @@ function checkPermission(permission: string): boolean {
   const permissionAliases: Record<string, string[]> = {
     'academics.curriculum.view': ['Permissions.Academics.Curriculum.View'],
     'Permissions.Academics.Curriculum.View': ['academics.curriculum.view'],
+    'academics:learning-plans:view': ['Permissions.Academics.LearningPlans.View', 'academics.learning_plans.view'],
+    'Permissions.Academics.LearningPlans.View': ['academics:learning-plans:view', 'academics.learning_plans.view'],
     'academics.participations.view': ['Permissions.Academics.Participations.View'],
     'Permissions.Academics.Participations.View': ['academics.participations.view'],
     'academics.activities.view': ['Permissions.Academics.Activities.View'],

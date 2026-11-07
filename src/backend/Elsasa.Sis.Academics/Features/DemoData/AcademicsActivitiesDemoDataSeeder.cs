@@ -241,10 +241,86 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
         );
         """;
 
+    // Submodule 5: Student Learning Plans SQL templates (IS013, P4-S12)
+    private const string _insertStudentLearningPlanSql = """
+        INSERT INTO academics.student_learning_plans (
+            id, student_id, academic_period_id, academic_period_label,
+            status, version, notes, created_at, created_by, updated_at, updated_by
+        ) VALUES (
+            @Id, @StudentId, @AcademicPeriodId, @AcademicPeriodLabel,
+            @Status, @Version, @Notes, @CreatedAt, @CreatedBy, @UpdatedAt, @UpdatedBy
+        );
+        """;
+
+    private const string _insertSlpLearningUnitSql = """
+        INSERT INTO academics.slp_learning_units (
+            id, student_learning_plan_id, learning_unit_id, sequence_order,
+            is_required, notes, created_at, created_by
+        ) VALUES (
+            @Id, @StudentLearningPlanId, @LearningUnitId, @SequenceOrder,
+            @IsRequired, @Notes, @CreatedAt, @CreatedBy
+        );
+        """;
+
+    private const string _insertAcademicPlanAdjustmentSql = """
+        INSERT INTO academics.academic_plan_adjustments (
+            id, student_learning_plan_id, adjustment_type, description,
+            rationale, effective_date, end_date, approved_by, approved_date,
+            notes, created_at, created_by
+        ) VALUES (
+            @Id, @StudentLearningPlanId, @AdjustmentType, @Description,
+            @Rationale, @EffectiveDate, @EndDate, @ApprovedBy, @ApprovedDate,
+            @Notes, @CreatedAt, @CreatedBy
+        );
+        """;
+
+    private const string _insertSlpApprovalSql = """
+        INSERT INTO academics.slp_approvals (
+            id, student_learning_plan_id, plan_version, approved_by,
+            approved_date, approval_type, notes, created_at, created_by
+        ) VALUES (
+            @Id, @StudentLearningPlanId, @PlanVersion, @ApprovedBy,
+            @ApprovedDate, @ApprovalType, @Notes, @CreatedAt, @CreatedBy
+        );
+        """;
+
+    private const string _insertParticipationWithSlpSql = """
+        INSERT INTO academics.academic_participations (
+            id, student_id, learning_unit_id, academic_period_id, academic_period_label,
+            participation_type, attempt_number, source, section_label, status,
+            start_date, end_date, completion_date, student_learning_plan_id, created_by
+        ) VALUES (
+            @Id, @StudentId, @LearningUnitId, @AcademicPeriodId, @AcademicPeriodLabel,
+            @ParticipationType, @AttemptNumber, @Source, @SectionLabel, @Status,
+            @StartDate, @EndDate, @CompletionDate, @StudentLearningPlanId, @CreatedBy
+        );
+        """;
+
+    private const string _insertLearningUnitSql = """
+        INSERT INTO academics.learning_units (
+            id, learning_structure_id, parent_unit_id, code, name, unit_type,
+            level, description, credit_weight, status, notes,
+            created_at, created_by
+        ) VALUES (
+            @Id, @LearningStructureId, @ParentUnitId, @Code, @Name, @UnitType,
+            @Level, @Description, @CreditWeight, @Status, @Notes,
+            @CreatedAt, @CreatedBy
+        );
+        """;
+
     // Flagship student personas for Submodule 4 Standing & Progression (TD-08, GAP-008)
     public static readonly Guid RinaKusumaStudentId = new("00000000-0000-0000-0004-000000000108");
     public static readonly Guid BudiSantosoStudentId = DemoDataConstants.BudiStudentId;
     public static readonly Guid TimotiusStudentId = DemoDataConstants.TimotiusApplicantId;
+
+    // Deterministic constants for Submodule 5 SLP Personas (IS013, P4-S12)
+    public static readonly Guid BudiSlpV1Id = new("00000000-0000-0000-0006-000000000201");
+    public static readonly Guid BudiSlpV2Id = new("00000000-0000-0000-0006-000000000202");
+    public static readonly Guid TimotiusSlpV1Id = new("00000000-0000-0000-0006-000000000203");
+
+    public static readonly Guid LuMat3S1Id = new("00000000-0000-0000-0006-000000000101");
+    public static readonly Guid LuBi4S1Id = new("00000000-0000-0000-0006-000000000102");
+    public static readonly Guid LuPjok4S1Id = new("00000000-0000-0000-0006-000000000103");
 
     // -------------------------------------------------------------------------
     // Seed entry point
@@ -1081,6 +1157,19 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 now,
                 cancellationToken);
 
+            // ====================================================================
+            // 9. Seed Submodule 5: Student Learning Plans (IS013, P4-S12)
+            // ====================================================================
+            participationsCreated += await SeedStudentLearningPlansSubmoduleAsync(
+                connection,
+                transaction,
+                operationsContext,
+                academicsContext,
+                budiStudentId,
+                timotiusId,
+                now,
+                cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
 
             return new AcademicsActivitiesSeedResult(
@@ -1858,5 +1947,423 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 created++;
             }
         }
+    }
+
+    private static async Task<int> SeedStudentLearningPlansSubmoduleAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        OperationsSeedResult operationsContext,
+        AcademicsStructureSeedResult academicsContext,
+        Guid budiStudentId,
+        Guid timotiusId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var sem1Id = operationsContext.HistoricalPeriodId;
+        var baseDate = operationsContext.BaseDate;
+        var sem1StartDate = baseDate.AddDays(-180);
+        var sem1EndDate = baseDate.AddDays(-35);
+        var slpPeriodLabel = "Semester 1 TP 2029/2030";
+
+        // 1. Ensure required learning units exist in academics.learning_units
+        var mathSubjectId = academicsContext.SubjectUnitIds.TryGetValue("MATH", out var mId) ? (Guid?)mId : null;
+
+        var mat3Id = await EnsureLearningUnitAsync(
+            connection,
+            transaction,
+            academicsContext.LearningStructureId,
+            LuMat3S1Id,
+            parentUnitId: mathSubjectId,
+            code: "lu-mat-3-s1",
+            name: "Matematika Kelas 3 Remedial",
+            unitType: "subject",
+            level: "Grade 3",
+            description: "Remedial Grade 3 Mathematics unit for individualized learning plan",
+            creditWeight: 4.0m,
+            now: now,
+            cancellationToken: cancellationToken);
+
+        var bi4Id = await EnsureLearningUnitAsync(
+            connection,
+            transaction,
+            academicsContext.LearningStructureId,
+            LuBi4S1Id,
+            parentUnitId: null,
+            code: "lu-bi-4-s1",
+            name: "Bahasa Indonesia Kelas 4",
+            unitType: "subject",
+            level: "Grade 4",
+            description: "Standard Grade 4 Bahasa Indonesia constituent unit",
+            creditWeight: 4.0m,
+            now: now,
+            cancellationToken: cancellationToken);
+
+        var pjok4Id = await EnsureLearningUnitAsync(
+            connection,
+            transaction,
+            academicsContext.LearningStructureId,
+            LuPjok4S1Id,
+            parentUnitId: null,
+            code: "lu-pjok-4-s1",
+            name: "PJOK Kelas 4 (Adaptive)",
+            unitType: "subject",
+            level: "Grade 4",
+            description: "Adaptive Physical Education (PJOK) substitution unit",
+            creditWeight: 2.0m,
+            now: now,
+            cancellationToken: cancellationToken);
+
+        // ====================================================================
+        // Persona 1: Budi Santoso (Active revised v2 plan + historical revised v1 plan)
+        // ====================================================================
+        var v1CreatedAt = new DateTimeOffset(sem1StartDate.AddDays(-14), TimeSpan.Zero);
+        var v1ApprovedDate = DateOnly.FromDateTime(sem1StartDate.AddDays(-7));
+        var v2CreatedAt = new DateTimeOffset(sem1StartDate.AddDays(5), TimeSpan.Zero);
+        var v2ApprovedDate = DateOnly.FromDateTime(sem1StartDate.AddDays(7));
+        var v2ApprovedTimestamp = new DateTimeOffset(v2ApprovedDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+        // 1a. Budi Santoso v1 SLP (revised)
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertStudentLearningPlanSql,
+            new
+            {
+                Id = BudiSlpV1Id,
+                StudentId = budiStudentId,
+                AcademicPeriodId = sem1Id,
+                AcademicPeriodLabel = slpPeriodLabel,
+                Status = "revised",
+                Version = 1,
+                Notes = "Individualized learning plan for Budi Santoso - Grade 3 Remedial Mathematics and Grade 4 Bahasa Indonesia.",
+                CreatedAt = v1CreatedAt,
+                CreatedBy = "academic-coordinator",
+                UpdatedAt = (DateTimeOffset?)v2ApprovedTimestamp,
+                UpdatedBy = "Ibu Ratna (VP Academics)"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1b. Budi Santoso v1 Constituent Learning Units
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV1Id,
+                LearningUnitId = mat3Id,
+                SequenceOrder = (int?)1,
+                IsRequired = true,
+                Notes = "Remediation: Grade 3 level",
+                CreatedAt = v1CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV1Id,
+                LearningUnitId = bi4Id,
+                SequenceOrder = (int?)2,
+                IsRequired = true,
+                Notes = "Normal Grade 4 level",
+                CreatedAt = v1CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1c. Budi Santoso v1 Initial Approval Record
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpApprovalSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV1Id,
+                PlanVersion = 1,
+                ApprovedBy = "Ibu Ratna (VP Academics)",
+                ApprovedDate = v1ApprovedDate,
+                ApprovalType = "initial_approval",
+                Notes = "Initial approval for Budi Santoso individualized learning plan v1.",
+                CreatedAt = new DateTimeOffset(v1ApprovedDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                CreatedBy = "Ibu Ratna (VP Academics)"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1d. Budi Santoso v2 SLP (active)
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertStudentLearningPlanSql,
+            new
+            {
+                Id = BudiSlpV2Id,
+                StudentId = budiStudentId,
+                AcademicPeriodId = sem1Id,
+                AcademicPeriodLabel = slpPeriodLabel,
+                Status = "active",
+                Version = 2,
+                Notes = "Revised learning plan: Added Adaptive PJOK substitution and 50% extra exam time accommodation.",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator",
+                UpdatedAt = (DateTimeOffset?)v2ApprovedTimestamp,
+                UpdatedBy = "Ibu Ratna (VP Academics)"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1e. Budi Santoso v2 Constituent Learning Units (remedial math, bahasa indonesia, adaptive pjok)
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                LearningUnitId = mat3Id,
+                SequenceOrder = (int?)1,
+                IsRequired = true,
+                Notes = "Remediation: Grade 3 level",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                LearningUnitId = bi4Id,
+                SequenceOrder = (int?)2,
+                IsRequired = true,
+                Notes = "Normal Grade 4 level",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                LearningUnitId = pjok4Id,
+                SequenceOrder = (int?)3,
+                IsRequired = true,
+                Notes = "Adaptive PJOK substitution (lu-pjok-4-s1 adaptive)",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1f. Budi Santoso v2 Academic Plan Adjustments (substitution + accommodation)
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertAcademicPlanAdjustmentSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                AdjustmentType = "substitution",
+                Description = "Replace regular PJOK with Adaptive PJOK (lu-pjok-4-s1 adaptive)",
+                Rationale = "Medical recommendation for modified physical activity curriculum",
+                EffectiveDate = DateOnly.FromDateTime(sem1StartDate),
+                EndDate = (DateOnly?)DateOnly.FromDateTime(sem1EndDate),
+                ApprovedBy = "Ibu Ratna (VP Academics)",
+                ApprovedDate = v2ApprovedDate,
+                Notes = "Approved alongside SLP v2 revision",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertAcademicPlanAdjustmentSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                AdjustmentType = "accommodation",
+                Description = "50% extra exam time accommodation for written assessments",
+                Rationale = "Documented learning need assessment and processing speed accommodation",
+                EffectiveDate = DateOnly.FromDateTime(sem1StartDate),
+                EndDate = (DateOnly?)DateOnly.FromDateTime(sem1EndDate),
+                ApprovedBy = "Ibu Ratna (VP Academics)",
+                ApprovedDate = v2ApprovedDate,
+                Notes = "Extra time accommodation across all written tests",
+                CreatedAt = v2CreatedAt,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1g. Budi Santoso v2 Revision Approval Record
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpApprovalSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = BudiSlpV2Id,
+                PlanVersion = 2,
+                ApprovedBy = "Ibu Ratna (VP Academics)",
+                ApprovedDate = v2ApprovedDate,
+                ApprovalType = "revision_approval",
+                Notes = "Revision approval incorporating Adaptive PJOK substitution and 50% extra exam time accommodation.",
+                CreatedAt = v2ApprovedTimestamp,
+                CreatedBy = "Ibu Ratna (VP Academics)"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        // 1h. Linked academic_participations for Budi Santoso v2 active plan
+        var budiUnits = new[]
+        {
+            mat3Id,
+            bi4Id,
+            pjok4Id
+        };
+
+        foreach (var unitId in budiUnits)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertParticipationWithSlpSql,
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = budiStudentId,
+                    LearningUnitId = unitId,
+                    AcademicPeriodId = sem1Id,
+                    AcademicPeriodLabel = slpPeriodLabel,
+                    ParticipationType = "standard",
+                    AttemptNumber = 1,
+                    Source = "learning_plan",
+                    SectionLabel = "ELC-A",
+                    Status = "in_progress",
+                    StartDate = DateOnly.FromDateTime(sem1StartDate),
+                    EndDate = (DateOnly?)DateOnly.FromDateTime(sem1EndDate),
+                    CompletionDate = (DateOnly?)null,
+                    StudentLearningPlanId = (Guid?)BudiSlpV2Id,
+                    CreatedBy = _createdBy
+                },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+        }
+
+        // ====================================================================
+        // Persona 2: Timotius (Draft v1 plan awaiting review)
+        // ====================================================================
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertStudentLearningPlanSql,
+            new
+            {
+                Id = TimotiusSlpV1Id,
+                StudentId = timotiusId,
+                AcademicPeriodId = sem1Id,
+                AcademicPeriodLabel = slpPeriodLabel,
+                Status = "draft",
+                Version = 1,
+                Notes = "Draft individualized learning plan for Timotius with proposed accommodations awaiting Academic Authority review.",
+                CreatedAt = now,
+                CreatedBy = "academic-coordinator",
+                UpdatedAt = (DateTimeOffset?)null,
+                UpdatedBy = (string?)null
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertSlpLearningUnitSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = TimotiusSlpV1Id,
+                LearningUnitId = bi4Id,
+                SequenceOrder = (int?)1,
+                IsRequired = true,
+                Notes = "Standard Grade 4 curriculum unit with proposed accommodations",
+                CreatedAt = now,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertAcademicPlanAdjustmentSql,
+            new
+            {
+                Id = Guid.NewGuid(),
+                StudentLearningPlanId = TimotiusSlpV1Id,
+                AdjustmentType = "accommodation",
+                Description = "Proposed 25% extra exam time accommodation for written assessments",
+                Rationale = "Awaiting final medical evaluation and formal Academic Authority review",
+                EffectiveDate = DateOnly.FromDateTime(sem1StartDate),
+                EndDate = (DateOnly?)null,
+                ApprovedBy = "",
+                ApprovedDate = new DateOnly(1900, 1, 1),
+                Notes = "Pending review by Academic Authority",
+                CreatedAt = now,
+                CreatedBy = "academic-coordinator"
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        return budiUnits.Length;
+    }
+
+    private static async Task<Guid> EnsureLearningUnitAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        Guid learningStructureId,
+        Guid preferredId,
+        Guid? parentUnitId,
+        string code,
+        string name,
+        string unitType,
+        string level,
+        string description,
+        decimal creditWeight,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var existing = await connection.QueryFirstOrDefaultAsync<Guid?>(
+            new CommandDefinition(
+                "SELECT id FROM academics.learning_units WHERE learning_structure_id = @StructureId AND code = @Code",
+                new { StructureId = learningStructureId, Code = code },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+        if (existing.HasValue && existing.Value != Guid.Empty)
+        {
+            return existing.Value;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            _insertLearningUnitSql,
+            new
+            {
+                Id = preferredId,
+                LearningStructureId = learningStructureId,
+                ParentUnitId = parentUnitId,
+                Code = code,
+                Name = name,
+                UnitType = unitType,
+                Level = level,
+                Description = description,
+                CreditWeight = creditWeight,
+                Status = "active",
+                Notes = $"Seeded learning unit {code} for Hagios Student Learning Plans",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        return preferredId;
     }
 }

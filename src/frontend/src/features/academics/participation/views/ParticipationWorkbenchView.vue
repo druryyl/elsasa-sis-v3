@@ -23,6 +23,7 @@ import {
   FileCheck2,
   Building,
   GraduationCap,
+  Sparkles,
 } from 'lucide-vue-next';
 import {
   PageHeader,
@@ -41,6 +42,7 @@ import {
   useLearningStructures,
   useLearningUnits,
 } from '@/features/academics/curriculum/composables/useCurriculum';
+import { useLearningPlans } from '@/features/academics/learning-plans/composables/useLearningPlans';
 import type { AcademicParticipation } from '../types';
 import BatchEnrollCohortModal from '../components/BatchEnrollCohortModal.vue';
 import RegisterStudentModal from '../components/RegisterStudentModal.vue';
@@ -175,6 +177,32 @@ const {
     enabled: computed(() => Boolean(selectedUnitId.value)),
   },
 );
+
+// Active Student Learning Plans Query for Contextual Badging (SCR-ACD-05, P7-S24)
+const { data: activePlansData } = useLearningPlans(
+  computed(() => ({
+    academicPeriodId: selectedPeriodId.value ?? undefined,
+    status: 'active',
+    pageSize: 100,
+  })),
+  {
+    enabled: computed(() => Boolean(selectedPeriodId.value)),
+  },
+);
+
+const activePlanStudentIds = computed(() => {
+  const list = activePlansData.value?.items ?? [];
+  return new Set(list.map((p) => p.studentId));
+});
+
+function isStudentOnActivePlan(
+  studentId: string,
+  studentLearningPlanId?: string | null,
+  source?: string | null,
+): boolean {
+  if (studentLearningPlanId || source === 'learning_plan') return true;
+  return activePlanStudentIds.value.has(studentId);
+}
 
 const statusFilterOptions = [
   { label: 'All Statuses', value: 'all' },
@@ -584,9 +612,21 @@ function formatStatusLabel(status: string): string {
         <Column header="Student Participant" sortable field="studentName" style="min-width: 220px">
           <template #body="{ data }">
             <div class="space-y-0.5">
-              <span class="font-medium text-slate-900 dark:text-surface-100 block leading-tight">
-                {{ data.studentName ?? 'Unknown Student' }}
-              </span>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-medium text-slate-900 dark:text-surface-100 block leading-tight">
+                  {{ data.studentName ?? 'Unknown Student' }}
+                </span>
+                <!-- Active Learning Plan Badge (SCR-ACD-05, P7-S24) -->
+                <span
+                  v-if="isStudentOnActivePlan(data.studentId, data.studentLearningPlanId, data.source)"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
+                  data-testid="badge-active-slp"
+                  title="Governed by Active Student Learning Plan"
+                >
+                  <Sparkles class="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                  Active Learning Plan
+                </span>
+              </div>
               <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
                 <span class="font-mono">{{ data.studentNumber ?? data.studentId.slice(0, 8) }}</span>
                 <span v-if="data.sectionLabel">&bull;</span>
@@ -627,6 +667,7 @@ function formatStatusLabel(status: string): string {
               </div>
               <p class="text-[10px] text-slate-500 capitalize">
                 Source: {{ (data.source || 'assigned').replace('_', ' ') }}
+                <span v-if="data.studentLearningPlanId" class="text-indigo-600 dark:text-indigo-400 font-medium"> (SLP Linked)</span>
               </p>
             </div>
           </template>

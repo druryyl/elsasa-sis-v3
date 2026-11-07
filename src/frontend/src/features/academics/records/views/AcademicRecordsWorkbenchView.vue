@@ -63,6 +63,7 @@ import RecordCorrectionModal from '../components/RecordCorrectionModal.vue';
 import BatchCompileReportCardsModal from '../components/BatchCompileReportCardsModal.vue';
 import GenerateInterimTranscriptModal from '../components/GenerateInterimTranscriptModal.vue';
 import LearningProgressTab from '../components/LearningProgressTab.vue';
+import ActiveAdjustmentBadges from '../components/ActiveAdjustmentBadges.vue';
 
 // ---------------------------------------------------------------------------
 // 1. Navigation & Breadcrumbs
@@ -538,9 +539,16 @@ function handlePrintTranscript() {
                         <span class="font-bold text-surface-900 dark:text-surface-100 block">
                           {{ res.candidateName || res.studentName || 'Student ' + res.studentId }}
                         </span>
-                        <span class="text-[11px] text-surface-400 font-mono">
+                        <span class="text-[11px] text-surface-400 font-mono block">
                           {{ res.registrationNumber || res.studentNumber || 'Enrolled Student' }}
                         </span>
+                        <!-- Active Adjustment Badges (SCR-ACD-07, P7-S24) -->
+                        <div v-if="res.studentId" class="mt-1">
+                          <ActiveAdjustmentBadges
+                            :student-id="res.studentId"
+                            :academic-period-id="selectedPeriodId"
+                          />
+                        </div>
                       </td>
                       <td class="p-3">
                         <div class="flex items-center gap-1.5">
@@ -844,7 +852,7 @@ function handlePrintTranscript() {
                 <!-- Transcript Header Summary -->
                 <div class="p-5 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <div class="flex items-center gap-2 mb-1">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
                       <span class="font-bold text-base text-surface-900 dark:text-surface-100">
                         {{ studentTranscript.studentName || 'Student ID: ' + studentTranscript.studentId }}
                       </span>
@@ -852,6 +860,11 @@ function handlePrintTranscript() {
                       <span class="uppercase font-mono text-[10px] px-2 py-0.5 rounded bg-surface-100 dark:bg-surface-800 text-surface-600">
                         {{ studentTranscript.transcriptType }}
                       </span>
+                      <!-- Active Adjustment Badges (SCR-ACD-07, P7-S24) -->
+                      <ActiveAdjustmentBadges
+                        :student-id="studentTranscript.studentId"
+                        :academic-period-id="selectedPeriodId"
+                      />
                     </div>
                     <div class="flex items-center gap-4 text-xs text-surface-500">
                       <span>NISN: <strong>{{ studentTranscript.studentNisn || '—' }}</strong></span>

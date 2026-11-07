@@ -445,6 +445,59 @@ describe('AppLayout.vue', () => {
       expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(false);
     });
 
+    it('renders Learning Plans navigation item with RBAC filtering and icon (P7-S25)', () => {
+      const authStore = useAuthStore();
+
+      // Authorized roles: AcademicCoordinator, AcademicAuthority, Teacher, StudentDevelopmentOfficer, Admin
+      for (const role of [
+        'AcademicCoordinator',
+        'AcademicAuthority',
+        'Teacher',
+        'StudentDevelopmentOfficer',
+        'Admin',
+      ]) {
+        authStore.setSession(
+          'test-token',
+          createTestUser({
+            roles: [role],
+            permissions: [],
+          }),
+        );
+        const wrapper = mountLayout();
+        expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
+        const slpItem = wrapper.find('[data-testid="nav-item-academics-learning-plans"]');
+        expect(
+          slpItem.exists(),
+          `Expected nav-item-academics-learning-plans to exist for role ${role}`,
+        ).toBe(true);
+        expect(slpItem.text()).toContain('Learning Plans');
+        expect(slpItem.attributes('href')).toBe('/academics/learning-plans');
+        expect(slpItem.find('i.pi.pi-id-card').exists()).toBe(true);
+      }
+
+      // Explicit permission: academics:learning-plans:view
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics:learning-plans:view'],
+        }),
+      );
+      let wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-learning-plans"]').exists()).toBe(true);
+
+      // Unauthorized role: AdmissionOfficer
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AdmissionOfficer'],
+          permissions: ['Permissions.Students.Admission.View'],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-learning-plans"]').exists()).toBe(false);
+    });
+
     it('renders Student Portal navigation with My Learning & Coursework for Student role and hides Academics', () => {
       const authStore = useAuthStore();
       authStore.setSession(
@@ -581,6 +634,18 @@ describe('AppLayout.vue', () => {
       expect(activeCohortReview.exists()).toBe(true);
       expect(activeCohortReview.classes()).toContain('border-l-2');
       expect(activeCohortReview.classes()).toContain('border-teal-600');
+
+      // 7. Student Learning Plans (P7-S25)
+      await router.push('/academics/learning-plans');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Learning Plans');
+      const activeSlp = wrapper.find('[data-testid="nav-item-academics-learning-plans"]');
+      expect(activeSlp.exists()).toBe(true);
+      expect(activeSlp.classes()).toContain('border-l-2');
+      expect(activeSlp.classes()).toContain('border-teal-600');
     });
   });
 
