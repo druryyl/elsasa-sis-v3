@@ -100,4 +100,52 @@ public interface IAcademicsModule
     Task<Result<ReportCardSnapshotDto?>> GetStudentReportCardSnapshotAsync(
         Guid reportCardId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves the formal academic standing determination for a student in an academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the student academic standing DTO, or <see langword="null"/> if not determined.</returns>
+    Task<Result<StudentAcademicStandingDto?>> GetStudentAcademicStandingAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves the authoritative academic progression recommendation for a student in an academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the promotion recommendation DTO, or <see langword="null"/> if not issued.</returns>
+    Task<Result<PromotionRecommendationDto?>> GetPromotionRecommendationAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves all academic achievements, distinctions, and honors conferred on a student, optionally filtered by academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">Optional academic period filter.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the read-only list of academic achievements.</returns>
+    Task<Result<IReadOnlyList<AcademicAchievementDto>>> GetStudentAcademicAchievementsAsync(
+        Guid studentId,
+        Guid? academicPeriodId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves aggregated learning progress counts for a student within an academic period.
+    /// </summary>
+    /// <param name="studentId">The unique identifier of the student.</param>
+    /// <param name="academicPeriodId">The unique identifier of the academic period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result containing the read-only list of learning progress summary DTOs.</returns>
+    Task<Result<IReadOnlyList<LearningProgressSummaryDto>>> GetStudentLearningProgressSummaryAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default);
 }

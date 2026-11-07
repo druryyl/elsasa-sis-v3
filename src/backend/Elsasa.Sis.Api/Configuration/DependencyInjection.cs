@@ -2,6 +2,7 @@ namespace Elsasa.Sis.Api.Configuration;
 
 using System.Reflection;
 using Elsasa.Sis.Academics;
+using Elsasa.Sis.Api.Features.DemoData;
 using Elsasa.Sis.Api.Services;
 using Elsasa.Sis.Contracts;
 using Elsasa.Sis.Finance;
@@ -104,6 +105,10 @@ public static class DependencyInjection
         services.AddStudentsDomain();
         services.AddFinanceDomain();
         services.AddSharedStorage(configuration);
+
+        // 7. Demo Data configuration & orchestrator (ADR-001, ADR-006, TD-01, TD-02, TD-08, OQ-004)
+        services.Configure<DemoDataOptions>(configuration.GetSection(DemoDataOptions.SectionName));
+        services.AddScoped<DemoDataOrchestrator>();
 
         return services;
     }

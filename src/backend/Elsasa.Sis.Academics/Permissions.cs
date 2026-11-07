@@ -93,6 +93,44 @@ public static class Permissions
         {
             public const string Correct = "academics.corrections.correct";
             public const string ViewHistory = "academics.corrections.viewhistory";
+            public const string CorrectStanding = "academics.corrections.standing";
+            public const string CorrectProgression = "academics.corrections.progression";
+        }
+
+        public static class Progress
+        {
+            public const string View = "academics.progress.view";
+            public const string Record = "academics.progress.record";
+            public const string Conclude = "academics.progress.conclude";
+        }
+
+        public static class Standings
+        {
+            public const string View = "academics.standings.view";
+            public const string Evaluate = "academics.standings.evaluate";
+            public const string Determine = "academics.standings.determine";
+            public const string BatchDetermine = "academics.standings.batch_determine";
+        }
+
+        public static class Progression
+        {
+            public const string View = "academics.progression.view";
+            public const string Evaluate = "academics.progression.evaluate";
+            public const string Issue = "academics.progression.issue";
+            public const string BatchIssue = "academics.progression.batch_issue";
+        }
+
+        public static class Interventions
+        {
+            public const string View = "academics.interventions.view";
+            public const string Initiate = "academics.interventions.initiate";
+            public const string UpdateStatus = "academics.interventions.update_status";
+        }
+
+        public static class Achievements
+        {
+            public const string View = "academics.achievements.view";
+            public const string Confer = "academics.achievements.confer";
         }
     }
 }

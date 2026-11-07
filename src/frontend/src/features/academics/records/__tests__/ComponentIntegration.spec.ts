@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import ReportCardPrintPreview from '../components/ReportCardPrintPreview.vue';
 import AssessmentPlannerModal from '@/features/academics/assessment/components/AssessmentPlannerModal.vue';
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
+import PrimeVue from 'primevue/config';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,9 +13,10 @@ const queryClient = new QueryClient({
 });
 
 const globalPlugins = {
-  plugins: [[VueQueryPlugin, { queryClient }]],
+  plugins: [PrimeVue, [VueQueryPlugin, { queryClient }]],
   stubs: {
     'router-link': true,
+    Dialog: true,
   },
 };
 

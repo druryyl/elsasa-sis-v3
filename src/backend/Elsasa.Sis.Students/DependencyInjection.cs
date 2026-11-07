@@ -1,4 +1,4 @@
-namespace Elsasa.Sis.Students;
+﻿namespace Elsasa.Sis.Students;
 
 using Elsasa.Sis.Contracts.Students;
 using Elsasa.Sis.Students.Features.Admission.AssessmentEvidence.AddAssessmentEvidence;
@@ -29,6 +29,8 @@ using Elsasa.Sis.Students.Features.Records.SearchStudents;
 using Elsasa.Sis.Students.Features.Records.Status.ChangeStudentStatus;
 using Elsasa.Sis.Students.Features.Records.UpdateStudentIdentity;
 using Elsasa.Sis.Students.Services;
+using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Students.Features.DemoData;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -148,6 +150,14 @@ public static class DependencyInjection
                 Permissions.Students.Records.Edit,
                 "StudentAdminOfficer", "Student Administration Officer");
         });
+
+        // Demo Data Purger & Seeder (P2-S05)
+        // Register purger against the shared IDemoDataDomainPurger contract so the
+        // host DemoDataOrchestrator can resolve it (ADR-001, ADR-002).
+        services.AddScoped<StudentsDemoDataPurger>();
+        services.AddScoped<IStudentsDemoDataPurger, StudentsDemoDataPurger>();
+        services.AddScoped<IDemoDataDomainPurger, StudentsDemoDataPurger>();
+        services.AddScoped<IStudentsDemoDataSeeder, StudentsDemoDataSeeder>();
 
         return services;
     }

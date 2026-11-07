@@ -3,3 +3,4 @@
  */
 
 export * from '@/features/academics/assessment/types';
+export * from './learningProgress.types';

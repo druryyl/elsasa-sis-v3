@@ -11,6 +11,7 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import Checkbox from 'primevue/checkbox';
 import {
+  BookOpen,
   CheckCircle2,
   FileCheck,
   GraduationCap,
@@ -61,6 +62,7 @@ import ReportCardPrintPreview from '../components/ReportCardPrintPreview.vue';
 import RecordCorrectionModal from '../components/RecordCorrectionModal.vue';
 import BatchCompileReportCardsModal from '../components/BatchCompileReportCardsModal.vue';
 import GenerateInterimTranscriptModal from '../components/GenerateInterimTranscriptModal.vue';
+import LearningProgressTab from '../components/LearningProgressTab.vue';
 
 // ---------------------------------------------------------------------------
 // 1. Navigation & Breadcrumbs
@@ -115,7 +117,7 @@ const canIssueTranscripts = computed(() =>
 // ---------------------------------------------------------------------------
 // 3. Tab State
 // ---------------------------------------------------------------------------
-const activeTab = ref<'moderation' | 'reportCards' | 'transcripts'>('moderation');
+const activeTab = ref<'moderation' | 'learningProgress' | 'reportCards' | 'transcripts'>('moderation');
 
 // ---------------------------------------------------------------------------
 // 4. Tab 1: Summative Moderation Queue State & Queries
@@ -358,6 +360,12 @@ function handlePrintTranscript() {
               <span class="font-semibold text-xs">Summative Moderation Queue</span>
             </div>
           </Tab>
+          <Tab value="learningProgress" data-testid="tab-learning-progress">
+            <div class="flex items-center gap-2 py-1">
+              <BookOpen class="w-4 h-4 text-teal-600" />
+              <span class="font-semibold text-xs">Learning Progress & Completion</span>
+            </div>
+          </Tab>
           <Tab value="reportCards" data-testid="tab-report-cards">
             <div class="flex items-center gap-2 py-1">
               <FileCheck class="w-4 h-4 text-teal-600" />
@@ -580,6 +588,13 @@ function handlePrintTranscript() {
                 </table>
               </div>
             </div>
+          </TabPanel>
+
+          <!-- =============================================================== -->
+          <!-- TAB: LEARNING PROGRESS & COMPLETION (SCR-ACD-07, UC-ACD-12)      -->
+          <!-- =============================================================== -->
+          <TabPanel value="learningProgress" data-testid="panel-learning-progress">
+            <LearningProgressTab :default-period-id="selectedPeriodId" />
           </TabPanel>
 
           <!-- =============================================================== -->

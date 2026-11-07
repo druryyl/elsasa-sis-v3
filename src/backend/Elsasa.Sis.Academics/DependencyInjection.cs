@@ -57,7 +57,9 @@ using Elsasa.Sis.Academics.Features.AcademicResults.EvaluateStudentLearning;
 using Elsasa.Sis.Academics.Features.AcademicResults.GetResultsByAssessment;
 using Elsasa.Sis.Academics.Features.AcademicResults.GetStudentResultsWorkspace;
 using Elsasa.Sis.Academics.Features.AcademicResults.PublishAcademicResults;
+using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectAcademicStanding;
 using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectApprovedResult;
+using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectPromotionRecommendation;
 using Elsasa.Sis.Academics.Features.RecordCorrections.GetResultCorrectionHistory;
 using Elsasa.Sis.Academics.Features.ReportCards.ApproveReportCard;
 using Elsasa.Sis.Academics.Features.ReportCards.BatchCompileCohortReportCards;
@@ -69,10 +71,29 @@ using Elsasa.Sis.Academics.Features.Transcripts.GenerateInterimTranscript;
 using Elsasa.Sis.Academics.Features.Transcripts.GetStudentTranscript;
 using Elsasa.Sis.Academics.Features.Transcripts.GetTranscriptById;
 using Elsasa.Sis.Academics.Features.Transcripts.IssueTranscript;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.ConferAcademicAchievement;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.GetPeriodAchievements;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.GetStudentAchievements;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetActiveInterventions;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetAtRiskLearners;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetInterventionById;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.InitiateAcademicIntervention;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.UpdateInterventionStatus;
+using Elsasa.Sis.Academics.Features.AcademicStandings.BatchDetermineCohortStanding;
+using Elsasa.Sis.Academics.Features.AcademicStandings.DetermineAcademicStanding;
+using Elsasa.Sis.Academics.Features.AcademicStandings.GetCohortStandings;
+using Elsasa.Sis.Academics.Features.AcademicStandings.GetStudentStandings;
+using Elsasa.Sis.Academics.Features.CohortReview;
+using Elsasa.Sis.Academics.Features.CohortReview.EvaluateCohortProgression;
+using Elsasa.Sis.Academics.Features.CohortReview.EvaluateCohortStanding;
+using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetCohortPromotionRecommendations;
+using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetStudentPromotionRecommendations;
 using Elsasa.Sis.Academics.Features.LearningUnits.UpdateLearningUnit;
+using Elsasa.Sis.Academics.Features.DemoData;
 using Elsasa.Sis.Academics.Services;
 using Elsasa.Sis.Academics.Services.Reassessment;
 using Elsasa.Sis.Contracts.Academics;
+using Elsasa.Sis.Contracts.DemoData;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -193,9 +214,11 @@ public static class DependencyInjection
         services.AddScoped<GetResultsByAssessmentHandler>();
         services.AddScoped<GetStudentResultsWorkspaceHandler>();
 
-        // Academic Record Corrections feature handlers (P6-S14, UC-ACD-19, TD-06)
+        // Academic Record Corrections feature handlers (P6-S14, P5-S12, UC-ACD-15, UC-ACD-19, TD-05, TD-06)
         services.AddScoped<CorrectApprovedResultHandler>();
         services.AddScoped<GetResultCorrectionHistoryHandler>();
+        services.AddScoped<CorrectAcademicStandingHandler>();
+        services.AddScoped<CorrectPromotionRecommendationHandler>();
 
         // Report Cards Compilation, Snapshot Freezing, Publishing & Query handlers (P5-S11, P5-S12, UC-ACD-13, TD-05, TD-07)
         services.AddScoped<CompileReportCardHandler>();
@@ -210,6 +233,50 @@ public static class DependencyInjection
         services.AddScoped<IssueTranscriptHandler>();
         services.AddScoped<GetStudentTranscriptHandler>();
         services.AddScoped<GetTranscriptByIdHandler>();
+
+        // Learning Progress & Completion feature handlers (P2-S04, P2-S05, UC-ACD-12)
+        services.AddScoped<Elsasa.Sis.Academics.Features.LearningProgress.RecordLearningProgress.RecordLearningProgressHandler>();
+        services.AddScoped<Elsasa.Sis.Academics.Features.LearningProgress.ConcludeParticipation.ConcludeParticipationHandler>();
+        services.AddScoped<Elsasa.Sis.Academics.Features.LearningProgress.GetStudentLearningProgress.GetStudentLearningProgressHandler>();
+        services.AddScoped<Elsasa.Sis.Academics.Features.LearningProgress.GetUnitLearningProgress.GetUnitLearningProgressHandler>();
+
+        // Academic Achievements feature handlers (P4-S11, UC-ACD-21)
+        services.AddScoped<ConferAcademicAchievementHandler>();
+        services.AddScoped<GetStudentAchievementsHandler>();
+        services.AddScoped<GetPeriodAchievementsHandler>();
+
+        // Cohort Academic Review & Threshold Evaluation feature handlers (P3-S06, TD-03, UC-ACD-17)
+        services.AddSingleton<ThresholdRuleEvaluator>();
+        services.AddScoped<EvaluateCohortStandingHandler>();
+        services.AddScoped<EvaluateCohortProgressionHandler>();
+
+        // Academic Standings feature handlers (P3-S07, P3-S09, UC-ACD-17, TD-03)
+        services.AddScoped<DetermineAcademicStandingHandler>();
+        services.AddScoped<BatchDetermineCohortStandingHandler>();
+        services.AddScoped<GetStudentStandingsHandler>();
+        services.AddScoped<GetCohortStandingsHandler>();
+
+        // Promotion Recommendations feature handlers (P3-S08, P3-S09, UC-ACD-17, TD-03)
+        services.AddScoped<Elsasa.Sis.Academics.Features.PromotionRecommendations.IssuePromotionRecommendation.IssuePromotionRecommendationHandler>();
+        services.AddScoped<Elsasa.Sis.Academics.Features.PromotionRecommendations.BatchIssuePromotionRecommendations.BatchIssuePromotionRecommendationsHandler>();
+        services.AddScoped<GetStudentPromotionRecommendationsHandler>();
+        services.AddScoped<GetCohortPromotionRecommendationsHandler>();
+
+        // Academic Interventions & At-Risk Query Engine feature handlers (P4-S10, UC-ACD-11, TD-04)
+        services.AddScoped<GetAtRiskLearnersHandler>();
+        services.AddScoped<InitiateAcademicInterventionHandler>();
+        services.AddScoped<UpdateInterventionStatusHandler>();
+        services.AddScoped<GetActiveInterventionsHandler>();
+        services.AddScoped<GetInterventionByIdHandler>();
+
+        // Demo Data Purger & Structure Seeder (P1-S03, ADR-002, ADR-004, TD-02, TD-05)
+        // Register purger against the shared IDemoDataDomainPurger contract so the
+        // host DemoDataOrchestrator can resolve it (ADR-001, ADR-002).
+        services.AddScoped<AcademicsDemoDataPurger>();
+        services.AddScoped<IAcademicsDemoDataPurger, AcademicsDemoDataPurger>();
+        services.AddScoped<IDemoDataDomainPurger, AcademicsDemoDataPurger>();
+        services.AddScoped<IAcademicsStructureDemoDataSeeder, AcademicsStructureDemoDataSeeder>();
+        services.AddScoped<IAcademicsActivitiesDemoDataSeeder, AcademicsActivitiesDemoDataSeeder>();
 
         // Cross-domain query & cloning services (P2-S04, P2-S05)
         services.AddScoped<IAcademicsModule, AcademicsModule>();
@@ -502,6 +569,128 @@ public static class DependencyInjection
             AddPermissionPolicy(
                 Permissions.Academics.Corrections.ViewHistory,
                 "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority");
+
+            // Learning Progress permissions (ADR-009, TD-02, TD-07, IS012)
+            // Academic Coordinator: View, Record, Conclude
+            // Academic Authority: View, Record, Conclude
+            // Teacher: View
+            // Student: View
+            AddPermissionPolicy(
+                Permissions.Academics.Progress.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher",
+                "Student");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Progress.Record,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Progress.Conclude,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority");
+
+            // Academic Standings permissions (ADR-009, TD-03, IS012)
+            // Academic Authority: View, Evaluate, Determine, BatchDetermine
+            // Academic Coordinator: View, Evaluate
+            // Teacher: View
+            // StudentAdministrationOfficer: View
+            AddPermissionPolicy(
+                Permissions.Academics.Standings.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher",
+                "StudentAdminOfficer", "Student Admin Officer",
+                "StudentAdministrationOfficer", "Student Administration Officer");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Standings.Evaluate,
+                "AcademicAuthority", "Academic Authority",
+                "AcademicCoordinator", "Academic Coordinator");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Standings.Determine,
+                "AcademicAuthority", "Academic Authority");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Standings.BatchDetermine,
+                "AcademicAuthority", "Academic Authority");
+
+            // Promotion Recommendations permissions (ADR-009, TD-03, IS012)
+            // Academic Authority: View, Evaluate, Issue, BatchIssue
+            // Academic Coordinator: View, Evaluate
+            // Teacher: View
+            // StudentAdministrationOfficer: View
+            AddPermissionPolicy(
+                Permissions.Academics.Progression.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher",
+                "StudentAdminOfficer", "Student Admin Officer",
+                "StudentAdministrationOfficer", "Student Administration Officer");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Progression.Evaluate,
+                "AcademicAuthority", "Academic Authority",
+                "AcademicCoordinator", "Academic Coordinator");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Progression.Issue,
+                "AcademicAuthority", "Academic Authority");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Progression.BatchIssue,
+                "AcademicAuthority", "Academic Authority");
+
+            // Academic Interventions permissions (ADR-009, TD-04, IS012)
+            // Academic Coordinator: View, Initiate, UpdateStatus
+            // Academic Authority: View, Initiate, UpdateStatus
+            // Teacher: View, Initiate (educator referral)
+            AddPermissionPolicy(
+                Permissions.Academics.Interventions.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Interventions.Initiate,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Interventions.UpdateStatus,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority");
+
+            // Academic Achievements permissions (ADR-009, IS012)
+            // Academic Authority: View, Confer
+            // Academic Coordinator: View
+            // Teacher, Student, Parent, AdmissionOfficer: View
+            AddPermissionPolicy(
+                Permissions.Academics.Achievements.View,
+                "AcademicCoordinator", "Academic Coordinator",
+                "AcademicAuthority", "Academic Authority",
+                "Teacher",
+                "Student",
+                "Parent",
+                "AdmissionOfficer", "Admission Officer");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Achievements.Confer,
+                "AcademicAuthority", "Academic Authority");
+
+            // Non-Grade Record Corrections permissions (ADR-009, TD-05, IS012)
+            // Academic Authority: CorrectStanding, CorrectProgression
+            AddPermissionPolicy(
+                Permissions.Academics.Corrections.CorrectStanding,
+                "AcademicAuthority", "Academic Authority");
+
+            AddPermissionPolicy(
+                Permissions.Academics.Corrections.CorrectProgression,
                 "AcademicAuthority", "Academic Authority");
         });
 

@@ -19,6 +19,10 @@ export const RECORDS_PERMISSIONS = {
 
   CORRECTIONS_CORRECT: 'academics.corrections.correct',
   CORRECTIONS_VIEW_HISTORY: 'academics.corrections.viewhistory',
+
+  PROGRESS_VIEW: 'academics.progress.view',
+  PROGRESS_RECORD: 'academics.progress.record',
+  PROGRESS_CONCLUDE: 'academics.progress.conclude',
 } as const;
 
 export const AUTHORITY_ROLES = [

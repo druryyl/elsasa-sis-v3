@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, type Component as VueComponent } from 'vue';
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { useQueryClient } from '@tanstack/vue-query';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
+import ResetDemoDataDialog from '@/app/layouts/components/ResetDemoDataDialog.vue';
 import {
   Menu,
   ChevronLeft,
@@ -27,6 +30,7 @@ import {
   Layers,
   Wallet,
   BookOpen,
+  RotateCcw,
 } from 'lucide-vue-next';
 
 interface NavChildItem {
@@ -53,6 +57,12 @@ const appContextStore = useAppContextStore();
 const uiStore = useUIStore();
 const route = useRoute();
 const router = useRouter();
+
+// PrimeVue toast instance for reactive notifications
+const toastInstance = useToast();
+
+// TanStack Query client instance for cache invalidation on reset
+const queryClientInstance = useQueryClient();
 
 // User profile dropdown state
 const isProfileMenuOpen = ref(false);
@@ -157,6 +167,22 @@ const masterNavItems: NavParentItem[] = [
         permission: 'academics.assignments.view',
         roles: ['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'],
       },
+      {
+        id: 'academics-interventions',
+        label: 'Academic Interventions',
+        to: '/academics/interventions',
+        icon: 'pi pi-bolt',
+        permission: 'academics.interventions.view',
+        roles: ['AcademicCoordinator', 'Teacher', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-cohort-review',
+        label: 'Cohort Academic Review',
+        to: '/academics/cohort-review',
+        icon: 'pi pi-check-square',
+        permission: 'academics.standings.view',
+        roles: ['AcademicAuthority', 'Admin'],
+      },
     ],
   },
   {
@@ -258,6 +284,10 @@ function checkPermission(permission: string): boolean {
     'Permissions.Academics.Activities.View': ['academics.activities.view'],
     'academics.assignments.view': ['Permissions.Academics.Assignments.View'],
     'Permissions.Academics.Assignments.View': ['academics.assignments.view'],
+    'academics.interventions.view': ['Permissions.Academics.Interventions.View'],
+    'Permissions.Academics.Interventions.View': ['academics.interventions.view'],
+    'academics.standings.view': ['Permissions.Academics.Standings.View'],
+    'Permissions.Academics.Standings.View': ['academics.standings.view'],
   };
 
   const aliases = permissionAliases[permission];
@@ -364,6 +394,55 @@ function handleLogout() {
 function selectCampus(campusId: string) {
   appContextStore.setActiveCampus(campusId);
   isCampusSelectorOpen.value = false;
+}
+
+/**
+ * Display condition for the "Reset Demo Data" menu item.
+ * Hard-guarded to SuperAdmin role and non-production environments only
+ * (ADR-010, TD-08, TD-10, GAP-008).
+ */
+const canResetDemoData = computed(() => {
+  return authStore.hasRole('SuperAdmin') && !import.meta.env.PROD;
+});
+
+// Dialog visibility state for the destructive reset confirmation modal
+const isResetDemoDataDialogOpen = ref(false);
+
+function openResetDemoDataDialog() {
+  isResetDemoDataDialogOpen.value = true;
+  isProfileMenuOpen.value = false;
+}
+
+/**
+ * Reactive reset workflow executed after a successful demo data reset.
+ *
+ * - Shows a success toast notification.
+ * - Clears Pinia caches (appContextStore + cached TanStack Query keys).
+ * - Performs a clean page reload so the application re-hydrates from the
+ *   newly pristine database state.
+ */
+function handleResetDemoDataSuccess() {
+  if (toastInstance && typeof toastInstance.add === 'function') {
+    toastInstance.add({
+      severity: 'success',
+      summary: 'Demo Data Reset',
+      detail: 'Demo sample data reset successfully.',
+      life: 4000,
+    });
+  }
+
+  // Clear Pinia application context cache
+  appContextStore.clear();
+
+  // Clear cached TanStack Query keys so all views re-fetch from the pristine database
+  if (queryClientInstance) {
+    queryClientInstance.clear();
+  }
+
+  // Clean page reload to refresh application state from the new pristine database
+  if (typeof globalThis.window !== 'undefined' && typeof globalThis.window.location.reload === 'function') {
+    globalThis.window.location.reload();
+  }
 }
 
 function getDomainBadgeColor(groupId: string): string {
@@ -687,6 +766,16 @@ function getDomainBadgeColor(groupId: string): string {
 
               <div class="px-2 py-1">
                 <button
+                  v-if="canResetDemoData"
+                  type="button"
+                  class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors"
+                  data-testid="reset-demo-data-button"
+                  @click="openResetDemoDataDialog"
+                >
+                  <RotateCcw class="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
+                  <span>Reset Demo Data</span>
+                </button>
+                <button
                   type="button"
                   class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
                   data-testid="logout-button"
@@ -763,6 +852,14 @@ function getDomainBadgeColor(groupId: string): string {
       </main>
     </div>
   </div>
+
+  <!-- Destructive Reset Demo Data Confirmation Dialog (mounted at root level to preserve state) -->
+  <ResetDemoDataDialog
+    v-if="canResetDemoData"
+    :visible="isResetDemoDataDialogOpen"
+    @update:visible="isResetDemoDataDialogOpen = $event"
+    @success="handleResetDemoDataSuccess"
+  />
 </template>
 
 <style scoped>

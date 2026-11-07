@@ -27,6 +27,25 @@ using Elsasa.Sis.Academics.Features.Transcripts.GenerateInterimTranscript;
 using Elsasa.Sis.Academics.Features.Transcripts.GetStudentTranscript;
 using Elsasa.Sis.Academics.Features.Transcripts.GetTranscriptById;
 using Elsasa.Sis.Academics.Features.Transcripts.IssueTranscript;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.ConferAcademicAchievement;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.GetPeriodAchievements;
+using Elsasa.Sis.Academics.Features.AcademicAchievements.GetStudentAchievements;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetActiveInterventions;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetAtRiskLearners;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.GetInterventionById;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.InitiateAcademicIntervention;
+using Elsasa.Sis.Academics.Features.AcademicInterventions.UpdateInterventionStatus;
+using Elsasa.Sis.Academics.Features.AcademicStandings.BatchDetermineCohortStanding;
+using Elsasa.Sis.Academics.Features.AcademicStandings.DetermineAcademicStanding;
+using Elsasa.Sis.Academics.Features.AcademicStandings.GetCohortStandings;
+using Elsasa.Sis.Academics.Features.AcademicStandings.GetStudentStandings;
+using Elsasa.Sis.Academics.Features.CohortReview;
+using Elsasa.Sis.Academics.Features.CohortReview.EvaluateCohortProgression;
+using Elsasa.Sis.Academics.Features.CohortReview.EvaluateCohortStanding;
+using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetCohortPromotionRecommendations;
+using Elsasa.Sis.Academics.Features.PromotionRecommendations.GetStudentPromotionRecommendations;
+using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectAcademicStanding;
+using Elsasa.Sis.Academics.Features.RecordCorrections.CorrectPromotionRecommendation;
 using Elsasa.Sis.Academics.Services;
 using Elsasa.Sis.Academics.Services.Reassessment;
 using Elsasa.Sis.Api.Configuration;
@@ -118,6 +137,43 @@ public sealed class AcademicsModuleHostIntegrationTests
         sp.GetService<IssueTranscriptHandler>().Should().NotBeNull();
         sp.GetService<GetStudentTranscriptHandler>().Should().NotBeNull();
         sp.GetService<GetTranscriptByIdHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Learning Progress Handlers (P2-S04, P2-S05)
+        sp.GetService<Elsasa.Sis.Academics.Features.LearningProgress.RecordLearningProgress.RecordLearningProgressHandler>().Should().NotBeNull();
+        sp.GetService<Elsasa.Sis.Academics.Features.LearningProgress.ConcludeParticipation.ConcludeParticipationHandler>().Should().NotBeNull();
+        sp.GetService<Elsasa.Sis.Academics.Features.LearningProgress.GetStudentLearningProgress.GetStudentLearningProgressHandler>().Should().NotBeNull();
+        sp.GetService<Elsasa.Sis.Academics.Features.LearningProgress.GetUnitLearningProgress.GetUnitLearningProgressHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Cohort Review & Standings Handlers (P3-S06, P3-S07, P3-S09)
+        sp.GetService<ThresholdRuleEvaluator>().Should().NotBeNull();
+        sp.GetService<EvaluateCohortStandingHandler>().Should().NotBeNull();
+        sp.GetService<EvaluateCohortProgressionHandler>().Should().NotBeNull();
+        sp.GetService<DetermineAcademicStandingHandler>().Should().NotBeNull();
+        sp.GetService<BatchDetermineCohortStandingHandler>().Should().NotBeNull();
+        sp.GetService<GetStudentStandingsHandler>().Should().NotBeNull();
+        sp.GetService<GetCohortStandingsHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Promotion Recommendations Handlers (P3-S08, P3-S09)
+        sp.GetService<Elsasa.Sis.Academics.Features.PromotionRecommendations.IssuePromotionRecommendation.IssuePromotionRecommendationHandler>().Should().NotBeNull();
+        sp.GetService<Elsasa.Sis.Academics.Features.PromotionRecommendations.BatchIssuePromotionRecommendations.BatchIssuePromotionRecommendationsHandler>().Should().NotBeNull();
+        sp.GetService<GetStudentPromotionRecommendationsHandler>().Should().NotBeNull();
+        sp.GetService<GetCohortPromotionRecommendationsHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Academic Interventions Handlers (P4-S10)
+        sp.GetService<GetAtRiskLearnersHandler>().Should().NotBeNull();
+        sp.GetService<InitiateAcademicInterventionHandler>().Should().NotBeNull();
+        sp.GetService<UpdateInterventionStatusHandler>().Should().NotBeNull();
+        sp.GetService<GetActiveInterventionsHandler>().Should().NotBeNull();
+        sp.GetService<GetInterventionByIdHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Academic Achievements Handlers (P4-S11)
+        sp.GetService<ConferAcademicAchievementHandler>().Should().NotBeNull();
+        sp.GetService<GetStudentAchievementsHandler>().Should().NotBeNull();
+        sp.GetService<GetPeriodAchievementsHandler>().Should().NotBeNull();
+
+        // Assert - Submodule 4: Non-Grade Corrections Handlers (P5-S12)
+        sp.GetService<CorrectAcademicStandingHandler>().Should().NotBeNull();
+        sp.GetService<CorrectPromotionRecommendationHandler>().Should().NotBeNull();
     }
 
     [Fact]
@@ -140,7 +196,7 @@ public sealed class AcademicsModuleHostIntegrationTests
         var endpoints = endpointSources.SelectMany(ds => ds.Endpoints).ToList();
         endpoints.Should().NotBeEmpty();
 
-        // Verify representative endpoints are mapped
+        // Verify representative endpoints are mapped across all submodules
         var routePatterns = endpoints
             .Select(e => (e as RouteEndpoint)?.RoutePattern.RawText)
             .Where(r => r is not null)
@@ -153,6 +209,14 @@ public sealed class AcademicsModuleHostIntegrationTests
         routePatterns.Should().Contain(p => p!.Contains("report-cards/compile"));
         routePatterns.Should().Contain(p => p!.Contains("transcripts/generate"));
         routePatterns.Should().Contain(p => p!.Contains("portal/learning/results"));
+
+        // Submodule 4 route patterns
+        routePatterns.Should().Contain(p => p!.Contains("learning-progress"));
+        routePatterns.Should().Contain(p => p!.Contains("academic-standings"));
+        routePatterns.Should().Contain(p => p!.Contains("promotion-recommendations"));
+        routePatterns.Should().Contain(p => p!.Contains("interventions"));
+        routePatterns.Should().Contain(p => p!.Contains("achievements"));
+        routePatterns.Should().Contain(p => p!.Contains("cohort-review"));
     }
 
     [Fact]
@@ -180,10 +244,18 @@ public sealed class AcademicsModuleHostIntegrationTests
             swaggerDoc.Should().NotBeNull();
             swaggerDoc.Paths.Should().NotBeEmpty();
 
-            // Verify Academics paths in Swagger doc
+            // Verify Academics paths in Swagger doc across submodules
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/assessments"));
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/report-cards"));
             swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/transcripts"));
+
+            // Submodule 4 routes in Swagger
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/learning-progress"));
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/academic-standings"));
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/promotion-recommendations"));
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/interventions"));
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/achievements"));
+            swaggerDoc.Paths.Keys.Should().Contain(k => k.Contains("/api/v1/academics/cohort-review"));
         }
         finally
         {
@@ -233,6 +305,62 @@ public sealed class AcademicsModuleHostIntegrationTests
         // Assert
         result.IsFailure.Should().BeTrue();
         result.Error!.Code.Should().Be("Academics.ReportCardSnapshotQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetStudentAcademicStandingAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetStudentAcademicStandingAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Academics.StudentAcademicStandingQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetPromotionRecommendationAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetPromotionRecommendationAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Academics.PromotionRecommendationQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetStudentAcademicAchievementsAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetStudentAcademicAchievementsAsync(Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Academics.StudentAcademicAchievementsQueryFailed");
+    }
+
+    [Fact]
+    public async Task AcademicsModule_GetStudentLearningProgressSummaryAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new AcademicsModule(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetStudentLearningProgressSummaryAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Academics.StudentLearningProgressSummaryQueryFailed");
     }
 
     [Fact]

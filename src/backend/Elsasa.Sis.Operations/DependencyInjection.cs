@@ -21,12 +21,15 @@ using Elsasa.Sis.Operations.Features.CalendarPeriods.RecordCorrections.CorrectOp
 using Elsasa.Sis.Operations.Features.CalendarPeriods.RecordCorrections.GetRecordCorrectionsList;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.CreateSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.GetActiveSchoolCalendar;
-using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.GetSchoolCalendarsList;using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.PublishSchoolCalendar;
+using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.GetSchoolCalendarsList;
+using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.PublishSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolCalendars.WithdrawSchoolCalendar;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.DeclareSchoolClosure;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.GetSchoolClosuresList;
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.LiftSchoolClosure;
 using Elsasa.Sis.Operations.Services;
+using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Operations.Features.DemoData;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -64,7 +67,7 @@ public static class DependencyInjection
         services.AddScoped<PublishSchoolCalendarHandler>();
         services.AddScoped<WithdrawSchoolCalendarHandler>();
         services.AddScoped<GetActiveSchoolCalendarHandler>();
-services.AddScoped<GetSchoolCalendarsListHandler>();
+        services.AddScoped<GetSchoolCalendarsListHandler>();
         // Calendar Entry & Matrix handlers
         services.AddScoped<CreateCalendarEntryHandler>();
         services.AddScoped<DeleteCalendarEntryHandler>();
@@ -81,6 +84,14 @@ services.AddScoped<GetSchoolCalendarsListHandler>();
         // Record Corrections handlers
         services.AddScoped<CorrectOperationsRecordHandler>();
         services.AddScoped<GetRecordCorrectionsListHandler>();
+
+        // Demo Data services (P1-S02)
+        // Register purger against the shared IOperationsDemoDataPurger and IDemoDataDomainPurger contracts so the
+        // host DemoDataOrchestrator can resolve it (ADR-001, ADR-002).
+        services.AddScoped<OperationsDemoDataPurger>();
+        services.AddScoped<IOperationsDemoDataPurger, OperationsDemoDataPurger>();
+        services.AddScoped<IDemoDataDomainPurger, OperationsDemoDataPurger>();
+        services.AddScoped<IOperationsDemoDataSeeder, OperationsDemoDataSeeder>();
 
         // Cross-domain query services (ADR-001, ADR-003, TD-03)
         services.AddScoped<IOperationsCalendarQueryService, OperationsCalendarQueryService>();

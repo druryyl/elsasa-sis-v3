@@ -531,5 +531,210 @@ public sealed class AcademicsModule(ISqlConnectionFactory connectionFactory) : I
                     $"Failed to query report card snapshot for '{reportCardId}': {ex.Message}"));
         }
     }
+
+    private const string _selectStudentAcademicStandingSql = """
+        SELECT
+            id AS Id,
+            student_id AS StudentId,
+            academic_period_id AS AcademicPeriodId,
+            standing AS Standing,
+            policy_reference AS PolicyReference,
+            conditions AS Conditions,
+            is_exception AS IsException,
+            exception_reason AS ExceptionReason,
+            committee_reference AS CommitteeReference,
+            authorized_by AS AuthorizedBy,
+            determined_at AS DeterminedAt
+        FROM academics.academic_standings
+        WHERE student_id = @StudentId
+          AND academic_period_id = @AcademicPeriodId;
+        """;
+
+    private const string _selectPromotionRecommendationSql = """
+        SELECT
+            id AS Id,
+            student_id AS StudentId,
+            academic_period_id AS AcademicPeriodId,
+            recommendation AS Recommendation,
+            from_level AS FromLevel,
+            recommended_to_level AS RecommendedToLevel,
+            conditions AS Conditions,
+            supporting_evidence AS SupportingEvidence,
+            academic_standing_id AS AcademicStandingId,
+            is_exception AS IsException,
+            exception_reason AS ExceptionReason,
+            committee_reference AS CommitteeReference,
+            authorized_by AS AuthorizedBy,
+            issued_at AS IssuedAt
+        FROM academics.promotion_recommendations
+        WHERE student_id = @StudentId
+          AND academic_period_id = @AcademicPeriodId;
+        """;
+
+    private const string _selectStudentAcademicAchievementsSql = """
+        SELECT
+            id AS Id,
+            student_id AS StudentId,
+            learning_unit_id AS LearningUnitId,
+            academic_period_id AS AcademicPeriodId,
+            achievement_type AS AchievementType,
+            title AS Title,
+            description AS Description,
+            criteria_met AS CriteriaMet,
+            supporting_evidence AS SupportingEvidence,
+            recognized_by AS RecognizedBy,
+            recognized_at AS RecognizedAt
+        FROM academics.academic_achievements
+        WHERE student_id = @StudentId
+          AND (@AcademicPeriodId IS NULL OR academic_period_id = @AcademicPeriodId)
+        ORDER BY recognized_at DESC, created_at DESC;
+        """;
+
+    private const string _selectStudentLearningProgressSummarySql = """
+        SELECT
+            status AS Status,
+            COUNT(1) AS UnitCount
+        FROM academics.learning_progress
+        WHERE student_id = @StudentId
+          AND academic_period_id = @AcademicPeriodId
+        GROUP BY status
+        ORDER BY status ASC;
+        """;
+
+    /// <inheritdoc />
+    public async Task<Result<StudentAcademicStandingDto?>> GetStudentAcademicStandingAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var standing = await connection.QuerySingleOrDefaultAsync<StudentAcademicStandingDto>(new CommandDefinition(
+                _selectStudentAcademicStandingSql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct));
+
+            return Result.Success(standing);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<StudentAcademicStandingDto?>(
+                DomainError.Failure(
+                    "Academics.StudentAcademicStandingQueryFailed",
+                    $"Failed to query academic standing for student '{studentId}' in period '{academicPeriodId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<PromotionRecommendationDto?>> GetPromotionRecommendationAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var recommendation = await connection.QuerySingleOrDefaultAsync<PromotionRecommendationDto>(new CommandDefinition(
+                _selectPromotionRecommendationSql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct));
+
+            return Result.Success(recommendation);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<PromotionRecommendationDto?>(
+                DomainError.Failure(
+                    "Academics.PromotionRecommendationQueryFailed",
+                    $"Failed to query promotion recommendation for student '{studentId}' in period '{academicPeriodId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<AcademicAchievementDto>>> GetStudentAcademicAchievementsAsync(
+        Guid studentId,
+        Guid? academicPeriodId = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var achievements = (await connection.QueryAsync<AcademicAchievementDto>(new CommandDefinition(
+                _selectStudentAcademicAchievementsSql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct))).AsList();
+
+            return Result.Success<IReadOnlyList<AcademicAchievementDto>>(achievements);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IReadOnlyList<AcademicAchievementDto>>(
+                DomainError.Failure(
+                    "Academics.StudentAcademicAchievementsQueryFailed",
+                    $"Failed to query academic achievements for student '{studentId}': {ex.Message}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<LearningProgressSummaryDto>>> GetStudentLearningProgressSummaryAsync(
+        Guid studentId,
+        Guid academicPeriodId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await connectionFactory.CreateConnectionAsync(ct);
+
+            var summary = (await connection.QueryAsync<LearningProgressSummaryDto>(new CommandDefinition(
+                _selectStudentLearningProgressSummarySql,
+                new
+                {
+                    StudentId = studentId,
+                    AcademicPeriodId = academicPeriodId
+                },
+                cancellationToken: ct))).AsList();
+
+            return Result.Success<IReadOnlyList<LearningProgressSummaryDto>>(summary);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IReadOnlyList<LearningProgressSummaryDto>>(
+                DomainError.Failure(
+                    "Academics.StudentLearningProgressSummaryQueryFailed",
+                    $"Failed to query learning progress summary for student '{studentId}' in period '{academicPeriodId}': {ex.Message}"));
+        }
+    }
 }
 

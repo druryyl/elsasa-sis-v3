@@ -27,7 +27,15 @@ public sealed class TestEventCollector :
     INotificationHandler<AcademicResultPublishedEvent>,
     INotificationHandler<AcademicResultCorrectedEvent>,
     INotificationHandler<ReportCardPublishedEvent>,
-    INotificationHandler<TranscriptIssuedEvent>
+    INotificationHandler<TranscriptIssuedEvent>,
+    INotificationHandler<LearningProgressUpdatedEvent>,
+    INotificationHandler<AcademicStandingDeterminedEvent>,
+    INotificationHandler<PromotionRecommendationIssuedEvent>,
+    INotificationHandler<AcademicInterventionInitiatedEvent>,
+    INotificationHandler<AcademicInterventionConcludedEvent>,
+    INotificationHandler<AcademicAchievementConferredEvent>,
+    INotificationHandler<AcademicStandingCorrectedEvent>,
+    INotificationHandler<PromotionRecommendationCorrectedEvent>
 {
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
@@ -47,6 +55,14 @@ public sealed class TestEventCollector :
     private readonly ConcurrentBag<AcademicResultCorrectedEvent> _academicResultCorrectedEvents = [];
     private readonly ConcurrentBag<ReportCardPublishedEvent> _reportCardPublishedEvents = [];
     private readonly ConcurrentBag<TranscriptIssuedEvent> _transcriptIssuedEvents = [];
+    private readonly ConcurrentBag<LearningProgressUpdatedEvent> _learningProgressUpdatedEvents = [];
+    private readonly ConcurrentBag<AcademicStandingDeterminedEvent> _academicStandingDeterminedEvents = [];
+    private readonly ConcurrentBag<PromotionRecommendationIssuedEvent> _promotionRecommendationIssuedEvents = [];
+    private readonly ConcurrentBag<AcademicInterventionInitiatedEvent> _academicInterventionInitiatedEvents = [];
+    private readonly ConcurrentBag<AcademicInterventionConcludedEvent> _academicInterventionConcludedEvents = [];
+    private readonly ConcurrentBag<AcademicAchievementConferredEvent> _academicAchievementConferredEvents = [];
+    private readonly ConcurrentBag<AcademicStandingCorrectedEvent> _academicStandingCorrectedEvents = [];
+    private readonly ConcurrentBag<PromotionRecommendationCorrectedEvent> _promotionRecommendationCorrectedEvents = [];
 
     /// <summary>
     /// Gets all captured <see cref="ApplicantAcceptedEvent"/> notifications.
@@ -139,6 +155,46 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<TranscriptIssuedEvent> TranscriptIssuedEvents => _transcriptIssuedEvents;
 
     /// <summary>
+    /// Gets all captured <see cref="LearningProgressUpdatedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<LearningProgressUpdatedEvent> LearningProgressUpdatedEvents => _learningProgressUpdatedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicStandingDeterminedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicStandingDeterminedEvent> AcademicStandingDeterminedEvents => _academicStandingDeterminedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="PromotionRecommendationIssuedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<PromotionRecommendationIssuedEvent> PromotionRecommendationIssuedEvents => _promotionRecommendationIssuedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicInterventionInitiatedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicInterventionInitiatedEvent> AcademicInterventionInitiatedEvents => _academicInterventionInitiatedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicInterventionConcludedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicInterventionConcludedEvent> AcademicInterventionConcludedEvents => _academicInterventionConcludedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicAchievementConferredEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicAchievementConferredEvent> AcademicAchievementConferredEvents => _academicAchievementConferredEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="AcademicStandingCorrectedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<AcademicStandingCorrectedEvent> AcademicStandingCorrectedEvents => _academicStandingCorrectedEvents;
+
+    /// <summary>
+    /// Gets all captured <see cref="PromotionRecommendationCorrectedEvent"/> notifications.
+    /// </summary>
+    public IReadOnlyCollection<PromotionRecommendationCorrectedEvent> PromotionRecommendationCorrectedEvents => _promotionRecommendationCorrectedEvents;
+
+    /// <summary>
     /// Clears all captured notifications.
     /// </summary>
     public void Reset()
@@ -161,6 +217,14 @@ public sealed class TestEventCollector :
         _academicResultCorrectedEvents.Clear();
         _reportCardPublishedEvents.Clear();
         _transcriptIssuedEvents.Clear();
+        _learningProgressUpdatedEvents.Clear();
+        _academicStandingDeterminedEvents.Clear();
+        _promotionRecommendationIssuedEvents.Clear();
+        _academicInterventionInitiatedEvents.Clear();
+        _academicInterventionConcludedEvents.Clear();
+        _academicAchievementConferredEvents.Clear();
+        _academicStandingCorrectedEvents.Clear();
+        _promotionRecommendationCorrectedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -304,6 +368,70 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _transcriptIssuedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(LearningProgressUpdatedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _learningProgressUpdatedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicStandingDeterminedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicStandingDeterminedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(PromotionRecommendationIssuedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _promotionRecommendationIssuedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicInterventionInitiatedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicInterventionInitiatedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicInterventionConcludedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicInterventionConcludedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicAchievementConferredEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicAchievementConferredEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(AcademicStandingCorrectedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _academicStandingCorrectedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(PromotionRecommendationCorrectedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _promotionRecommendationCorrectedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

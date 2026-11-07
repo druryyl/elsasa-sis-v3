@@ -24,6 +24,7 @@ import type {
   AdministrativePlacementDto,
   ChangeAdministrativePlacementResponse,
 } from '../types/records.types';
+import ProgressionRecommendationBadge from '@/features/students/lifecycle/components/ProgressionRecommendationBadge.vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -259,6 +260,14 @@ async function handleFormSubmit() {
           <span class="text-[11px] text-surface-500 dark:text-surface-400 block">Effective Since</span>
           <strong class="text-teal-800 dark:text-teal-300 font-semibold">{{ formatDisplayDate(currentActivePlacement.effectiveDate) }}</strong>
         </div>
+      </div>
+
+      <!-- Authoritative Academic Progression Recommendation Section -->
+      <div class="space-y-1.5" data-testid="modal-progression-recommendation-section">
+        <ProgressionRecommendationBadge
+          :student-id="student?.id"
+          :show-details="true"
+        />
       </div>
 
       <!-- General Form Error Message -->

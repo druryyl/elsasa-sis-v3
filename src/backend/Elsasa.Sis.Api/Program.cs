@@ -1,5 +1,6 @@
 using Elsasa.Sis.Academics;
 using Elsasa.Sis.Api.Configuration;
+using Elsasa.Sis.Api.Features.DemoData;
 using Elsasa.Sis.Api.Middleware;
 using Elsasa.Sis.Database;
 using Elsasa.Sis.Shared.Endpoints;
@@ -18,6 +19,60 @@ if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
         ? overrideArg["--ConnectionStrings:DefaultConnection=".Length..]
         : builder.Configuration.GetConnectionString(DependencyInjection.DefaultConnectionKey);
     return Program.RunMigration(connectionString);
+}
+
+// Demo data seed/clean CLI support (ADR-001, ADR-006, TD-01, TD-02, TD-08, OQ-004)
+if (args.Contains("--seed-demo", StringComparer.OrdinalIgnoreCase) || args.Contains("--clean-only", StringComparer.OrdinalIgnoreCase))
+{
+    var cleanOnly = args.Contains("--clean-only", StringComparer.OrdinalIgnoreCase);
+
+    // Run pending migrations first (ADR-006)
+    var migrationConnectionString = builder.Configuration.GetConnectionString(DependencyInjection.DefaultConnectionKey);
+    var migrationStatus = Program.RunMigration(migrationConnectionString);
+    if (migrationStatus != 0)
+    {
+        Console.Error.WriteLine("Demo data operation aborted: Database migration failed.");
+        return 1;
+    }
+
+    // Build minimal host for demo data orchestration
+    builder.Services.AddGlobalExceptionHandler();
+    builder.Services.AddHostComposition(builder.Configuration);
+    builder.Services.AddJwtAuthentication(builder.Configuration);
+    builder.Services.AddSwaggerDocumentation();
+    builder.Services.AddAcademicsDomain(builder.Configuration);
+
+    using var host = builder.Build();
+    try
+    {
+        await host.StartAsync();
+
+        using var scope = host.Services.CreateScope();
+        var orchestrator = scope.ServiceProvider.GetRequiredService<DemoDataOrchestrator>();
+        var cancellationToken = host.Services.GetRequiredService<Microsoft.Extensions.Hosting.IHostApplicationLifetime>().ApplicationStopping;
+
+        Console.WriteLine($"Running demo data operation (CleanOnly: {cleanOnly})...");
+        var summary = await orchestrator.ExecuteResetAsync(cleanOnly, cancellationToken);
+
+        Console.WriteLine($"Demo data reset completed successfully.");
+        Console.WriteLine($"  Purged Schemas: {summary.PurgedSchemas}");
+        Console.WriteLine($"  Seeded Domains: {summary.SeededDomains}");
+        Console.WriteLine($"  Students: {summary.TotalStudentsSeeded}");
+        Console.WriteLine($"  Invoices: {summary.TotalInvoicesSeeded}");
+        Console.WriteLine($"  Attendance Records: {summary.TotalAttendanceSeeded}");
+        Console.WriteLine($"  Results: {summary.TotalResultsSeeded}");
+        Console.WriteLine($"  Report Cards: {summary.TotalReportCardsSeeded}");
+        Console.WriteLine($"  Duration: {summary.ElapsedMilliseconds}ms");
+        Console.WriteLine($"  Anchored Date: {summary.AnchoredDate:yyyy-MM-dd}");
+        Console.WriteLine($"  Academic Year: {summary.BaseAcademicYearCode}");
+
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Demo data operation failed: {ex.Message}");
+        return 1;
+    }
 }
 
 // Configure physical storage path for coursework submissions (TD-07, P5-S13)
@@ -65,6 +120,7 @@ app.MapHealthChecks("/health");
 app.MapEndpoints(DependencyInjection.Stage1Assemblies);
 app.MapAcademicsEndpoints();
 new Elsasa.Sis.Api.Features.Auth.LoginEndpoint().MapEndpoint(app);
+new Elsasa.Sis.Api.Features.DemoData.DemoDataEndpoints().MapEndpoint(app);
 
 // Provide a landing page so the default browser URL (root path) does not return 404.
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled", false))

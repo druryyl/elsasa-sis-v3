@@ -71,3 +71,12 @@ export const correctionKeys = {
   detail: (resultId: string | null | undefined) =>
     [...correctionKeys.histories(), resultId] as const,
 } as const;
+
+export const learningProgressKeys = {
+  all: ['academics', 'learning-progress'] as const,
+  byStudent: (studentId?: string | null | undefined, periodId?: string | null | undefined) =>
+    ['academics', 'learning-progress', studentId, periodId] as const,
+  byUnit: (unitId?: string | null | undefined) =>
+    ['academics', 'learning-progress', 'unit', unitId] as const,
+} as const;
+
