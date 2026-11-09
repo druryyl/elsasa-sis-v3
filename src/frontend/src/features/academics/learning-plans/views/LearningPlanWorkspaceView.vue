@@ -40,6 +40,7 @@ import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
 import { useAcademicYearsQuery } from '@/features/operations/calendar/composables/useAcademicYearsQuery';
+import { useOperationalPeriodsQuery } from '@/features/operations/calendar/composables/useOperationalPeriodsQuery';
 import {
   useLearningPlans,
   useLearningPlanDetail,
@@ -99,31 +100,76 @@ const showMobileDetail = ref<boolean>(false);
 // ---------------------------------------------------------------------------
 // 4. Academic Periods Query
 // ---------------------------------------------------------------------------
-const { data: academicYears, isLoading: isLoadingPeriods } = useAcademicYearsQuery();
+const { data: academicYears, isLoading: isLoadingAcademicYears } = useAcademicYearsQuery();
 
-const periodOptions = computed<AcademicPeriodOption[]>(() => {
-  if (!academicYears.value || academicYears.value.length === 0) {
-    return [];
-  }
-  return academicYears.value.map((ay) => ({
-    id: ay.id,
-    label: `${ay.name} (${ay.code})`,
-    code: ay.code,
-  }));
+// Active or primary academic year for querying operational periods (semesters)
+const activeAcademicYear = computed(() => {
+  if (!academicYears.value || academicYears.value.length === 0) return null;
+  return academicYears.value.find((y) => y.status === 'active') ?? academicYears.value[0];
 });
 
-// Auto-select initial academic period from appContext or first option
+const { data: operationalPeriods, isLoading: isLoadingOperationalPeriods } = useOperationalPeriodsQuery(
+  () => activeAcademicYear.value?.id,
+  {
+    enabled: computed(() => Boolean(activeAcademicYear.value?.id)),
+  },
+);
+
+const isLoadingPeriods = computed(
+  () => isLoadingAcademicYears.value || isLoadingOperationalPeriods.value,
+);
+
+// Options for Formulate Plan modal (excludes filter empty option)
+const modalPeriodOptions = computed<AcademicPeriodOption[]>(() => {
+  const options: AcademicPeriodOption[] = [];
+
+  // 1. Include operational periods (semesters) if available
+  if (operationalPeriods.value && operationalPeriods.value.length > 0) {
+    for (const p of operationalPeriods.value) {
+      options.push({
+        id: p.id,
+        label: p.name,
+        code: p.periodCode,
+      });
+    }
+  }
+
+  // 2. Include academic years
+  if (academicYears.value && academicYears.value.length > 0) {
+    for (const ay of academicYears.value) {
+      if (!options.some((o) => o.id === ay.id)) {
+        options.push({
+          id: ay.id,
+          label: `${ay.name} (${ay.code})`,
+          code: ay.code,
+        });
+      }
+    }
+  }
+
+  return options;
+});
+
+// Options for Master Sidebar filter dropdown
+const periodOptions = computed<AcademicPeriodOption[]>(() => {
+  const options: AcademicPeriodOption[] = [
+    { id: '', label: 'All Academic Periods' },
+  ];
+  return options.concat(modalPeriodOptions.value);
+});
+
+// Auto-select initial academic period from appContext or default to all
 watch(
   () => periodOptions.value,
   (options) => {
-    if (options.length > 0 && !selectedPeriodId.value) {
+    if (options.length > 0 && selectedPeriodId.value === null) {
       if (
         appContextStore.activeAcademicPeriodId &&
         options.some((o) => o.id === appContextStore.activeAcademicPeriodId)
       ) {
         selectedPeriodId.value = appContextStore.activeAcademicPeriodId;
       } else {
-        selectedPeriodId.value = options[0].id;
+        selectedPeriodId.value = '';
       }
     }
   },
@@ -602,7 +648,7 @@ const statusOptions = [
     <!-- Create / Formulate New Plan Modal -->
     <CreatePlanModal
       v-model:visible="isCreateModalOpen"
-      :periods="periodOptions"
+      :periods="modalPeriodOptions"
       :initial-period-id="selectedPeriodId"
       @created="handlePlanCreated"
     />

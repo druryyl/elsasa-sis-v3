@@ -112,6 +112,16 @@ public sealed class OperationsCalendarQueryServiceTests(IntegrationTestWebAppFac
         // Assert 2
         nonExistentResult.IsSuccess.Should().BeTrue();
         nonExistentResult.Value.Should().BeNull();
+
+        // Act 3: Query using academic year ID as fallback container period
+        var ayPeriodResult = await queryService.GetOperationalPeriodByIdAsync(ay.Id);
+
+        // Assert 3
+        ayPeriodResult.IsSuccess.Should().BeTrue();
+        ayPeriodResult.Value.Should().NotBeNull();
+        ayPeriodResult.Value!.Id.Should().Be(ay.Id);
+        ayPeriodResult.Value.PeriodCode.Should().Be(ayRequest.Code);
+        ayPeriodResult.Value.PeriodType.Should().Be("academic_year");
     }
 
     [SkippableFact]

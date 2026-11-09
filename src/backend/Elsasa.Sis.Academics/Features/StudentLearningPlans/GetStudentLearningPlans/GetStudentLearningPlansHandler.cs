@@ -18,7 +18,13 @@ public sealed class GetStudentLearningPlansHandler(ISqlConnectionFactory connect
         SELECT COUNT(1)
         FROM academics.student_learning_plans p
         LEFT JOIN students.students s ON s.id = p.student_id
-        WHERE (@AcademicPeriodId IS NULL OR p.academic_period_id = @AcademicPeriodId)
+        WHERE (
+            @AcademicPeriodId IS NULL
+            OR p.academic_period_id = @AcademicPeriodId
+            OR p.academic_period_id IN (
+                SELECT op.id FROM operations.operational_periods op WHERE op.academic_year_id = @AcademicPeriodId
+            )
+        )
           AND (@Status IS NULL OR p.status = @Status)
           AND (
               @SearchPattern IS NULL
@@ -43,7 +49,13 @@ public sealed class GetStudentLearningPlansHandler(ISqlConnectionFactory connect
             p.updated_at AS UpdatedAt
         FROM academics.student_learning_plans p
         LEFT JOIN students.students s ON s.id = p.student_id
-        WHERE (@AcademicPeriodId IS NULL OR p.academic_period_id = @AcademicPeriodId)
+        WHERE (
+            @AcademicPeriodId IS NULL
+            OR p.academic_period_id = @AcademicPeriodId
+            OR p.academic_period_id IN (
+                SELECT op.id FROM operations.operational_periods op WHERE op.academic_year_id = @AcademicPeriodId
+            )
+        )
           AND (@Status IS NULL OR p.status = @Status)
           AND (
               @SearchPattern IS NULL

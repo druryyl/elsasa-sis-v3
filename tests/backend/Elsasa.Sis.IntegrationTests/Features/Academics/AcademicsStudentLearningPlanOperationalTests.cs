@@ -751,4 +751,34 @@ public sealed class AcademicsStudentLearningPlanOperationalTests(IntegrationTest
             new { Id = planId });
         dbStatus.Should().Be("archived");
     }
+
+    [SkippableFact]
+    public async Task StudentLearningPlan_FormulateWithAcademicYearId_Should_Succeed()
+    {
+        SkipIfDatabaseUnavailable();
+        Factory.EventCollector.Reset();
+        Factory.CurrentUser.Reset();
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var (ayId, _, _, _, _) = await SetupOperationalCurriculumAsync(suffix);
+        var studentId = Guid.NewGuid();
+
+        await using var connection = await OpenConnectionAsync();
+        await EnsureStudentAsync(connection, studentId, $"STD-AY-{suffix}", $"AY Student {suffix}");
+        Factory.StudentsModule.MarkStudentEnrolled(studentId);
+
+        var formulateRequest = new CreateStudentLearningPlanRequest(
+            StudentId: studentId,
+            AcademicPeriodId: ayId,
+            AcademicPeriodLabel: $"Tahun Pelajaran {suffix}",
+            Notes: "Plan formulated with academic year container ID");
+
+        var formulateResponse = await Client.PostAsJsonAsync("/api/v1/academics/learning-plans", formulateRequest);
+        formulateResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var createdPlan = await formulateResponse.Content.ReadFromJsonAsync<CreateStudentLearningPlanResponse>();
+        createdPlan.Should().NotBeNull();
+        createdPlan!.AcademicPeriodId.Should().Be(ayId);
+        createdPlan.Status.Should().Be("draft");
+    }
 }

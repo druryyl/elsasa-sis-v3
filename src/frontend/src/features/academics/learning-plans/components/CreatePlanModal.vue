@@ -54,16 +54,20 @@ const selectedPeriodId = ref<string>('');
 const notes = ref<string>('');
 const validationError = ref<string | null>(null);
 
+// Filter out empty options (such as "All Academic Periods" from filter controls)
+const availablePeriods = computed(() => props.periods.filter((p) => Boolean(p.id)));
+
 // Sync initialPeriodId when opened or changed
 watch(
-  () => [props.visible, props.initialPeriodId, props.periods],
+  () => [props.visible, props.initialPeriodId, availablePeriods.value],
   ([visible]) => {
     if (visible) {
       validationError.value = null;
-      if (props.initialPeriodId) {
+      const validPeriods = availablePeriods.value;
+      if (props.initialPeriodId && validPeriods.some((p) => p.id === props.initialPeriodId)) {
         selectedPeriodId.value = props.initialPeriodId;
-      } else if (props.periods.length > 0 && !selectedPeriodId.value) {
-        selectedPeriodId.value = props.periods[0].id;
+      } else if (validPeriods.length > 0 && (!selectedPeriodId.value || !validPeriods.some((p) => p.id === selectedPeriodId.value))) {
+        selectedPeriodId.value = validPeriods[0].id;
       }
     }
   },
@@ -107,7 +111,7 @@ function handleClose() {
 const createPlanMutation = useCreatePlanMutation();
 
 const selectedPeriodLabel = computed(() => {
-  const found = props.periods.find((p) => p.id === selectedPeriodId.value);
+  const found = availablePeriods.value.find((p) => p.id === selectedPeriodId.value);
   return found ? found.label : '';
 });
 
@@ -268,12 +272,12 @@ async function handleSubmit() {
         </label>
         <Select
           v-model="selectedPeriodId"
-          :options="periods"
+          :options="availablePeriods"
           option-label="label"
           option-value="id"
           placeholder="Select Academic Period"
           class="w-full text-sm"
-          :disabled="createPlanMutation.isPending.value || periods.length === 0"
+          :disabled="createPlanMutation.isPending.value || availablePeriods.length === 0"
         />
         <p class="text-[11px] text-slate-500">
           Each student may have at most one active learning plan per academic period.
