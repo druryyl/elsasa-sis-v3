@@ -1,8 +1,10 @@
 namespace Elsasa.Sis.Finance;
 
+using Elsasa.Sis.Contracts.DemoData;
 using Elsasa.Sis.Contracts.Finance;
 using Elsasa.Sis.Finance.Features.Accounts.GetStudentFinancialAccount;
 using Elsasa.Sis.Finance.Features.Accounts.SearchStudentFinancialAccounts;
+using Elsasa.Sis.Finance.Features.DemoData;
 using Elsasa.Sis.Finance.Features.Obligations.AssessAdHocObligation;
 using Elsasa.Sis.Finance.Features.Obligations.BatchAssessObligations;
 using Elsasa.Sis.Finance.Features.Obligations.GetObligations;
@@ -70,6 +72,15 @@ public static class DependencyInjection
         services.AddScoped<CreateChargeRuleHandler>();
         services.AddScoped<GetFinancialPoliciesHandler>();
         services.AddScoped<GetFinancialPolicyByIdHandler>();
+
+        // Demo Data services (P1-S04, P3-S06)
+        // Register purger against the shared IDemoDataDomainPurger contract so the
+        // host DemoDataOrchestrator can resolve it (ADR-001, ADR-002).
+        services.AddScoped<FinanceDemoDataPurger>();
+        services.AddScoped<IFinanceDemoDataPurger, FinanceDemoDataPurger>();
+        services.AddScoped<IDemoDataDomainPurger, FinanceDemoDataPurger>();
+        services.AddScoped<IFinancePolicyDemoDataSeeder, FinancePolicyDemoDataSeeder>();
+        services.AddScoped<IFinanceTransactionsDemoDataSeeder, FinanceTransactionsDemoDataSeeder>();
 
         // Obligation Assessment feature handlers (P3-S06, P3-S07)
         services.AddScoped<BatchAssessObligationsHandler>();

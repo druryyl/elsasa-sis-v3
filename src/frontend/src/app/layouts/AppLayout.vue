@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, type Component as VueComponent } from 'vue';
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { useQueryClient } from '@tanstack/vue-query';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
+import ResetDemoDataDialog from '@/app/layouts/components/ResetDemoDataDialog.vue';
 import {
   Menu,
   ChevronLeft,
@@ -27,6 +30,7 @@ import {
   Layers,
   Wallet,
   BookOpen,
+  RotateCcw,
 } from 'lucide-vue-next';
 
 interface NavChildItem {
@@ -53,6 +57,12 @@ const appContextStore = useAppContextStore();
 const uiStore = useUIStore();
 const route = useRoute();
 const router = useRouter();
+
+// PrimeVue toast instance for reactive notifications
+const toastInstance = useToast();
+
+// TanStack Query client instance for cache invalidation on reset
+const queryClientInstance = useQueryClient();
 
 // User profile dropdown state
 const isProfileMenuOpen = ref(false);
@@ -134,6 +144,14 @@ const masterNavItems: NavParentItem[] = [
         roles: ['AcademicCoordinator', 'AcademicAuthority', 'Admin'],
       },
       {
+        id: 'academics-learning-plans',
+        label: 'Learning Plans',
+        to: '/academics/learning-plans',
+        icon: 'pi pi-id-card',
+        permission: 'academics:learning-plans:view',
+        roles: ['AcademicCoordinator', 'AcademicAuthority', 'Teacher', 'StudentDevelopmentOfficer', 'Admin'],
+      },
+      {
         id: 'academics-participation',
         label: 'Participation & Rosters',
         to: '/academics/participation',
@@ -156,6 +174,22 @@ const masterNavItems: NavParentItem[] = [
         icon: 'pi pi-file-edit',
         permission: 'academics.assignments.view',
         roles: ['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-interventions',
+        label: 'Academic Interventions',
+        to: '/academics/interventions',
+        icon: 'pi pi-bolt',
+        permission: 'academics.interventions.view',
+        roles: ['AcademicCoordinator', 'Teacher', 'AcademicAuthority', 'Admin'],
+      },
+      {
+        id: 'academics-cohort-review',
+        label: 'Cohort Academic Review',
+        to: '/academics/cohort-review',
+        icon: 'pi pi-check-square',
+        permission: 'academics.standings.view',
+        roles: ['AcademicAuthority', 'Admin'],
       },
     ],
   },
@@ -252,12 +286,18 @@ function checkPermission(permission: string): boolean {
   const permissionAliases: Record<string, string[]> = {
     'academics.curriculum.view': ['Permissions.Academics.Curriculum.View'],
     'Permissions.Academics.Curriculum.View': ['academics.curriculum.view'],
+    'academics:learning-plans:view': ['Permissions.Academics.LearningPlans.View', 'academics.learning_plans.view'],
+    'Permissions.Academics.LearningPlans.View': ['academics:learning-plans:view', 'academics.learning_plans.view'],
     'academics.participations.view': ['Permissions.Academics.Participations.View'],
     'Permissions.Academics.Participations.View': ['academics.participations.view'],
     'academics.activities.view': ['Permissions.Academics.Activities.View'],
     'Permissions.Academics.Activities.View': ['academics.activities.view'],
     'academics.assignments.view': ['Permissions.Academics.Assignments.View'],
     'Permissions.Academics.Assignments.View': ['academics.assignments.view'],
+    'academics.interventions.view': ['Permissions.Academics.Interventions.View'],
+    'Permissions.Academics.Interventions.View': ['academics.interventions.view'],
+    'academics.standings.view': ['Permissions.Academics.Standings.View'],
+    'Permissions.Academics.Standings.View': ['academics.standings.view'],
   };
 
   const aliases = permissionAliases[permission];
@@ -365,6 +405,72 @@ function selectCampus(campusId: string) {
   appContextStore.setActiveCampus(campusId);
   isCampusSelectorOpen.value = false;
 }
+
+/**
+ * Display condition for the "Reset Demo Data" menu item.
+ * Hard-guarded to SuperAdmin role and non-production environments only
+ * (ADR-010, TD-08, TD-10, GAP-008).
+ */
+const canResetDemoData = computed(() => {
+  return authStore.hasRole('SuperAdmin') && !import.meta.env.PROD;
+});
+
+// Dialog visibility state for the destructive reset confirmation modal
+const isResetDemoDataDialogOpen = ref(false);
+
+function openResetDemoDataDialog() {
+  isResetDemoDataDialogOpen.value = true;
+  isProfileMenuOpen.value = false;
+}
+
+/**
+ * Reactive reset workflow executed after a successful demo data reset.
+ *
+ * - Shows a success toast notification.
+ * - Clears Pinia caches (appContextStore + cached TanStack Query keys).
+ * - Performs a clean page reload so the application re-hydrates from the
+ *   newly pristine database state.
+ */
+function handleResetDemoDataSuccess() {
+  if (toastInstance && typeof toastInstance.add === 'function') {
+    toastInstance.add({
+      severity: 'success',
+      summary: 'Demo Data Reset',
+      detail: 'Demo sample data reset successfully.',
+      life: 4000,
+    });
+  }
+
+  // Clear Pinia application context cache
+  appContextStore.clear();
+
+  // Clear cached TanStack Query keys so all views re-fetch from the pristine database
+  if (queryClientInstance) {
+    queryClientInstance.clear();
+  }
+
+  // Clean page reload to refresh application state from the new pristine database
+  if (typeof globalThis.window !== 'undefined' && typeof globalThis.window.location.reload === 'function') {
+    globalThis.window.location.reload();
+  }
+}
+
+function getDomainBadgeColor(groupId: string): string {
+  switch (groupId) {
+    case 'operations':
+      return 'bg-amber-500';
+    case 'academics':
+      return 'bg-indigo-500';
+    case 'students':
+      return 'bg-teal-500';
+    case 'finance':
+      return 'bg-emerald-500';
+    case 'portal':
+      return 'bg-rose-500';
+    default:
+      return 'bg-slate-400';
+  }
+}
 </script>
 
 <template>
@@ -414,10 +520,10 @@ function selectCampus(campusId: string) {
             v-if="item.to && !item.children"
             :to="item.to"
             :class="[
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
               isItemActive(item.to)
-                ? 'bg-elsasa-teal-50 text-elsasa-teal-600 font-semibold'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                ? 'bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 font-semibold border-l-2 border-teal-600 shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
               uiStore.isSidebarCollapsed ? 'justify-center' : '',
             ]"
             :title="uiStore.isSidebarCollapsed ? item.label : undefined"
@@ -428,7 +534,7 @@ function selectCampus(campusId: string) {
               :class="[item.icon, 'text-base shrink-0']"
               aria-hidden="true"
             />
-            <component v-else :is="item.icon" class="w-5 h-5 shrink-0" aria-hidden="true" />
+            <component :is="item.icon" v-else class="w-5 h-5 shrink-0" aria-hidden="true" />
             <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ item.label }}</span>
           </RouterLink>
 
@@ -438,17 +544,18 @@ function selectCampus(campusId: string) {
             <button
               v-if="!uiStore.isSidebarCollapsed"
               type="button"
-              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-800 transition-colors focus:outline-none"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-800 hover:bg-slate-50 transition-colors focus:outline-none"
               :data-testid="`nav-group-${item.id}`"
               @click="toggleGroup(item.id)"
             >
               <span class="flex items-center gap-2 truncate">
+                <span :class="['w-1.5 h-1.5 rounded-full shrink-0', getDomainBadgeColor(item.id)]" aria-hidden="true" />
                 <i
                   v-if="typeof item.icon === 'string'"
                   :class="[item.icon, 'text-base shrink-0']"
                   aria-hidden="true"
                 />
-                <component v-else :is="item.icon" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <component :is="item.icon" v-else class="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true" />
                 <span class="truncate">{{ item.label }}</span>
               </span>
               <ChevronDown
@@ -477,8 +584,8 @@ function selectCampus(campusId: string) {
                 aria-hidden="true"
               />
               <component
-                v-else
                 :is="item.icon"
+                v-else
                 :class="[
                   'w-5 h-5',
                   isGroupActive(item) ? 'text-elsasa-teal-600' : 'text-slate-400',
@@ -498,10 +605,10 @@ function selectCampus(campusId: string) {
                 :key="child.id"
                 :to="child.to"
                 :class="[
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
                   isItemActive(child.to)
-                    ? 'bg-elsasa-teal-50 text-elsasa-teal-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                    ? 'bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 font-semibold border-l-2 border-teal-600 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
                   uiStore.isSidebarCollapsed ? 'justify-center' : '',
                 ]"
                 :title="uiStore.isSidebarCollapsed ? child.label : undefined"
@@ -512,7 +619,7 @@ function selectCampus(campusId: string) {
                   :class="[child.icon, 'text-base shrink-0']"
                   aria-hidden="true"
                 />
-                <component v-else :is="child.icon ?? Layers" class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <component :is="child.icon ?? Layers" v-else class="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span v-if="!uiStore.isSidebarCollapsed" class="truncate">{{ child.label }}</span>
               </RouterLink>
             </div>
@@ -669,6 +776,16 @@ function selectCampus(campusId: string) {
 
               <div class="px-2 py-1">
                 <button
+                  v-if="canResetDemoData"
+                  type="button"
+                  class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors"
+                  data-testid="reset-demo-data-button"
+                  @click="openResetDemoDataDialog"
+                >
+                  <RotateCcw class="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
+                  <span>Reset Demo Data</span>
+                </button>
+                <button
                   type="button"
                   class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
                   data-testid="logout-button"
@@ -745,6 +862,14 @@ function selectCampus(campusId: string) {
       </main>
     </div>
   </div>
+
+  <!-- Destructive Reset Demo Data Confirmation Dialog (mounted at root level to preserve state) -->
+  <ResetDemoDataDialog
+    v-if="canResetDemoData"
+    :visible="isResetDemoDataDialogOpen"
+    @update:visible="isResetDemoDataDialogOpen = $event"
+    @success="handleResetDemoDataSuccess"
+  />
 </template>
 
 <style scoped>

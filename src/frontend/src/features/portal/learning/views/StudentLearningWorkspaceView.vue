@@ -26,6 +26,7 @@ import {
   UploadCloud,
   FileText,
   ShieldAlert,
+  Award,
 } from 'lucide-vue-next';
 import {
   PageHeader,
@@ -46,6 +47,7 @@ import type {
 } from '../types';
 import CourseworkSubmissionModal from '../components/CourseworkSubmissionModal.vue';
 import SubmissionHistoryDrawer from '../components/SubmissionHistoryDrawer.vue';
+import StudentResultsTab from '../components/StudentResultsTab.vue';
 
 interface Props {
   studentId?: string;
@@ -54,6 +56,8 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   studentId: undefined,
 });
+
+const activeMainTab = ref('coursework');
 
 // ---------------------------------------------------------------------------
 // 1. Navigation & Breadcrumbs
@@ -249,8 +253,24 @@ function getCountdownBadge(task: StudentCourseworkTask): CountdownBadge {
       :breadcrumbs="breadcrumbs"
     />
 
-    <!-- Summary Metrics Bar -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="workspace-metrics-bar">
+    <!-- Main Workspace Mode Tabs -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <Tabs v-model:value="activeMainTab">
+        <TabList class="px-6 border-b border-slate-200">
+          <Tab value="coursework" class="flex items-center gap-2 py-3" data-testid="tab-main-coursework">
+            <BookOpen class="w-4 h-4 text-teal-600" />
+            <span class="font-semibold text-xs sm:text-sm">Coursework Assignments</span>
+          </Tab>
+          <Tab value="grades" class="flex items-center gap-2 py-3" data-testid="tab-main-grades">
+            <Award class="w-4 h-4 text-teal-600" />
+            <span class="font-semibold text-xs sm:text-sm">Grades &amp; Report Cards</span>
+          </Tab>
+        </TabList>
+
+        <TabPanels class="p-6">
+          <TabPanel value="coursework" class="p-0 space-y-6">
+            <!-- Summary Metrics Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="workspace-metrics-bar">
       <!-- Metric 1: Due Soon -->
       <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
         <div class="w-10 h-10 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
@@ -589,6 +609,15 @@ function getCountdownBadge(task: StudentCourseworkTask): CountdownBadge {
           </div>
         </div>
       </div>
+    </div>
+          </TabPanel>
+
+          <!-- Tab 2: Grades & Report Cards -->
+          <TabPanel value="grades" class="p-0">
+            <StudentResultsTab :student-id="effectiveStudentId" />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
 
     <!-- Coursework Submission Modal -->

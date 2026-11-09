@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 namespace Elsasa.Sis.Api.Configuration;
 
 using System.Security.Claims;
@@ -47,6 +48,8 @@ public static class AuthenticationConfiguration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
@@ -60,6 +63,7 @@ public static class AuthenticationConfiguration
         {
             options.RequireHttpsMetadata = jwtOptions.RequireHttpsMetadata;
             options.SaveToken = true;
+            options.MapInboundClaims = false;
 
             var tokenValidationParameters = new TokenValidationParameters
             {

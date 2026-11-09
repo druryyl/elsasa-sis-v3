@@ -15,6 +15,7 @@ import { useAuthStore } from '@/app/stores/auth.store';
 import { PARTICIPATION_PERMISSIONS } from '../constants/permissions';
 import * as academicYearApi from '@/features/operations/calendar/api/academicYear.api';
 import * as curriculumApi from '@/features/academics/curriculum/api/curriculumApi';
+import * as learningPlansApi from '@/features/academics/learning-plans/api/learningPlansApi';
 import * as participationApi from '../api/participation.api';
 import type { AcademicParticipation } from '../types';
 
@@ -122,7 +123,8 @@ const mockParticipations: AcademicParticipation[] = [
     attemptNumber: 1,
     status: 'paused',
     participationType: 'standard',
-    source: 'assigned',
+    source: 'learning_plan',
+    studentLearningPlanId: 'slp-1',
     startDate: '2024-07-15',
     completionDate: null,
     endDate: null,
@@ -182,6 +184,28 @@ describe('ParticipationWorkbenchView.vue (SCR-ACD-05)', () => {
     });
     vi.spyOn(curriculumApi, 'getLearningUnits').mockResolvedValue(mockUnits);
     vi.spyOn(participationApi, 'getParticipationsByUnit').mockResolvedValue(mockParticipations);
+    const mockLearningPlans = {
+      items: [
+        {
+          id: 'slp-1',
+          studentId: 'stu-1',
+          academicPeriodId: 'ay-2024-2025',
+          academicPeriodLabel: 'Tahun Pelajaran 2024/2025',
+          version: 1,
+          status: 'active' as const,
+          constituentUnitsCount: 1,
+          adjustmentsCount: 0,
+          createdAt: '2024-07-01T00:00:00Z',
+          updatedAt: null,
+        },
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 100,
+      totalPages: 1,
+    };
+    vi.spyOn(learningPlansApi, 'getLearningPlans').mockResolvedValue(mockLearningPlans);
+    vi.spyOn(learningPlansApi.learningPlansApi, 'getLearningPlans').mockResolvedValue(mockLearningPlans);
 
     const authStore = useAuthStore();
     authStore.setSession('token-coord', {
@@ -362,6 +386,15 @@ describe('ParticipationWorkbenchView.vue (SCR-ACD-05)', () => {
     const updateDialog = wrapper.findComponent(UpdateParticipationStatusDialog);
     expect(updateDialog.props('visible')).toBe(true);
     expect(updateDialog.props('participation')?.studentName).toBe('Ahmad Faiz');
+  });
+
+  it('displays "Active Learning Plan" badge on students with an active SLP', async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const slpBadge = wrapper.find('[data-testid="badge-active-slp"]');
+    expect(slpBadge.exists()).toBe(true);
+    expect(slpBadge.text()).toContain('Active Learning Plan');
   });
 
   it('renders empty state when unit has no enrolled participants', async () => {

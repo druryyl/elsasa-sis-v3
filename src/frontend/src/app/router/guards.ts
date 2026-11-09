@@ -49,6 +49,19 @@ export function setupNavigationGuards(router: Router): void {
         (to.meta.permission === 'academics.curriculum.view' &&
           (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
             authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        ((to.meta.permission === 'academics:learning-plans:view' ||
+          to.meta.permission === 'academics.learning_plans.view' ||
+          to.meta.permission === 'Permissions.Academics.LearningPlans.View') &&
+          (authStore.hasPermission('Permissions.Academics.LearningPlans.View') ||
+            authStore.hasPermission('academics:learning-plans:view') ||
+            authStore.hasPermission('academics.learning_plans.view') ||
+            authStore.hasAnyRole([
+              'AcademicCoordinator',
+              'AcademicAuthority',
+              'Teacher',
+              'StudentDevelopmentOfficer',
+              'Admin',
+            ]))) ||
         (to.meta.permission === 'academics.participations.view' &&
           (authStore.hasPermission('Permissions.Academics.Participations.View') ||
             authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
@@ -57,7 +70,13 @@ export function setupNavigationGuards(router: Router): void {
             authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
         (to.meta.permission === 'academics.assignments.view' &&
           (authStore.hasPermission('Permissions.Academics.Assignments.View') ||
-            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin'])));
+            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+        (to.meta.permission === 'academics.interventions.view' &&
+          (authStore.hasPermission('Permissions.Academics.Interventions.View') ||
+            authStore.hasAnyRole(['AcademicCoordinator', 'Teacher', 'AcademicAuthority', 'Admin']))) ||
+        (to.meta.permission === 'academics.standings.view' &&
+          (authStore.hasPermission('Permissions.Academics.Standings.View') ||
+            authStore.hasAnyRole(['AcademicAuthority', 'Admin'])));
 
       if (!isAllowed) {
         return '/403';

@@ -119,6 +119,7 @@ export interface RegisterParticipationRequest {
   participationType: ParticipationType | string;
   source: ParticipationSource | string;
   startDate: string;
+  studentLearningPlanId?: string | null;
 }
 
 /**

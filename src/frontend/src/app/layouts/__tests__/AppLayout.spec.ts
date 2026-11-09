@@ -16,6 +16,8 @@ import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
 import { primevueConfig } from '@/app/config/primevue';
 
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+
 function createTestUser(overrides?: Partial<UserSession>): UserSession {
   return {
     userId: '11111111-1111-1111-1111-111111111111',
@@ -30,6 +32,7 @@ function createTestUser(overrides?: Partial<UserSession>): UserSession {
 
 describe('AppLayout.vue', () => {
   let router: ReturnType<typeof createAppRouter>;
+  let queryClient: QueryClient;
 
   beforeEach(async () => {
     if (typeof window !== 'undefined') {
@@ -38,6 +41,12 @@ describe('AppLayout.vue', () => {
     }
     storage.clear();
     setActivePinia(createPinia());
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
     const authStore = useAuthStore();
     authStore.setSession('test-token', createTestUser());
     const uiStore = useUIStore();
@@ -52,7 +61,13 @@ describe('AppLayout.vue', () => {
   function mountLayout() {
     return mount(AppLayout, {
       global: {
-        plugins: [router],
+        plugins: [
+          router,
+          [PrimeVue, primevueConfig],
+          ToastService,
+          ConfirmationService,
+          [VueQueryPlugin, { queryClient }],
+        ],
         stubs: {
           RouterView: {
             template:
@@ -358,7 +373,7 @@ describe('AppLayout.vue', () => {
       expect(courseworkItem.attributes('href')).toBe('/academics/coursework');
     });
 
-    it('renders Teacher navigation showing Class Sessions and Coursework while hiding coordinator-only items and portal', () => {
+    it('renders Teacher navigation showing Class Sessions, Coursework and Interventions while hiding coordinator-only and authority items and portal', () => {
       const authStore = useAuthStore();
       authStore.setSession(
         'test-token',
@@ -373,8 +388,114 @@ describe('AppLayout.vue', () => {
       expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="nav-item-academics-sessions"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="nav-item-academics-coursework"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-interventions"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-cohort-review"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="nav-item-academics-participation"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="nav-group-portal"]').exists()).toBe(false);
+    });
+
+    it('renders Submodule 4 navigation items with strict RBAC filtering (SCR-ACD-06, SCR-ACD-09, P8-S25)', () => {
+      const authStore = useAuthStore();
+
+      // Academic Coordinator: sees Interventions, does NOT see Cohort Review
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AcademicCoordinator'],
+          permissions: [],
+        }),
+      );
+      let wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-interventions"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-cohort-review"]').exists()).toBe(false);
+
+      // Academic Authority: sees BOTH Interventions and Cohort Review
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AcademicAuthority'],
+          permissions: [],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-interventions"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-cohort-review"]').exists()).toBe(true);
+
+      // Admin: sees BOTH Interventions and Cohort Review
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Admin'],
+          permissions: [],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-interventions"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-academics-cohort-review"]').exists()).toBe(true);
+
+      // Unauthorized role (AdmissionOfficer): neither Academic item exists
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AdmissionOfficer'],
+          permissions: ['Permissions.Students.Admission.View'],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(false);
+    });
+
+    it('renders Learning Plans navigation item with RBAC filtering and icon (P7-S25)', () => {
+      const authStore = useAuthStore();
+
+      // Authorized roles: AcademicCoordinator, AcademicAuthority, Teacher, StudentDevelopmentOfficer, Admin
+      for (const role of [
+        'AcademicCoordinator',
+        'AcademicAuthority',
+        'Teacher',
+        'StudentDevelopmentOfficer',
+        'Admin',
+      ]) {
+        authStore.setSession(
+          'test-token',
+          createTestUser({
+            roles: [role],
+            permissions: [],
+          }),
+        );
+        const wrapper = mountLayout();
+        expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(true);
+        const slpItem = wrapper.find('[data-testid="nav-item-academics-learning-plans"]');
+        expect(
+          slpItem.exists(),
+          `Expected nav-item-academics-learning-plans to exist for role ${role}`,
+        ).toBe(true);
+        expect(slpItem.text()).toContain('Learning Plans');
+        expect(slpItem.attributes('href')).toBe('/academics/learning-plans');
+        expect(slpItem.find('i.pi.pi-id-card').exists()).toBe(true);
+      }
+
+      // Explicit permission: academics:learning-plans:view
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Staff'],
+          permissions: ['academics:learning-plans:view'],
+        }),
+      );
+      let wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-learning-plans"]').exists()).toBe(true);
+
+      // Unauthorized role: AdmissionOfficer
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AdmissionOfficer'],
+          permissions: ['Permissions.Students.Admission.View'],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-academics-learning-plans"]').exists()).toBe(false);
     });
 
     it('renders Student Portal navigation with My Learning & Coursework for Student role and hides Academics', () => {
@@ -489,6 +610,42 @@ describe('AppLayout.vue', () => {
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Student Portal');
       expect(breadcrumbs.text()).toContain('My Learning & Coursework');
+
+      // 5. Academic Interventions (P8-S25)
+      await router.push('/academics/interventions');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Academic Interventions');
+      const activeInterventions = wrapper.find('[data-testid="nav-item-academics-interventions"]');
+      expect(activeInterventions.exists()).toBe(true);
+      expect(activeInterventions.classes()).toContain('border-l-2');
+      expect(activeInterventions.classes()).toContain('border-teal-600');
+
+      // 6. Cohort Academic Review (P8-S25)
+      await router.push('/academics/cohort-review');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Cohort Academic Review');
+      const activeCohortReview = wrapper.find('[data-testid="nav-item-academics-cohort-review"]');
+      expect(activeCohortReview.exists()).toBe(true);
+      expect(activeCohortReview.classes()).toContain('border-l-2');
+      expect(activeCohortReview.classes()).toContain('border-teal-600');
+
+      // 7. Student Learning Plans (P7-S25)
+      await router.push('/academics/learning-plans');
+      wrapper = mountLayout();
+      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
+      expect(breadcrumbs.text()).toContain('Home');
+      expect(breadcrumbs.text()).toContain('Academics');
+      expect(breadcrumbs.text()).toContain('Learning Plans');
+      const activeSlp = wrapper.find('[data-testid="nav-item-academics-learning-plans"]');
+      expect(activeSlp.exists()).toBe(true);
+      expect(activeSlp.classes()).toContain('border-l-2');
+      expect(activeSlp.classes()).toContain('border-teal-600');
     });
   });
 
@@ -507,6 +664,9 @@ describe('AuthLayout.vue', () => {
     const wrapper = mount(AuthLayout, {
       global: {
         plugins: [router],
+        stubs: {
+          RouterView: true,
+        },
       },
     });
 
@@ -522,9 +682,21 @@ describe('App.vue', () => {
     setActivePinia(createPinia());
     const router = createAppRouter({ history: createMemoryHistory() });
 
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     const wrapper = mount(App, {
       global: {
-        plugins: [router, [PrimeVue, primevueConfig], ToastService, ConfirmationService],
+        plugins: [
+          router,
+          [PrimeVue, primevueConfig],
+          ToastService,
+          ConfirmationService,
+          [VueQueryPlugin, { queryClient }],
+        ],
+        stubs: {
+          RouterView: true,
+        },
       },
     });
 

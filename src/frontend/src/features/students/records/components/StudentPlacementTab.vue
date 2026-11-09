@@ -17,6 +17,7 @@ import { formatDisplayDate } from '@/shared/utils/dateUtils';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { RECORDS_PERMISSIONS } from '../constants/permissions';
 import type { StudentDetail, AdministrativePlacementDto } from '../types/records.types';
+import ProgressionRecommendationBadge from '@/features/students/lifecycle/components/ProgressionRecommendationBadge.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -226,6 +227,24 @@ const hasPlacements = computed(() => {
             </span>
           </div>
         </div>
+      </div>
+
+      <!-- Authoritative Academic Progression Recommendation Section -->
+      <div class="space-y-2" data-testid="student-progression-recommendation-section">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <GraduationCap class="w-4 h-4 text-teal-600" />
+            <h4 class="text-xs font-bold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+              Academic Progression Recommendation
+            </h4>
+          </div>
+          <span class="text-xs text-surface-400">Academics Domain</span>
+        </div>
+
+        <ProgressionRecommendationBadge
+          :student-id="student?.id"
+          :show-details="true"
+        />
       </div>
 
       <!-- 2. Historical Placement Timeline / Table -->

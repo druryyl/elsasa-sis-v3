@@ -16,6 +16,7 @@ import { PageHeader } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import FamilyBillingTab from './FamilyBillingTab.vue';
+import FamilyAcademicTab from './FamilyAcademicTab.vue';
 
 const authStore = useAuthStore();
 
@@ -59,11 +60,15 @@ const userName = computed(() => authStore.user?.fullName ?? 'Parent / Guardian')
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <Tabs v-model:value="activeTab">
         <TabList class="px-6 border-b border-slate-200">
-          <Tab value="billing" class="flex items-center gap-2 py-3">
+          <Tab value="billing" class="flex items-center gap-2 py-3" data-testid="tab-family-billing">
             <CreditCard class="w-4 h-4" />
             <span>Billing &amp; Statements</span>
           </Tab>
-          <Tab value="tasks" class="flex items-center gap-2 py-3">
+          <Tab value="academic" class="flex items-center gap-2 py-3" data-testid="tab-family-academic">
+            <GraduationCap class="w-4 h-4" />
+            <span>Academic Progress &amp; Report Cards</span>
+          </Tab>
+          <Tab value="tasks" class="flex items-center gap-2 py-3" data-testid="tab-family-tasks">
             <CheckSquare class="w-4 h-4" />
             <span>Tasks &amp; Requests</span>
           </Tab>
@@ -72,6 +77,10 @@ const userName = computed(() => authStore.user?.fullName ?? 'Parent / Guardian')
         <TabPanels class="p-6">
           <TabPanel value="billing" class="p-0">
             <FamilyBillingTab />
+          </TabPanel>
+
+          <TabPanel value="academic" class="p-0">
+            <FamilyAcademicTab />
           </TabPanel>
 
           <TabPanel value="tasks" class="p-0">

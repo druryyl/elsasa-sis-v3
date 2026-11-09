@@ -97,6 +97,23 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AttendanceCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AssignmentReleasedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.CourseworkSubmittedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultApprovedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultPublishedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicResultCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.ReportCardPublishedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.TranscriptIssuedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.LearningProgressUpdatedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicStandingDeterminedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.PromotionRecommendationIssuedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicInterventionInitiatedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicInterventionConcludedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicAchievementConferredEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.AcademicStandingCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.PromotionRecommendationCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanCreatedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanApprovedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanRevisedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanParticipationsSyncedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
 
             // Register TestFinanceModule for simulating IFinanceModule verification
             services.RemoveAll<Elsasa.Sis.Contracts.Finance.IFinanceModule>();

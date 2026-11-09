@@ -118,6 +118,11 @@ export const registerParticipationSchema = z.object({
     .refine(isValidCalendarDate, {
       message: 'Start date must be a valid calendar date.',
     }),
+  studentLearningPlanId: z
+    .string()
+    .trim()
+    .optional()
+    .nullable(),
 });
 
 export type RegisterParticipationFormValues = z.infer<typeof registerParticipationSchema>;

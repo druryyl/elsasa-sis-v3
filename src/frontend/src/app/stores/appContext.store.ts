@@ -67,6 +67,14 @@ export const useAppContextStore = defineStore('appContext', {
       storage.removeItem(APP_CONTEXT_STORAGE_KEY);
     },
 
+    /**
+     * Clears all application context state and persisted cache.
+     * Alias of resetContext(); exposed for reactive reset workflows (P6-S12).
+     */
+    clear() {
+      this.resetContext();
+    },
+
     persistContext() {
       storage.setItem<PersistedAppContext>(APP_CONTEXT_STORAGE_KEY, {
         activeCampusId: this.activeCampusId,

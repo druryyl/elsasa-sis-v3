@@ -456,8 +456,12 @@ public sealed class EnrollAcceptedApplicantHandler(
                     cancellationToken: cancellationToken));
         }
 
+        var isAcceptedOrDecided = application is not null
+            && (string.Equals(application.ApplicationStatus, "decided", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(application.ApplicationStatus, "accepted", StringComparison.OrdinalIgnoreCase));
+
         if (application is null
-            || !string.Equals(application.ApplicationStatus, "decided", StringComparison.OrdinalIgnoreCase)
+            || !isAcceptedOrDecided
             || !string.Equals(application.DecisionType, "accepted", StringComparison.OrdinalIgnoreCase))
         {
             return Result.Failure<EnrollAcceptedApplicantResponse>(

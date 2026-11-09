@@ -63,6 +63,7 @@ import {
   ApplicationInfoTab,
   DocumentVerificationTab,
   AssessmentEvidenceTab,
+  ApplicantAssessmentTab,
   DecisionHistoryTab,
   RecordDecisionModal,
   VerifyDocumentModal,
@@ -814,6 +815,12 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
                 </span>
               </div>
             </Tab>
+            <Tab value="entrance-assessment" data-testid="tab-entrance-assessment">
+              <div class="flex items-center gap-1.5 py-1 text-xs">
+                <GraduationCap class="w-3.5 h-3.5 text-teal-600" />
+                <span class="font-medium">Entrance Assessment</span>
+              </div>
+            </Tab>
             <Tab value="decision" data-testid="tab-decision">
               <div class="flex items-center gap-1.5 py-1 text-xs">
                 <Gavel class="w-3.5 h-3.5 text-teal-600" />
@@ -846,7 +853,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
               />
             </TabPanel>
 
-            <!-- Tab 3: Entrance Assessment Diagnostic Evidence -->
+            <!-- Tab 3: Entrance Assessment Diagnostic Evidence (Manual) -->
             <TabPanel value="assessment" data-testid="panel-assessment">
               <AssessmentEvidenceTab
                 :application-id="dossier.id"
@@ -858,7 +865,16 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
               />
             </TabPanel>
 
-            <!-- Tab 4: Decision & Governance History -->
+            <!-- Tab 4: Academics Diagnostic Entrance Exam Results -->
+            <TabPanel value="entrance-assessment" data-testid="panel-entrance-assessment">
+              <ApplicantAssessmentTab
+                :applicant-id="dossier.applicantId"
+                :application-id="dossier.id"
+                :applicant-name="dossier.applicant.fullName"
+              />
+            </TabPanel>
+
+            <!-- Tab 5: Decision & Governance History -->
             <TabPanel value="decision" data-testid="panel-decision">
               <DecisionHistoryTab
                 :dossier="dossier"

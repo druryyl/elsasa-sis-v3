@@ -55,7 +55,7 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/features/dashboard/views/DashboardView.vue'),
         meta: { title: 'Dashboard' },
       },
-      // STAGE 2: ACADEMICS DOMAIN (SCR-ACD-03, SCR-ACD-05, SCR-ACD-01, SCR-ACD-02)
+      // STAGE 2: ACADEMICS DOMAIN (SCR-ACD-03, SCR-ACD-05, SCR-ACD-01, SCR-ACD-02, SCR-ACD-06, SCR-ACD-09)
       {
         path: 'academics',
         component: RouterView,
@@ -69,6 +69,19 @@ export const routes: RouteRecordRaw[] = [
               requiresAuth: true,
               permission: 'academics.curriculum.view',
               title: 'Curriculum & Learning Structures',
+            },
+          },
+          {
+            path: 'learning-plans',
+            name: 'academics.learning-plans',
+            component: () =>
+              import(
+                '@/features/academics/learning-plans/views/LearningPlanWorkspaceView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics:learning-plans:view',
+              title: 'Learning Plans',
             },
           },
           {
@@ -104,6 +117,45 @@ export const routes: RouteRecordRaw[] = [
               requiresAuth: true,
               permission: 'academics.assignments.view',
               title: 'Coursework',
+            },
+          },
+          {
+            path: 'assessment',
+            name: 'academics.assessment',
+            component: () =>
+              import('@/features/academics/assessment/views/AssessmentWorkbenchView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.assessments.view',
+              title: 'Assessment & Scoring',
+            },
+          },
+          // STAGE 2: SCR-ACD-06 Academic Intervention Workbench (ACD-WF-10, UC-ACD-11, P8-S21, P8-S25)
+          {
+            path: 'interventions',
+            name: 'academics.interventions',
+            component: () =>
+              import(
+                '@/features/academics/interventions/views/AcademicInterventionWorkbenchView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.interventions.view',
+              title: 'Academic Interventions',
+            },
+          },
+          // STAGE 2: SCR-ACD-09 Cohort Academic Review Workbench (ACD-WF-13, UC-ACD-17, UC-ACD-21, P8-S22, P8-S25)
+          {
+            path: 'cohort-review',
+            name: 'academics.cohort-review',
+            component: () =>
+              import(
+                '@/features/academics/cohort-review/views/CohortAcademicReviewView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'academics.standings.view',
+              title: 'Cohort Academic Review',
             },
           },
         ],
@@ -159,6 +211,17 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               permission: 'Permissions.Students.Records.View',
               title: 'Student Records Desk',
+            },
+          },
+          // STAGE 2: SCR-STU-03 Student Lifecycle Workbench (STD-WF-08, P8-S24)
+          {
+            path: 'lifecycle',
+            name: 'students.lifecycle.workbench',
+            component: () =>
+              import('@/features/students/lifecycle/views/StudentLifecycleWorkbenchView.vue'),
+            meta: {
+              permission: 'Permissions.Students.Records.View',
+              title: 'Student Lifecycle Workbench',
             },
           },
         ],
