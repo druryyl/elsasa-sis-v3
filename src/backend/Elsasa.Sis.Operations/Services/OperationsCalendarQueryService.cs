@@ -40,6 +40,21 @@ public sealed class OperationsCalendarQueryService(ISqlConnectionFactory connect
         WHERE id = @PeriodId;
         """;
 
+    private const string _selectAcademicYearAsPeriodByIdSql = """
+        SELECT
+            id AS Id,
+            id AS AcademicYearId,
+            code AS PeriodCode,
+            name AS Name,
+            'academic_year' AS PeriodType,
+            start_date AS StartDate,
+            end_date AS EndDate,
+            CAST(NULL AS UNIQUEIDENTIFIER) AS ParentPeriodId,
+            status AS Status
+        FROM operations.academic_years
+        WHERE id = @PeriodId;
+        """;
+
     private const string _selectActiveAdmissionWindowsSql = """
         SELECT
             id AS Id,
@@ -120,6 +135,14 @@ public sealed class OperationsCalendarQueryService(ISqlConnectionFactory connect
                 _selectOperationalPeriodByIdSql,
                 new { PeriodId = periodId },
                 cancellationToken: ct));
+
+            if (period is null)
+            {
+                period = await connection.QuerySingleOrDefaultAsync<OperationalPeriodDto>(new CommandDefinition(
+                    _selectAcademicYearAsPeriodByIdSql,
+                    new { PeriodId = periodId },
+                    cancellationToken: ct));
+            }
 
             return Result.Success(period);
         }

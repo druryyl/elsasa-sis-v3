@@ -9,6 +9,7 @@ import CreatePlanModal from '../components/CreatePlanModal.vue';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { LEARNING_PLAN_PERMISSIONS } from '../constants/permissions';
 import * as academicYearApi from '@/features/operations/calendar/api/academicYear.api';
+import * as operationalPeriodApi from '@/features/operations/calendar/api/operationalPeriod.api';
 import * as learningPlansApi from '../api/learningPlansApi';
 import * as studentRecordsApi from '@/features/students/records/api/records.api';
 import type { StudentLearningPlanListItem, StudentLearningPlan } from '../types';
@@ -189,6 +190,20 @@ describe('LearningPlanWorkspaceView.vue (SCR-ACD-04 Master-Detail Workspace)', (
     });
 
     vi.spyOn(academicYearApi, 'getAcademicYears').mockResolvedValue(mockAcademicYears);
+    vi.spyOn(operationalPeriodApi, 'getPeriods').mockResolvedValue([
+      {
+        id: 'sem-1-2029',
+        academicYearId: 'ay-2029-2030',
+        periodCode: 'SEM-1',
+        name: 'Semester 1 TP 2029/2030',
+        periodType: 'semester',
+        startDate: '2029-07-01',
+        endDate: '2029-12-31',
+        parentPeriodId: null,
+        campusContext: 'All',
+        status: 'active',
+      },
+    ]);
     vi.spyOn(learningPlansApi.learningPlansApi, 'getLearningPlans').mockResolvedValue({
       items: mockLearningPlans,
       page: 1,
