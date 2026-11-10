@@ -74,6 +74,7 @@ const isCampusSelectorOpen = ref(false);
 const openGroups = ref<Record<string, boolean>>({
   operations: true,
   academics: true,
+  teaching: true,
   students: true,
   finance: true,
   portal: true,
@@ -194,6 +195,23 @@ const masterNavItems: NavParentItem[] = [
     ],
   },
   {
+    id: 'teaching',
+    label: 'Teaching',
+    icon: 'pi pi-graduation-cap',
+    permission: 'Permissions.Teaching.Faculty.View',
+    roles: ['TeachingAuthority', 'TeachingCoordinator', 'Admin'],
+    children: [
+      {
+        id: 'teaching-faculty',
+        label: 'Faculty Resources',
+        to: '/teaching/faculty',
+        icon: 'pi pi-users',
+        permission: 'Permissions.Teaching.Faculty.View',
+        roles: ['TeachingAuthority', 'TeachingCoordinator', 'Admin'],
+      },
+    ],
+  },
+  {
     id: 'students',
     label: 'Students',
     icon: GraduationCap,
@@ -298,6 +316,8 @@ function checkPermission(permission: string): boolean {
     'Permissions.Academics.Interventions.View': ['academics.interventions.view'],
     'academics.standings.view': ['Permissions.Academics.Standings.View'],
     'Permissions.Academics.Standings.View': ['academics.standings.view'],
+    'teaching.faculty.view': ['Permissions.Teaching.Faculty.View'],
+    'Permissions.Teaching.Faculty.View': ['teaching.faculty.view'],
   };
 
   const aliases = permissionAliases[permission];
@@ -383,7 +403,12 @@ const resolvedBreadcrumbs = computed<BreadcrumbItem[]>(() => {
       crumbs.push({ label: matchedParent.label });
     }
 
-    const title = (route.meta.title as string | undefined) ?? pathSegments[pathSegments.length - 1];
+    const rawTitle =
+      (route.meta.breadcrumb as string | undefined) ??
+      (route.meta.title as string | undefined);
+    const title = rawTitle
+      ? rawTitle.replace(/\s*—\s*Elsasa SIS$/, '')
+      : pathSegments[pathSegments.length - 1];
     crumbs.push({ label: title, current: true });
   }
 
@@ -391,7 +416,9 @@ const resolvedBreadcrumbs = computed<BreadcrumbItem[]>(() => {
 });
 
 const currentPageTitle = computed(() => {
-  return (route.meta.title as string | undefined) ?? 'Elsasa SIS';
+  const rawTitle = route.meta.title as string | undefined;
+  if (!rawTitle) return 'Elsasa SIS';
+  return rawTitle.replace(/\s*—\s*Elsasa SIS$/, '');
 });
 
 // User logout handler
@@ -461,6 +488,8 @@ function getDomainBadgeColor(groupId: string): string {
       return 'bg-amber-500';
     case 'academics':
       return 'bg-indigo-500';
+    case 'teaching':
+      return 'bg-purple-500';
     case 'students':
       return 'bg-teal-500';
     case 'finance':

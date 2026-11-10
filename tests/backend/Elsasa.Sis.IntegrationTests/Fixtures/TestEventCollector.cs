@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using Elsasa.Sis.Contracts.Academics.Events;
 using Elsasa.Sis.Contracts.Finance.Events;
 using Elsasa.Sis.Contracts.Students.Events;
+using Elsasa.Sis.Contracts.Teaching.Events;
 using MediatR;
 
 /// <summary>
@@ -39,8 +40,22 @@ public sealed class TestEventCollector :
     INotificationHandler<StudentLearningPlanCreatedEvent>,
     INotificationHandler<StudentLearningPlanApprovedEvent>,
     INotificationHandler<StudentLearningPlanRevisedEvent>,
-    INotificationHandler<StudentLearningPlanParticipationsSyncedEvent>
+    INotificationHandler<StudentLearningPlanParticipationsSyncedEvent>,
+    INotificationHandler<TeacherProfileCreatedEvent>,
+    INotificationHandler<TeacherProfileApprovedEvent>,
+    INotificationHandler<TeacherStandingChangedEvent>,
+    INotificationHandler<QualificationEvidenceVerifiedEvent>,
+    INotificationHandler<TeachingAuthorizationGrantedEvent>,
+    INotificationHandler<TeachingAuthorizationStatusChangedEvent>,
+    INotificationHandler<TeachingRecordCorrectedEvent>
 {
+    private readonly ConcurrentBag<TeacherProfileCreatedEvent> _teacherProfileCreatedEvents = [];
+    private readonly ConcurrentBag<TeacherProfileApprovedEvent> _teacherProfileApprovedEvents = [];
+    private readonly ConcurrentBag<TeacherStandingChangedEvent> _teacherStandingChangedEvents = [];
+    private readonly ConcurrentBag<QualificationEvidenceVerifiedEvent> _qualificationEvidenceVerifiedEvents = [];
+    private readonly ConcurrentBag<TeachingAuthorizationGrantedEvent> _teachingAuthorizationGrantedEvents = [];
+    private readonly ConcurrentBag<TeachingAuthorizationStatusChangedEvent> _teachingAuthorizationStatusChangedEvents = [];
+    private readonly ConcurrentBag<TeachingRecordCorrectedEvent> _teachingRecordCorrectedEvents = [];
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
     private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
@@ -222,6 +237,14 @@ public sealed class TestEventCollector :
     /// </summary>
     public IReadOnlyCollection<StudentLearningPlanParticipationsSyncedEvent> StudentLearningPlanParticipationsSyncedEvents => _studentLearningPlanParticipationsSyncedEvents;
 
+    public IReadOnlyCollection<TeacherProfileCreatedEvent> TeacherProfileCreatedEvents => _teacherProfileCreatedEvents;
+    public IReadOnlyCollection<TeacherProfileApprovedEvent> TeacherProfileApprovedEvents => _teacherProfileApprovedEvents;
+    public IReadOnlyCollection<TeacherStandingChangedEvent> TeacherStandingChangedEvents => _teacherStandingChangedEvents;
+    public IReadOnlyCollection<QualificationEvidenceVerifiedEvent> QualificationEvidenceVerifiedEvents => _qualificationEvidenceVerifiedEvents;
+    public IReadOnlyCollection<TeachingAuthorizationGrantedEvent> TeachingAuthorizationGrantedEvents => _teachingAuthorizationGrantedEvents;
+    public IReadOnlyCollection<TeachingAuthorizationStatusChangedEvent> TeachingAuthorizationStatusChangedEvents => _teachingAuthorizationStatusChangedEvents;
+    public IReadOnlyCollection<TeachingRecordCorrectedEvent> TeachingRecordCorrectedEvents => _teachingRecordCorrectedEvents;
+
     /// <summary>
     /// Clears all captured notifications.
     /// </summary>
@@ -257,6 +280,13 @@ public sealed class TestEventCollector :
         _studentLearningPlanApprovedEvents.Clear();
         _studentLearningPlanRevisedEvents.Clear();
         _studentLearningPlanParticipationsSyncedEvents.Clear();
+        _teacherProfileCreatedEvents.Clear();
+        _teacherProfileApprovedEvents.Clear();
+        _teacherStandingChangedEvents.Clear();
+        _qualificationEvidenceVerifiedEvents.Clear();
+        _teachingAuthorizationGrantedEvents.Clear();
+        _teachingAuthorizationStatusChangedEvents.Clear();
+        _teachingRecordCorrectedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -496,6 +526,62 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _studentLearningPlanParticipationsSyncedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeacherProfileCreatedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teacherProfileCreatedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeacherProfileApprovedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teacherProfileApprovedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeacherStandingChangedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teacherStandingChangedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(QualificationEvidenceVerifiedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _qualificationEvidenceVerifiedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAuthorizationGrantedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAuthorizationGrantedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAuthorizationStatusChangedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAuthorizationStatusChangedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingRecordCorrectedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingRecordCorrectedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

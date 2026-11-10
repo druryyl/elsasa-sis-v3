@@ -20,14 +20,16 @@ public sealed partial class DemoDataOrchestrator : IDisposable
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private bool _disposed;
 
-    // Domain purgers (reverse dependency order: Academics → Finance → Students → Operations)
+    // Domain purgers (reverse dependency order: Academics → Finance → Students → Teaching → Operations)
     private readonly IAcademicsDemoDataPurger _academicsPurger;
     private readonly IFinanceDemoDataPurger _financePurger;
     private readonly IStudentsDemoDataPurger _studentsPurger;
+    private readonly ITeachingDemoDataPurger _teachingPurger;
     private readonly IOperationsDemoDataPurger _operationsPurger;
 
-    // Domain seeders (forward topological order)
+    // Domain seeders (forward topological order: Operations → Teaching → Academics Structure → Finance Policy → Students → Finance Transactions → Academics Activities)
     private readonly IOperationsDemoDataSeeder _operationsSeeder;
+    private readonly ITeachingDemoDataSeeder _teachingSeeder;
     private readonly IAcademicsStructureDemoDataSeeder _academicsStructureSeeder;
     private readonly IFinancePolicyDemoDataSeeder _financePolicySeeder;
     private readonly IStudentsDemoDataSeeder _studentsSeeder;
@@ -44,8 +46,10 @@ public sealed partial class DemoDataOrchestrator : IDisposable
         IAcademicsDemoDataPurger academicsPurger,
         IFinanceDemoDataPurger financePurger,
         IStudentsDemoDataPurger studentsPurger,
+        ITeachingDemoDataPurger teachingPurger,
         IOperationsDemoDataPurger operationsPurger,
         IOperationsDemoDataSeeder operationsSeeder,
+        ITeachingDemoDataSeeder teachingSeeder,
         IAcademicsStructureDemoDataSeeder academicsStructureSeeder,
         IFinancePolicyDemoDataSeeder financePolicySeeder,
         IStudentsDemoDataSeeder studentsSeeder,
@@ -58,8 +62,10 @@ public sealed partial class DemoDataOrchestrator : IDisposable
         _academicsPurger = academicsPurger;
         _financePurger = financePurger;
         _studentsPurger = studentsPurger;
+        _teachingPurger = teachingPurger;
         _operationsPurger = operationsPurger;
         _operationsSeeder = operationsSeeder;
+        _teachingSeeder = teachingSeeder;
         _academicsStructureSeeder = academicsStructureSeeder;
         _financePolicySeeder = financePolicySeeder;
         _studentsSeeder = studentsSeeder;
@@ -135,7 +141,13 @@ public sealed partial class DemoDataOrchestrator : IDisposable
             purgedSchemas++;
             LogPurgedStudents(_logger, purgeStopwatch.ElapsedMilliseconds);
 
-            // 4. Operations (root domain - no upstream dependencies)
+            // 4. Teaching (TD-09, P5-S16)
+            LogPurgingTeaching(_logger);
+            await _teachingPurger.PurgeDomainDataAsync(cancellationToken);
+            purgedSchemas++;
+            LogPurgedTeaching(_logger, purgeStopwatch.ElapsedMilliseconds);
+
+            // 5. Operations (root domain - no upstream dependencies)
             LogPurgingOperations(_logger);
             await _operationsPurger.PurgeDomainDataAsync(cancellationToken);
             purgedSchemas++;
@@ -172,7 +184,13 @@ public sealed partial class DemoDataOrchestrator : IDisposable
             seededDomains++;
             LogOperationsSeeded(_logger, operationsResult.AcademicYearCode, operationsResult.ActivePeriodId);
 
-            // 2. AcademicsStructureSeeder.SeedAcademicsStructureAsync(OperationsSeedResult) → AcademicsStructureSeedResult
+            // 2. TeachingSeeder.SeedTeachingAsync(OperationsSeedResult) → TeachingSeedResult (TD-09, P5-S16)
+            LogSeedingTeaching(_logger);
+            var teachingResult = await _teachingSeeder.SeedTeachingAsync(operationsResult, cancellationToken);
+            seededDomains++;
+            LogTeachingSeeded(_logger, teachingResult.TeacherProfilesCreated, teachingResult.QualificationsCreated, teachingResult.AuthorizationsCreated);
+
+            // 3. AcademicsStructureSeeder.SeedAcademicsStructureAsync(OperationsSeedResult) → AcademicsStructureSeedResult
             LogSeedingAcademicsStructure(_logger);
             var academicsStructureResult = await _academicsStructureSeeder.SeedAcademicsStructureAsync(operationsResult, cancellationToken);
             seededDomains++;
@@ -341,4 +359,16 @@ public sealed partial class DemoDataOrchestrator : IDisposable
 
     [LoggerMessage(EventId = 27, Level = LogLevel.Information, Message = "Demo data reset completed successfully in {TotalMs}ms: {Summary}")]
     private static partial void LogCompleted(ILogger logger, long totalMs, DemoResetSummary summary);
+
+    [LoggerMessage(EventId = 28, Level = LogLevel.Information, Message = "Purging Teaching domain demo data...")]
+    private static partial void LogPurgingTeaching(ILogger logger);
+
+    [LoggerMessage(EventId = 29, Level = LogLevel.Information, Message = "Teaching domain purged in {ElapsedMs}ms")]
+    private static partial void LogPurgedTeaching(ILogger logger, long elapsedMs);
+
+    [LoggerMessage(EventId = 30, Level = LogLevel.Information, Message = "Seeding Teaching domain (faculty personas, capabilities, credentials, authorizations)...")]
+    private static partial void LogSeedingTeaching(ILogger logger);
+
+    [LoggerMessage(EventId = 31, Level = LogLevel.Information, Message = "Teaching seeded: Teachers={Teachers}, Qualifications={Qualifications}, Authorizations={Authorizations}")]
+    private static partial void LogTeachingSeeded(ILogger logger, int teachers, int qualifications, int authorizations);
 }

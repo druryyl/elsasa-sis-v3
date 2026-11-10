@@ -15,21 +15,29 @@ namespace Elsasa.Sis.ArchitectureTests;
 public sealed class AssemblyDependencyTests
 {
     private static readonly string[] _contractsForbiddenTypeDependencies =
-        [TestAssemblies.Api, TestAssemblies.Database, TestAssemblies.Finance, TestAssemblies.Operations, TestAssemblies.Students, TestAssemblies.Academics];
+        [TestAssemblies.Api, TestAssemblies.Database, TestAssemblies.Finance, TestAssemblies.Operations, TestAssemblies.Students, TestAssemblies.Academics, TestAssemblies.Teaching];
 
     [Theory]
     [InlineData(TestAssemblies.Operations, TestAssemblies.Students)]
     [InlineData(TestAssemblies.Operations, TestAssemblies.Finance)]
     [InlineData(TestAssemblies.Operations, TestAssemblies.Academics)]
+    [InlineData(TestAssemblies.Operations, TestAssemblies.Teaching)]
     [InlineData(TestAssemblies.Students, TestAssemblies.Operations)]
     [InlineData(TestAssemblies.Students, TestAssemblies.Finance)]
     [InlineData(TestAssemblies.Students, TestAssemblies.Academics)]
+    [InlineData(TestAssemblies.Students, TestAssemblies.Teaching)]
     [InlineData(TestAssemblies.Finance, TestAssemblies.Operations)]
     [InlineData(TestAssemblies.Finance, TestAssemblies.Students)]
     [InlineData(TestAssemblies.Finance, TestAssemblies.Academics)]
+    [InlineData(TestAssemblies.Finance, TestAssemblies.Teaching)]
     [InlineData(TestAssemblies.Academics, TestAssemblies.Operations)]
     [InlineData(TestAssemblies.Academics, TestAssemblies.Students)]
     [InlineData(TestAssemblies.Academics, TestAssemblies.Finance)]
+    [InlineData(TestAssemblies.Academics, TestAssemblies.Teaching)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Operations)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Students)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Finance)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Academics)]
     public void DomainAssembly_Should_NotReferenceSiblingDomain_When_AssemblyMetadataIsInspected(
         string assemblyName,
         string forbiddenAssemblyName)
@@ -56,6 +64,8 @@ public sealed class AssemblyDependencyTests
     [InlineData(TestAssemblies.Finance, TestAssemblies.Database)]
     [InlineData(TestAssemblies.Academics, TestAssemblies.Api)]
     [InlineData(TestAssemblies.Academics, TestAssemblies.Database)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Api)]
+    [InlineData(TestAssemblies.Teaching, TestAssemblies.Database)]
     public void DomainAssembly_Should_NotReferenceInfrastructureAssembly_When_AssemblyMetadataIsInspected(
         string assemblyName,
         string forbiddenAssemblyName)
@@ -97,6 +107,36 @@ public sealed class AssemblyDependencyTests
             TestAssemblies.Operations,
             TestAssemblies.Students,
             TestAssemblies.Finance,
+            TestAssemblies.Teaching,
+            TestAssemblies.Api,
+            TestAssemblies.Database);
+    }
+
+    [Fact]
+    public void Teaching_Should_ReferenceOnlySharedAndContracts_When_AssemblyMetadataIsInspected()
+    {
+        // Arrange
+        var assembly = TestAssemblies.Get(TestAssemblies.Teaching);
+
+        // Act
+        var references = TestAssemblies.References(assembly);
+        var sisReferences = TestAssemblies.SisReferences(assembly);
+
+        // Assert
+        Assert.NotEmpty(references);
+        Assert.All(
+            sisReferences,
+            name => Assert.True(
+                string.Equals(name, TestAssemblies.Shared, StringComparison.Ordinal) ||
+                string.Equals(name, TestAssemblies.Contracts, StringComparison.Ordinal),
+                $"Elsasa.Sis.Teaching must reference only Elsasa.Sis.Shared and Elsasa.Sis.Contracts but references '{name}'."));
+
+        TestAssemblies.AssertNoTypeLevelDependency(
+            assembly,
+            TestAssemblies.Operations,
+            TestAssemblies.Students,
+            TestAssemblies.Finance,
+            TestAssemblies.Academics,
             TestAssemblies.Api,
             TestAssemblies.Database);
     }
@@ -161,6 +201,7 @@ public sealed class AssemblyDependencyTests
     [InlineData(TestAssemblies.Students)]
     [InlineData(TestAssemblies.Finance)]
     [InlineData(TestAssemblies.Academics)]
+    [InlineData(TestAssemblies.Teaching)]
     public void Database_Should_NotReferenceDomainAssembly_When_AssemblyMetadataIsInspected(string forbiddenAssemblyName)
     {
         // Arrange

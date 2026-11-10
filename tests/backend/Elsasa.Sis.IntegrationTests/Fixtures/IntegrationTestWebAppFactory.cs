@@ -114,6 +114,13 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanApprovedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanRevisedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
             services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Academics.Events.StudentLearningPlanParticipationsSyncedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeacherProfileCreatedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeacherProfileApprovedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeacherStandingChangedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.QualificationEvidenceVerifiedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeachingAuthorizationGrantedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeachingAuthorizationStatusChangedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
+            services.AddSingleton<MediatR.INotificationHandler<Elsasa.Sis.Contracts.Teaching.Events.TeachingRecordCorrectedEvent>>(sp => sp.GetRequiredService<TestEventCollector>());
 
             // Register TestFinanceModule for simulating IFinanceModule verification
             services.RemoveAll<Elsasa.Sis.Contracts.Finance.IFinanceModule>();

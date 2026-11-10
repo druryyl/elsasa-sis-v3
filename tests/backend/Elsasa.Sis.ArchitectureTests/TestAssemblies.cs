@@ -23,15 +23,17 @@ internal static class TestAssemblies
     internal const string Students = "Elsasa.Sis.Students";
     internal const string Finance = "Elsasa.Sis.Finance";
     internal const string Academics = "Elsasa.Sis.Academics";
+    internal const string Teaching = "Elsasa.Sis.Teaching";
     internal const string Api = "Elsasa.Sis.Api";
 
     internal static readonly Assembly AcademicsAssembly = typeof(Elsasa.Sis.Academics.AcademicsAssemblyMarker).Assembly;
+    internal static readonly Assembly TeachingAssembly = typeof(Elsasa.Sis.Teaching.TeachingAssemblyMarker).Assembly;
 
     /// <summary>
     /// Domain assemblies (ADR-001, ADR-010). They may reference only
     /// <c>Shared</c> and <c>Contracts</c> and must never reference each other.
     /// </summary>
-    internal static readonly string[] DomainAssemblyNames = [Operations, Students, Finance, Academics];
+    internal static readonly string[] DomainAssemblyNames = [Operations, Students, Finance, Academics, Teaching];
 
     /// <summary>
     /// Infrastructure assemblies that domain assemblies must never reference.
@@ -43,7 +45,7 @@ internal static class TestAssemblies
     /// shared kernel is the root of the dependency graph.
     /// </summary>
     internal static readonly string[] OtherSisAssemblyNames =
-        [Api, Contracts, Database, Finance, Operations, Students, Academics];
+        [Api, Contracts, Database, Finance, Operations, Students, Academics, Teaching];
 
     private static readonly Dictionary<string, Assembly> _assembliesByName = new(StringComparer.Ordinal)
     {
@@ -54,6 +56,7 @@ internal static class TestAssemblies
         [Students] = typeof(Elsasa.Sis.Students.StudentsAssemblyMarker).Assembly,
         [Finance] = typeof(Elsasa.Sis.Finance.FinanceAssemblyMarker).Assembly,
         [Academics] = AcademicsAssembly,
+        [Teaching] = TeachingAssembly,
         [Api] = typeof(Program).Assembly,
     };
 
