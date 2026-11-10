@@ -11,6 +11,7 @@ using Elsasa.Sis.Shared.Common;
 using Elsasa.Sis.Shared.Database;
 using Elsasa.Sis.Shared.Storage;
 using Elsasa.Sis.Students;
+using Elsasa.Sis.Teaching;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         typeof(StudentsAssemblyMarker).Assembly,
         typeof(FinanceAssemblyMarker).Assembly,
         typeof(AcademicsAssemblyMarker).Assembly,
+        typeof(TeachingAssemblyMarker).Assembly,
         typeof(ContractsAssemblyMarker).Assembly,
         typeof(Program).Assembly,
     ];
@@ -51,6 +53,7 @@ public static class DependencyInjection
     public static readonly Assembly[] Stage2Assemblies =
     [
         typeof(AcademicsAssemblyMarker).Assembly,
+        typeof(TeachingAssemblyMarker).Assembly,
     ];
 
     /// <summary>

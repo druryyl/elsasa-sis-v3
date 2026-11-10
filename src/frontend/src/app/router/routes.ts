@@ -160,6 +160,26 @@ export const routes: RouteRecordRaw[] = [
           },
         ],
       },
+      // STAGE 2: TEACHING DOMAIN (SCR-TCH-01, P8-S28)
+      {
+        path: 'teaching',
+        component: RouterView,
+        redirect: '/teaching/faculty',
+        children: [
+          {
+            path: 'faculty',
+            name: 'teaching-faculty',
+            component: () =>
+              import('@/features/teaching/faculty/views/FacultyResourceWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              permission: 'Permissions.Teaching.Faculty.View',
+              title: 'Faculty Resources — Elsasa SIS',
+              breadcrumb: 'Faculty Resources',
+            },
+          },
+        ],
+      },
       // STAGE 1: STUDENTS DOMAIN
       {
         path: 'students',

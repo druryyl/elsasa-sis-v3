@@ -3,6 +3,7 @@ using Elsasa.Sis.Api.Configuration;
 using Elsasa.Sis.Api.Features.DemoData;
 using Elsasa.Sis.Api.Middleware;
 using Elsasa.Sis.Database;
+using Elsasa.Sis.Teaching;
 using Elsasa.Sis.Shared.Endpoints;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -41,6 +42,7 @@ if (args.Contains("--seed-demo", StringComparer.OrdinalIgnoreCase) || args.Conta
     builder.Services.AddJwtAuthentication(builder.Configuration);
     builder.Services.AddSwaggerDocumentation();
     builder.Services.AddAcademicsDomain(builder.Configuration);
+    builder.Services.AddTeachingModule(builder.Configuration);
 
     using var host = builder.Build();
     try
@@ -87,6 +89,7 @@ builder.Services.AddHostComposition(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddSwaggerDocumentation();
 builder.Services.AddAcademicsDomain(builder.Configuration);
+builder.Services.AddTeachingModule(builder.Configuration);
 
 var app = builder.Build();
 
@@ -119,6 +122,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapEndpoints(DependencyInjection.Stage1Assemblies);
 app.MapAcademicsEndpoints();
+app.MapTeachingEndpoints();
 new Elsasa.Sis.Api.Features.Auth.LoginEndpoint().MapEndpoint(app);
 new Elsasa.Sis.Api.Features.DemoData.DemoDataEndpoints().MapEndpoint(app);
 

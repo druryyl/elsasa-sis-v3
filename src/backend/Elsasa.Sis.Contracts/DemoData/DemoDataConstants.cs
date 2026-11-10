@@ -40,4 +40,10 @@ public static class DemoDataConstants
 
     // Deterministic IDs for Jonathan's Semester 2 unpaid invoice (Finance transactions)
     public static readonly Guid JonathanUnpaidInvoiceId = new("00000000-0000-0000-0005-000000000001");
+
+    // Flagship teaching personas (GAP-008, TD-09, P5-S16)
+    public static readonly Guid BudiHartonoTeacherId = new("00000000-0000-0000-0006-000000000001");
+    public static readonly Guid SitiNurhalizaTeacherId = new("00000000-0000-0000-0006-000000000002");
+    public static readonly Guid JohnMillerTeacherId = new("00000000-0000-0000-0006-000000000003");
+    public static readonly Guid HendraSetiawanTeacherId = new("00000000-0000-0000-0006-000000000004");
 }

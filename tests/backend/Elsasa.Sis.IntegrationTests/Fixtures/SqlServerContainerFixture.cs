@@ -154,7 +154,7 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
             _sharedRespawner = await Respawn.Respawner.CreateAsync(connection, new RespawnerOptions
             {
                 DbAdapter = DbAdapter.SqlServer,
-                SchemasToInclude = ["operations", "students", "finance", "academics"],
+                SchemasToInclude = ["operations", "students", "finance", "academics", "teaching"],
                 TablesToIgnore =
                 [
                     new Respawn.Graph.Table("dbo", "_SchemaVersions"),

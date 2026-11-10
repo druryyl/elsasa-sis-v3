@@ -132,6 +132,7 @@ public sealed class DependencyInjectionTests
         // Act
         services.AddHostComposition(configuration);
         Elsasa.Sis.Academics.DependencyInjection.AddAcademicsDomain(services, configuration);
+        Elsasa.Sis.Teaching.DependencyInjection.AddTeachingModule(services, configuration);
 
         // Assert: ValidateOnBuild reproduces the host's startup service validation,
         // catching missing registrations such as IFinanceModule.
@@ -154,8 +155,8 @@ public sealed class DependencyInjectionTests
     public void DomainAssemblies_Should_IncludeExpectedAssemblies()
     {
         // Assert
-        Assert.Equal(6, DependencyInjection.DomainAssemblies.Length);
+        Assert.Equal(7, DependencyInjection.DomainAssemblies.Length);
         Assert.Equal(3, DependencyInjection.Stage1Assemblies.Length);
-        Assert.Single(DependencyInjection.Stage2Assemblies);
+        Assert.Equal(2, DependencyInjection.Stage2Assemblies.Length);
     }
 }
