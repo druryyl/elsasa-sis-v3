@@ -77,10 +77,26 @@ export function setupNavigationGuards(router: Router): void {
         (to.meta.permission === 'academics.standings.view' &&
           (authStore.hasPermission('Permissions.Academics.Standings.View') ||
             authStore.hasAnyRole(['AcademicAuthority', 'Admin']))) ||
-        (to.meta.permission === 'Permissions.Teaching.Faculty.View' &&
+        ((to.meta.permission === 'Permissions.Teaching.Faculty.View' ||
+          to.meta.permission === 'teaching.faculty.view') &&
           (authStore.hasPermission('Permissions.Teaching.Faculty.View') ||
             authStore.hasPermission('teaching.faculty.view') ||
-            authStore.hasAnyRole(['TeachingAuthority', 'TeachingCoordinator', 'Admin'])));
+            authStore.hasAnyRole(['TeachingAuthority', 'TeachingCoordinator', 'Admin']))) ||
+        ((to.meta.permission === 'Permissions.Teaching.Assignments.View' ||
+          to.meta.permission === 'teaching.assignments.view') &&
+          (authStore.hasPermission('Permissions.Teaching.Assignments.View') ||
+            authStore.hasPermission('teaching.assignments.view') ||
+            authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
+        ((to.meta.permission === 'Permissions.Teaching.Workload.View' ||
+          to.meta.permission === 'teaching.workload.view') &&
+          (authStore.hasPermission('Permissions.Teaching.Workload.View') ||
+            authStore.hasPermission('teaching.workload.view') ||
+            authStore.hasAnyRole(['TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
+        ((to.meta.permission === 'Permissions.Teaching.Availability.Declare' ||
+          to.meta.permission === 'teaching.availability.declare') &&
+          (authStore.hasPermission('Permissions.Teaching.Availability.Declare') ||
+            authStore.hasPermission('teaching.availability.declare') ||
+            authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'Admin'])));
 
       if (!isAllowed) {
         return '/403';

@@ -12,6 +12,20 @@ public sealed class TeachingDemoDataPurger(
     ISqlConnectionFactory connectionFactory) : ITeachingDemoDataPurger
 {
     private const string _purgeSql = """
+        DELETE FROM teaching.teaching_history_entries;
+        DELETE FROM teaching.assignment_completions;
+        DELETE FROM teaching.teaching_reassignments;
+        DELETE FROM teaching.teaching_substitutions;
+        DELETE FROM teaching.workload_exceptions;
+        DELETE FROM teaching.workload_commitments;
+        DELETE FROM teaching.teacher_unavailability_windows;
+        DELETE FROM teaching.teacher_availabilities;
+        DELETE FROM teaching.capacity_conflicts;
+        DELETE FROM teaching.teaching_assignments;
+        DELETE FROM teaching.teacher_eligibility_evaluations;
+        DELETE FROM teaching.teaching_demands;
+        DELETE FROM teaching.assignment_roles;
+        DELETE FROM teaching.workload_policies;
         DELETE FROM teaching.teaching_record_corrections;
         DELETE FROM teaching.supervision_requirements;
         DELETE FROM teaching.authorization_evidence;

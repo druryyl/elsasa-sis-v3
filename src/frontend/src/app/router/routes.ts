@@ -160,7 +160,7 @@ export const routes: RouteRecordRaw[] = [
           },
         ],
       },
-      // STAGE 2: TEACHING DOMAIN (SCR-TCH-01, P8-S28)
+      // STAGE 2: TEACHING DOMAIN (SCR-TCH-01, SCR-TCH-02, SCR-TCH-03, SCR-TCH-04, P8-S28)
       {
         path: 'teaching',
         component: RouterView,
@@ -176,6 +176,48 @@ export const routes: RouteRecordRaw[] = [
               permission: 'Permissions.Teaching.Faculty.View',
               title: 'Faculty Resources — Elsasa SIS',
               breadcrumb: 'Faculty Resources',
+            },
+          },
+          {
+            path: 'assignments',
+            name: 'teaching-assignments',
+            component: () =>
+              import(
+                '@/features/teaching/assignments/views/TeachingAssignmentWorkspaceView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'Permissions.Teaching.Assignments.View',
+              title: 'Assignments & Coverage — Elsasa SIS',
+              breadcrumb: 'Assignments & Coverage',
+            },
+          },
+          {
+            path: 'workload',
+            name: 'teaching-workload',
+            component: () =>
+              import(
+                '@/features/teaching/workload/views/FacultyWorkloadMonitoringView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'Permissions.Teaching.Workload.View',
+              title: 'Workload Monitoring — Elsasa SIS',
+              breadcrumb: 'Workload Monitoring',
+            },
+          },
+          {
+            path: 'my-availability',
+            name: 'teaching-availability',
+            component: () =>
+              import(
+                '@/features/teaching/availability/views/MyTeachingAvailabilityView.vue'
+              ),
+            meta: {
+              requiresAuth: true,
+              permission: 'Permissions.Teaching.Availability.Declare',
+              title: 'My Teaching Availability — Elsasa SIS',
+              breadcrumb: 'My Availability',
             },
           },
         ],
