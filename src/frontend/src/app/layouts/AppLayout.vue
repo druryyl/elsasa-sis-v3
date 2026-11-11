@@ -10,7 +10,6 @@ import {
   LEVEL2_DASHBOARD_ACCESS,
   isAuthorizedForAnyRule,
 } from '@/app/router/dashboardAccess';
-import type { BreadcrumbItem } from '@/shared/types/navigation';
 import ResetDemoDataDialog from '@/app/layouts/components/ResetDemoDataDialog.vue';
 import {
   Menu,
@@ -495,47 +494,6 @@ function isGroupActive(group: NavParentItem): boolean {
   return Boolean(group.children?.some((child) => isItemActive(child.to)));
 }
 
-// Dynamic Breadcrumbs resolution
-const resolvedBreadcrumbs = computed<BreadcrumbItem[]>(() => {
-  if (uiStore.breadcrumbs.length > 0) {
-    return uiStore.breadcrumbs;
-  }
-
-  const crumbs: BreadcrumbItem[] = [{ label: 'Home', to: '/dashboard' }];
-
-  if (route.path === '/dashboard') {
-    return [{ label: 'Dashboard', current: true }];
-  }
-
-  // Derive domain and page crumbs from route path
-  const pathSegments = route.path.split('/').filter(Boolean);
-  if (pathSegments.length > 0) {
-    const domainSegment = pathSegments[0];
-    const matchedParent = masterNavItems.find(
-      (item) => item.id.toLowerCase() === domainSegment.toLowerCase(),
-    );
-    if (matchedParent) {
-      crumbs.push({ label: matchedParent.label });
-    }
-
-    const rawTitle =
-      (route.meta.breadcrumb as string | undefined) ??
-      (route.meta.title as string | undefined);
-    const title = rawTitle
-      ? rawTitle.replace(/\s*—\s*Elsasa SIS$/, '')
-      : pathSegments[pathSegments.length - 1];
-    crumbs.push({ label: title, current: true });
-  }
-
-  return crumbs;
-});
-
-const currentPageTitle = computed(() => {
-  const rawTitle = route.meta.title as string | undefined;
-  if (!rawTitle) return 'Elsasa SIS';
-  return rawTitle.replace(/\s*—\s*Elsasa SIS$/, '');
-});
-
 // User logout handler
 function handleLogout() {
   authStore.logout();
@@ -632,7 +590,7 @@ function getDomainBadgeColor(groupId: string): string {
     >
       <!-- Sidebar Header / Branding -->
       <div
-        class="h-16 flex items-center border-b border-slate-200 px-4"
+        class="h-14 flex items-center border-b border-slate-200 px-4"
         :class="uiStore.isSidebarCollapsed ? 'justify-center' : 'justify-between'"
       >
         <RouterLink
@@ -794,7 +752,7 @@ function getDomainBadgeColor(groupId: string): string {
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <!-- Top Navigation Bar -->
       <header
-        class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-10 shrink-0"
+        class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-5 z-10 shrink-0"
         data-testid="top-navigation-bar"
       >
         <!-- Left: Sidebar Toggle Button & Branding Placeholder -->
@@ -809,8 +767,11 @@ function getDomainBadgeColor(groupId: string): string {
             <Menu class="w-5 h-5" aria-hidden="true" />
           </button>
 
-          <!-- Topbar Institution Title (visible on mobile / tablet) -->
-          <span class="font-semibold text-slate-800 text-sm hidden sm:inline-block">
+          <!-- Topbar Institution Title (visible when sidebar is collapsed) -->
+          <span
+            v-if="uiStore.isSidebarCollapsed"
+            class="font-semibold text-slate-800 text-sm hidden sm:inline-block"
+          >
             Elsasa SIS
           </span>
         </div>
@@ -947,60 +908,8 @@ function getDomainBadgeColor(groupId: string): string {
         </div>
       </header>
 
-      <!-- Dynamic Breadcrumbs & Page Header Region -->
-      <section
-        class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3.5 shrink-0 shadow-xs"
-        data-testid="layout-page-header"
-      >
-        <!-- Breadcrumb Navigation -->
-        <nav
-          v-if="resolvedBreadcrumbs.length > 0"
-          aria-label="Breadcrumb"
-          class="mb-1"
-          data-testid="layout-breadcrumbs"
-        >
-          <ol class="flex items-center flex-wrap gap-1.5 text-xs text-slate-500">
-            <li
-              v-for="(crumb, idx) in resolvedBreadcrumbs"
-              :key="idx"
-              class="inline-flex items-center gap-1.5"
-            >
-              <ChevronRight
-                v-if="idx > 0"
-                class="w-3.5 h-3.5 text-slate-400 shrink-0"
-                aria-hidden="true"
-              />
-              <RouterLink
-                v-if="crumb.to && !crumb.disabled && !crumb.current"
-                :to="crumb.to"
-                class="text-slate-600 hover:text-elsasa-teal-600 font-medium transition-colors"
-              >
-                {{ crumb.label }}
-              </RouterLink>
-              <span
-                v-else
-                :class="[crumb.current ? 'font-semibold text-slate-800' : 'text-slate-500']"
-                :aria-current="crumb.current ? 'page' : undefined"
-              >
-                {{ crumb.label }}
-              </span>
-            </li>
-          </ol>
-        </nav>
-
-        <!-- Dynamic Page Title -->
-        <div class="flex items-center justify-between">
-          <h1
-            class="text-lg sm:text-xl font-bold text-elsasa-navy-900 tracking-tight"
-            data-testid="layout-page-title"
-          >
-            {{ currentPageTitle }}
-          </h1>
-        </div>
-      </section>
-
       <!-- Main Routed Content (Wrapped in Transition) -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50" data-testid="main-content">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-5 bg-slate-50" data-testid="main-content">
         <RouterView v-slot="{ Component, route: currentRoute }">
           <Transition name="page" mode="out-in">
             <component :is="Component" :key="currentRoute.fullPath" />

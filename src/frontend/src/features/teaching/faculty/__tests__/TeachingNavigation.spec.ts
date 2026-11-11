@@ -178,21 +178,4 @@ describe('Teaching Domain Navigation & Route Integration (P8-S28)', () => {
       expect(facultyItem.classes()).toContain('border-teal-600');
     });
   });
-
-  describe('Dynamic Breadcrumbs & Header Integration', () => {
-    it('resolves breadcrumbs correctly for /teaching/faculty', async () => {
-      await router.push('/teaching/faculty');
-      const wrapper = mountLayout();
-
-      const breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.exists()).toBe(true);
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Teaching');
-      expect(breadcrumbs.text()).toContain('Faculty Resources');
-
-      const pageTitle = wrapper.find('[data-testid="layout-page-title"]');
-      expect(pageTitle.exists()).toBe(true);
-      expect(pageTitle.text()).toBe('Faculty Resources');
-    });
-  });
 });

@@ -643,38 +643,16 @@ describe('AppLayout.vue', () => {
     });
   });
 
-  describe('Dynamic Breadcrumbs and Page Header Region', () => {
-    it('renders dynamic breadcrumbs and title derived from current route', () => {
+  describe('Page Content Maximization & Route Navigation State', () => {
+    it('omits redundant layout-page-header so routed views own PageHeader', () => {
       const wrapper = mountLayout();
 
-      const pageHeader = wrapper.find('[data-testid="layout-page-header"]');
-      expect(pageHeader.exists()).toBe(true);
-
-      const title = wrapper.find('[data-testid="layout-page-title"]');
-      expect(title.text()).toBe('Dashboard');
-
-      const breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.exists()).toBe(true);
-      expect(breadcrumbs.text()).toContain('Dashboard');
+      expect(wrapper.find('[data-testid="layout-page-header"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="layout-page-title"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="layout-breadcrumbs"]').exists()).toBe(false);
     });
 
-    it('renders custom breadcrumbs when uiStore breadcrumbs are configured', async () => {
-      const uiStore = useUIStore();
-      uiStore.setBreadcrumbs([
-        { label: 'Home', to: '/dashboard' },
-        { label: 'Operations', to: '/operations' },
-        { label: 'Academic Calendar', current: true },
-      ]);
-
-      const wrapper = mountLayout();
-      const breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Operations');
-      expect(breadcrumbs.text()).toContain('Academic Calendar');
-    });
-
-    it('resolves breadcrumbs correctly for Submodule 2 routes', async () => {
+    it('highlights active sidebar items across Submodule 2 routes', async () => {
       const authStore = useAuthStore();
       authStore.setSession(
         'test-token',
@@ -683,47 +661,43 @@ describe('AppLayout.vue', () => {
         }),
       );
 
-      // Mount AppLayout once and verify reactive breadcrumbs + active nav items across route transitions
+      // Mount AppLayout once and verify active nav items across route transitions
       await router.push('/academics/participation');
       const wrapper = mountLayout();
 
       // 1. Academics Participation
-      let breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Participation & Rosters');
+      const activeParticipation = wrapper.find('[data-testid="nav-item-academics-participation"]');
+      expect(activeParticipation.exists()).toBe(true);
+      expect(activeParticipation.classes()).toContain('border-l-2');
+      expect(activeParticipation.classes()).toContain('border-teal-600');
 
       // 2. Academics Sessions
       await router.push('/academics/sessions');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Class Sessions');
+      const activeSessions = wrapper.find('[data-testid="nav-item-academics-sessions"]');
+      expect(activeSessions.exists()).toBe(true);
+      expect(activeSessions.classes()).toContain('border-l-2');
+      expect(activeSessions.classes()).toContain('border-teal-600');
 
       // 3. Academics Coursework
       await router.push('/academics/coursework');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Coursework');
+      const activeCoursework = wrapper.find('[data-testid="nav-item-academics-coursework"]');
+      expect(activeCoursework.exists()).toBe(true);
+      expect(activeCoursework.classes()).toContain('border-l-2');
+      expect(activeCoursework.classes()).toContain('border-teal-600');
 
       // 4. Portal Learning
       await router.push('/portal/learning');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Student Portal');
-      expect(breadcrumbs.text()).toContain('My Learning & Coursework');
+      const activePortal = wrapper.find('[data-testid="nav-item-portal-learning"]');
+      expect(activePortal.exists()).toBe(true);
+      expect(activePortal.classes()).toContain('border-l-2');
+      expect(activePortal.classes()).toContain('border-teal-600');
 
       // 5. Academic Interventions (P8-S25)
       await router.push('/academics/interventions');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Academic Interventions');
       const activeInterventions = wrapper.find('[data-testid="nav-item-academics-interventions"]');
       expect(activeInterventions.exists()).toBe(true);
       expect(activeInterventions.classes()).toContain('border-l-2');
@@ -732,10 +706,6 @@ describe('AppLayout.vue', () => {
       // 6. Cohort Academic Review (P8-S25)
       await router.push('/academics/cohort-review');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Cohort Academic Review');
       const activeCohortReview = wrapper.find('[data-testid="nav-item-academics-cohort-review"]');
       expect(activeCohortReview.exists()).toBe(true);
       expect(activeCohortReview.classes()).toContain('border-l-2');
@@ -744,10 +714,6 @@ describe('AppLayout.vue', () => {
       // 7. Student Learning Plans (P7-S25)
       await router.push('/academics/learning-plans');
       await flushPromises();
-      breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
-      expect(breadcrumbs.text()).toContain('Home');
-      expect(breadcrumbs.text()).toContain('Academics');
-      expect(breadcrumbs.text()).toContain('Learning Plans');
       const activeSlp = wrapper.find('[data-testid="nav-item-academics-learning-plans"]');
       expect(activeSlp.exists()).toBe(true);
       expect(activeSlp.classes()).toContain('border-l-2');

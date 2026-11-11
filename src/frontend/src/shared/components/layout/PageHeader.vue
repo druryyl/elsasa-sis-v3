@@ -27,12 +27,12 @@ defineSlots<{
 </script>
 
 <template>
-  <div :class="['mb-6 pb-4 border-b border-slate-200', $props.class]" data-testid="page-header">
+  <div :class="['mb-4 pb-3 border-b border-slate-200', $props.class]" data-testid="page-header">
     <!-- Breadcrumb Navigation -->
     <nav
       v-if="(breadcrumbs && breadcrumbs.length > 0) || $slots.breadcrumbs"
       aria-label="Breadcrumb"
-      class="mb-2.5"
+      class="mb-1.5"
       data-testid="page-header-breadcrumbs"
     >
       <slot name="breadcrumbs">
