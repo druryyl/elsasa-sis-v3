@@ -142,11 +142,12 @@ public sealed class TeachingArchitectureTests
         Assert.Empty(violations);
     }
 
-    [Fact]
-    public void TeachingDbUpMigration_Should_NotDeclareCrossSchemaForeignKeys()
+    [Theory]
+    [InlineData("Elsasa.Sis.Database.Scripts.20261110_0501_Teaching_TeacherProfile_Tables.sql")]
+    [InlineData("Elsasa.Sis.Database.Scripts.20261110_0502_Teaching_AssignmentWorkload_Tables.sql")]
+    public void TeachingDbUpMigrations_Should_NotDeclareCrossSchemaForeignKeys(string scriptResourceName)
     {
         // ADR-001, ADR-002: Relational tables must have zero cross-schema physical foreign keys.
-        const string scriptResourceName = "Elsasa.Sis.Database.Scripts.20261110_0501_Teaching_TeacherProfile_Tables.sql";
         using var stream = _databaseAssembly.GetManifestResourceStream(scriptResourceName);
         Assert.NotNull(stream);
 
@@ -191,6 +192,13 @@ public sealed class TeachingArchitectureTests
     [InlineData("TeachingAuthorizationGrantedEvent")]
     [InlineData("TeachingAuthorizationStatusChangedEvent")]
     [InlineData("TeachingRecordCorrectedEvent")]
+    [InlineData("TeachingDemandReceivedEvent")]
+    [InlineData("TeachingAssignmentProposedEvent")]
+    [InlineData("TeachingAssignmentApprovedEvent")]
+    [InlineData("TeachingAssignmentCancelledEvent")]
+    [InlineData("TeachingAssignmentCompletedEvent")]
+    [InlineData("TeachingSubstitutionAssignedEvent")]
+    [InlineData("WorkloadExceptionApprovedEvent")]
     public void TeachingDomainEvents_Should_ImplementIDomainEvent_AndResideInContractsTeachingEvents(string eventName)
     {
         // Arrange
@@ -308,6 +316,7 @@ public sealed class TeachingArchitectureTests
     }
 
     [Theory]
+    // Stage 1 Handlers: Teacher Profile & Authorization
     [InlineData("RegisterTeacherProfileHandler")]
     [InlineData("UpdateTeacherProfileHandler")]
     [InlineData("ApproveTeacherProfileHandler")]
@@ -329,6 +338,54 @@ public sealed class TeachingArchitectureTests
     [InlineData("ApplyRecordCorrectionHandler")]
     [InlineData("ApproveRecordCorrectionHandler")]
     [InlineData("GetRecordCorrectionsHandler")]
+    // Stage 2 Handlers: Demands
+    [InlineData("CreateTeachingDemandHandler")]
+    [InlineData("UpdateTeachingDemandHandler")]
+    [InlineData("UpdateTeachingDemandStatusHandler")]
+    [InlineData("GetTeachingDemandsHandler")]
+    [InlineData("GetTeachingDemandByIdHandler")]
+    // Stage 2 Handlers: Eligibility
+    [InlineData("EvaluateCandidateEligibilityHandler")]
+    [InlineData("GetCandidateEvaluationsHandler")]
+    // Stage 2 Handlers: Assignments
+    [InlineData("ProposeTeachingAssignmentHandler")]
+    [InlineData("ApproveTeachingAssignmentHandler")]
+    [InlineData("AcknowledgeTeachingAssignmentHandler")]
+    [InlineData("UpdateTeachingAssignmentStatusHandler")]
+    [InlineData("GetTeachingAssignmentsHandler")]
+    [InlineData("GetTeachingAssignmentByIdHandler")]
+    [InlineData("GetAssignmentRolesHandler")]
+    [InlineData("GetCapacityConflictsHandler")]
+    [InlineData("ResolveCapacityConflictHandler")]
+    // Stage 2 Handlers: Substitutions
+    [InlineData("ArrangeEmergencySubstitutionHandler")]
+    [InlineData("ApproveSubstitutionExceptionHandler")]
+    [InlineData("GetTeachingSubstitutionsHandler")]
+    [InlineData("CancelSubstitutionHandler")]
+    // Stage 2 Handlers: Reassignments
+    [InlineData("ProposePermanentReassignmentHandler")]
+    [InlineData("ApprovePermanentReassignmentHandler")]
+    [InlineData("ConfirmReassignmentHandoverHandler")]
+    [InlineData("GetTeachingReassignmentsHandler")]
+    [InlineData("GetTeachingReassignmentByIdHandler")]
+    // Stage 2 Handlers: Completions
+    [InlineData("ConcludeTeachingAssignmentHandler")]
+    [InlineData("GetAssignmentCompletionsHandler")]
+    // Stage 2 Handlers: Availability
+    [InlineData("DeclareTeacherAvailabilityHandler")]
+    [InlineData("GetTeacherAvailabilityHandler")]
+    [InlineData("CreateUnavailabilityWindowHandler")]
+    [InlineData("GetTeacherUnavailabilityWindowsHandler")]
+    [InlineData("CancelUnavailabilityWindowHandler")]
+    // Stage 2 Handlers: Workload
+    [InlineData("GetWorkloadPoliciesHandler")]
+    [InlineData("GetWorkloadCommitmentsHandler")]
+    [InlineData("RecalculatePeriodWorkloadHandler")]
+    [InlineData("RequestWorkloadExceptionHandler")]
+    [InlineData("GetWorkloadExceptionsHandler")]
+    [InlineData("ApproveWorkloadExceptionHandler")]
+    // Stage 2 Handlers: Teaching History
+    [InlineData("GetTeacherHistoryHandler")]
     public void TeachingFeatureHandlers_Should_FollowVerticalSliceConventions(string handlerName)
     {
         var handlerType = GetAllTypes(_teachingAssembly)
@@ -338,13 +395,97 @@ public sealed class TeachingArchitectureTests
         Assert.True(handlerType.IsSealed, $"Handler '{handlerName}' must be sealed.");
         Assert.True(
             handlerType.Namespace is not null && handlerType.Namespace.StartsWith("Elsasa.Sis.Teaching.Features.", StringComparison.Ordinal),
-            $"Handler '{handlerName}' must reside in a Feature slice namespace.");
+            $"Handler '{handlerName}' must reside in a Feature slice namespace under Elsasa.Sis.Teaching.Features.");
 
         var handleAsyncMethod = handlerType.GetMethod("HandleAsync", BindingFlags.Public | BindingFlags.Instance);
         Assert.NotNull(handleAsyncMethod);
         Assert.True(
             typeof(Task).IsAssignableFrom(handleAsyncMethod.ReturnType),
             $"Handler '{handlerName}.HandleAsync' must return a Task.");
+    }
+
+    [Theory]
+    // Stage 1 Endpoints: Teacher Profile & Authorization
+    [InlineData("RegisterTeacherProfileEndpoint")]
+    [InlineData("UpdateTeacherProfileEndpoint")]
+    [InlineData("ApproveTeacherProfileEndpoint")]
+    [InlineData("ChangeTeacherStandingEndpoint")]
+    [InlineData("GetTeacherProfileByIdEndpoint")]
+    [InlineData("GetTeacherProfilesEndpoint")]
+    [InlineData("GetTeachingRolesEndpoint")]
+    [InlineData("AddTeachingCapabilityEndpoint")]
+    [InlineData("RemoveTeachingCapabilityEndpoint")]
+    [InlineData("GetCapabilityTypesEndpoint")]
+    [InlineData("SubmitQualificationEvidenceEndpoint")]
+    [InlineData("VerifyQualificationEvidenceEndpoint")]
+    [InlineData("RejectQualificationEvidenceEndpoint")]
+    [InlineData("GetQualificationTypesEndpoint")]
+    [InlineData("GrantTeachingAuthorizationEndpoint")]
+    [InlineData("UpdateTeachingAuthorizationStatusEndpoint")]
+    [InlineData("AddSupervisionRequirementEndpoint")]
+    [InlineData("ResolveSupervisionRequirementEndpoint")]
+    [InlineData("ApplyRecordCorrectionEndpoint")]
+    [InlineData("ApproveRecordCorrectionEndpoint")]
+    [InlineData("GetRecordCorrectionsEndpoint")]
+    // Stage 2 Endpoints: Demands
+    [InlineData("CreateTeachingDemandEndpoint")]
+    [InlineData("UpdateTeachingDemandEndpoint")]
+    [InlineData("UpdateTeachingDemandStatusEndpoint")]
+    [InlineData("GetTeachingDemandsEndpoint")]
+    [InlineData("GetTeachingDemandByIdEndpoint")]
+    // Stage 2 Endpoints: Eligibility
+    [InlineData("EvaluateCandidateEligibilityEndpoint")]
+    [InlineData("GetCandidateEvaluationsEndpoint")]
+    // Stage 2 Endpoints: Assignments
+    [InlineData("ProposeTeachingAssignmentEndpoint")]
+    [InlineData("ApproveTeachingAssignmentEndpoint")]
+    [InlineData("AcknowledgeTeachingAssignmentEndpoint")]
+    [InlineData("UpdateTeachingAssignmentStatusEndpoint")]
+    [InlineData("GetTeachingAssignmentsEndpoint")]
+    [InlineData("GetTeachingAssignmentByIdEndpoint")]
+    [InlineData("GetAssignmentRolesEndpoint")]
+    [InlineData("GetCapacityConflictsEndpoint")]
+    [InlineData("ResolveCapacityConflictEndpoint")]
+    // Stage 2 Endpoints: Substitutions
+    [InlineData("ArrangeEmergencySubstitutionEndpoint")]
+    [InlineData("ApproveSubstitutionExceptionEndpoint")]
+    [InlineData("GetTeachingSubstitutionsEndpoint")]
+    [InlineData("CancelSubstitutionEndpoint")]
+    // Stage 2 Endpoints: Reassignments
+    [InlineData("ProposePermanentReassignmentEndpoint")]
+    [InlineData("ApprovePermanentReassignmentEndpoint")]
+    [InlineData("ConfirmReassignmentHandoverEndpoint")]
+    [InlineData("GetTeachingReassignmentsEndpoint")]
+    [InlineData("GetTeachingReassignmentByIdEndpoint")]
+    // Stage 2 Endpoints: Completions
+    [InlineData("ConcludeTeachingAssignmentEndpoint")]
+    [InlineData("GetAssignmentCompletionsEndpoint")]
+    // Stage 2 Endpoints: Availability
+    [InlineData("DeclareTeacherAvailabilityEndpoint")]
+    [InlineData("GetTeacherAvailabilityEndpoint")]
+    [InlineData("CreateUnavailabilityWindowEndpoint")]
+    [InlineData("GetTeacherUnavailabilityWindowsEndpoint")]
+    [InlineData("CancelUnavailabilityWindowEndpoint")]
+    // Stage 2 Endpoints: Workload
+    [InlineData("GetWorkloadPoliciesEndpoint")]
+    [InlineData("GetWorkloadCommitmentsEndpoint")]
+    [InlineData("RecalculatePeriodWorkloadEndpoint")]
+    [InlineData("RequestWorkloadExceptionEndpoint")]
+    [InlineData("GetWorkloadExceptionsEndpoint")]
+    [InlineData("ApproveWorkloadExceptionEndpoint")]
+    // Stage 2 Endpoints: Teaching History
+    [InlineData("GetTeacherHistoryEndpoint")]
+    public void TeachingFeatureEndpoints_Should_FollowVerticalSliceConventions(string endpointName)
+    {
+        var endpointType = GetAllTypes(_teachingAssembly)
+            .FirstOrDefault(t => t.Name == endpointName);
+
+        Assert.NotNull(endpointType);
+        Assert.True(endpointType.IsSealed, $"Endpoint '{endpointName}' must be sealed.");
+        Assert.True(typeof(IEndpoint).IsAssignableFrom(endpointType), $"Endpoint '{endpointName}' must implement IEndpoint.");
+        Assert.True(
+            endpointType.Namespace is not null && endpointType.Namespace.StartsWith("Elsasa.Sis.Teaching.Features.", StringComparison.Ordinal),
+            $"Endpoint '{endpointName}' must reside in a Feature slice namespace under Elsasa.Sis.Teaching.Features.");
     }
 
     #endregion
@@ -462,6 +603,45 @@ public sealed class TeachingArchitectureTests
         Assert.True(implType.IsSealed, "TeachingModuleImpl must be sealed.");
         Assert.True(typeof(ITeachingModule).IsAssignableFrom(implType), "TeachingModuleImpl must implement ITeachingModule.");
         Assert.Equal("Elsasa.Sis.Teaching.Services", implType.Namespace);
+    }
+
+    [Theory]
+    [InlineData("GetTeacherProfileAsync", "TeacherProfileDto")]
+    [InlineData("IsTeacherAuthorizedAsync", "Boolean")]
+    [InlineData("GetActiveTeachersAsync", "IReadOnlyList`1")]
+    [InlineData("GetApprovedAssignmentForLearningUnitAsync", "TeachingAssignmentDto")]
+    [InlineData("GetTeacherActiveAssignmentsAsync", "IReadOnlyList`1")]
+    [InlineData("GetTeacherAvailabilityAsync", "TeacherAvailabilityDto")]
+    [InlineData("IsTeacherAssignedToScopeAsync", "Boolean")]
+    public void ITeachingModule_SynchronousInquiryMethods_Should_ReturnTaskResult(string methodName, string innerTypeName)
+    {
+        var method = typeof(ITeachingModule).GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(method);
+        Assert.True(typeof(Task).IsAssignableFrom(method.ReturnType), $"{methodName} must return Task");
+        Assert.True(method.ReturnType.IsGenericType, $"{methodName} must return generic Task<T>");
+
+        var genericType = method.ReturnType.GetGenericArguments()[0];
+        Assert.Equal("Result`1", genericType.Name);
+
+        var innerType = genericType.GetGenericArguments()[0];
+        Assert.Contains(innerTypeName, innerType.Name);
+    }
+
+    [Theory]
+    [InlineData("GetTeacherProfileAsync")]
+    [InlineData("IsTeacherAuthorizedAsync")]
+    [InlineData("GetActiveTeachersAsync")]
+    [InlineData("GetApprovedAssignmentForLearningUnitAsync")]
+    [InlineData("GetTeacherActiveAssignmentsAsync")]
+    [InlineData("GetTeacherAvailabilityAsync")]
+    [InlineData("IsTeacherAssignedToScopeAsync")]
+    public void TeachingModuleImpl_Should_ImplementAllInquiryMethods(string methodName)
+    {
+        var implType = _teachingAssembly.GetType("Elsasa.Sis.Teaching.Services.TeachingModuleImpl");
+        Assert.NotNull(implType);
+        var method = implType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(method);
+        Assert.True(typeof(Task).IsAssignableFrom(method.ReturnType));
     }
 
     #endregion

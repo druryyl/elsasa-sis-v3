@@ -234,4 +234,24 @@ public sealed class AssemblyDependencyTests
         Assert.Single(violations);
         Assert.Equal(TestAssemblies.Students, violations[0]);
     }
+
+    [Fact]
+    public void TeachingHandlersAndEndpoints_Should_ResideWithinFeatureFoldersAndFollowNamingConventions()
+    {
+        // Arrange
+        var assembly = TestAssemblies.Get(TestAssemblies.Teaching);
+        var types = assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && (t.Name.EndsWith("Handler", StringComparison.Ordinal) || t.Name.EndsWith("Endpoint", StringComparison.Ordinal)))
+            .ToArray();
+
+        // Assert
+        Assert.NotEmpty(types);
+        foreach (var type in types)
+        {
+            Assert.True(type.IsSealed, $"Type '{type.FullName}' must be sealed.");
+            Assert.True(
+                type.Namespace is not null && System.Text.RegularExpressions.Regex.IsMatch(type.Namespace, @"^Elsasa\.Sis\.Teaching\.Features\..+"),
+                $"Teaching type '{type.FullName}' must reside within a feature slice folder under 'Elsasa.Sis.Teaching.Features'.");
+        }
+    }
 }

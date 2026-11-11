@@ -198,8 +198,6 @@ const masterNavItems: NavParentItem[] = [
     id: 'teaching',
     label: 'Teaching',
     icon: 'pi pi-graduation-cap',
-    permission: 'Permissions.Teaching.Faculty.View',
-    roles: ['TeachingAuthority', 'TeachingCoordinator', 'Admin'],
     children: [
       {
         id: 'teaching-faculty',
@@ -208,6 +206,30 @@ const masterNavItems: NavParentItem[] = [
         icon: 'pi pi-users',
         permission: 'Permissions.Teaching.Faculty.View',
         roles: ['TeachingAuthority', 'TeachingCoordinator', 'Admin'],
+      },
+      {
+        id: 'teaching-assignments',
+        label: 'Assignments & Coverage',
+        to: '/teaching/assignments',
+        icon: 'pi pi-briefcase',
+        permission: 'Permissions.Teaching.Assignments.View',
+        roles: ['TeachingCoordinator', 'TeachingAuthority', 'Admin'],
+      },
+      {
+        id: 'teaching-workload',
+        label: 'Workload Monitoring',
+        to: '/teaching/workload',
+        icon: 'pi pi-chart-bar',
+        permission: 'Permissions.Teaching.Workload.View',
+        roles: ['TeachingCoordinator', 'TeachingAuthority', 'Admin'],
+      },
+      {
+        id: 'teaching-my-availability',
+        label: 'My Availability',
+        to: '/teaching/my-availability',
+        icon: 'pi pi-clock',
+        permission: 'Permissions.Teaching.Availability.Declare',
+        roles: ['Teacher', 'TeachingCoordinator', 'Admin'],
       },
     ],
   },
@@ -318,6 +340,12 @@ function checkPermission(permission: string): boolean {
     'Permissions.Academics.Standings.View': ['academics.standings.view'],
     'teaching.faculty.view': ['Permissions.Teaching.Faculty.View'],
     'Permissions.Teaching.Faculty.View': ['teaching.faculty.view'],
+    'teaching.assignments.view': ['Permissions.Teaching.Assignments.View'],
+    'Permissions.Teaching.Assignments.View': ['teaching.assignments.view'],
+    'teaching.workload.view': ['Permissions.Teaching.Workload.View'],
+    'Permissions.Teaching.Workload.View': ['teaching.workload.view'],
+    'teaching.availability.declare': ['Permissions.Teaching.Availability.Declare'],
+    'Permissions.Teaching.Availability.Declare': ['teaching.availability.declare'],
   };
 
   const aliases = permissionAliases[permission];

@@ -47,7 +47,8 @@ public sealed class DemoDataProductionGuardTest : BaseIntegrationTest
             financePolicySeeder: null!,
             studentsSeeder: null!,
             financeTransactionsSeeder: null!,
-            academicsActivitiesSeeder: null!);
+            academicsActivitiesSeeder: null!,
+            teachingAssignmentsSeeder: null!);
 
         var act = () => orchestrator.ExecuteResetAsync();
 

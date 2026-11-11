@@ -47,7 +47,14 @@ public sealed class TestEventCollector :
     INotificationHandler<QualificationEvidenceVerifiedEvent>,
     INotificationHandler<TeachingAuthorizationGrantedEvent>,
     INotificationHandler<TeachingAuthorizationStatusChangedEvent>,
-    INotificationHandler<TeachingRecordCorrectedEvent>
+    INotificationHandler<TeachingRecordCorrectedEvent>,
+    INotificationHandler<TeachingDemandReceivedEvent>,
+    INotificationHandler<TeachingAssignmentProposedEvent>,
+    INotificationHandler<TeachingAssignmentApprovedEvent>,
+    INotificationHandler<TeachingAssignmentCancelledEvent>,
+    INotificationHandler<TeachingAssignmentCompletedEvent>,
+    INotificationHandler<TeachingSubstitutionAssignedEvent>,
+    INotificationHandler<WorkloadExceptionApprovedEvent>
 {
     private readonly ConcurrentBag<TeacherProfileCreatedEvent> _teacherProfileCreatedEvents = [];
     private readonly ConcurrentBag<TeacherProfileApprovedEvent> _teacherProfileApprovedEvents = [];
@@ -56,6 +63,13 @@ public sealed class TestEventCollector :
     private readonly ConcurrentBag<TeachingAuthorizationGrantedEvent> _teachingAuthorizationGrantedEvents = [];
     private readonly ConcurrentBag<TeachingAuthorizationStatusChangedEvent> _teachingAuthorizationStatusChangedEvents = [];
     private readonly ConcurrentBag<TeachingRecordCorrectedEvent> _teachingRecordCorrectedEvents = [];
+    private readonly ConcurrentBag<TeachingDemandReceivedEvent> _teachingDemandReceivedEvents = [];
+    private readonly ConcurrentBag<TeachingAssignmentProposedEvent> _teachingAssignmentProposedEvents = [];
+    private readonly ConcurrentBag<TeachingAssignmentApprovedEvent> _teachingAssignmentApprovedEvents = [];
+    private readonly ConcurrentBag<TeachingAssignmentCancelledEvent> _teachingAssignmentCancelledEvents = [];
+    private readonly ConcurrentBag<TeachingAssignmentCompletedEvent> _teachingAssignmentCompletedEvents = [];
+    private readonly ConcurrentBag<TeachingSubstitutionAssignedEvent> _teachingSubstitutionAssignedEvents = [];
+    private readonly ConcurrentBag<WorkloadExceptionApprovedEvent> _workloadExceptionApprovedEvents = [];
     private readonly ConcurrentBag<ApplicantAcceptedEvent> _applicantAcceptedEvents = [];
     private readonly ConcurrentBag<StudentEnrolledEvent> _studentEnrolledEvents = [];
     private readonly ConcurrentBag<PlacementChangedEvent> _placementChangedEvents = [];
@@ -244,6 +258,13 @@ public sealed class TestEventCollector :
     public IReadOnlyCollection<TeachingAuthorizationGrantedEvent> TeachingAuthorizationGrantedEvents => _teachingAuthorizationGrantedEvents;
     public IReadOnlyCollection<TeachingAuthorizationStatusChangedEvent> TeachingAuthorizationStatusChangedEvents => _teachingAuthorizationStatusChangedEvents;
     public IReadOnlyCollection<TeachingRecordCorrectedEvent> TeachingRecordCorrectedEvents => _teachingRecordCorrectedEvents;
+    public IReadOnlyCollection<TeachingDemandReceivedEvent> TeachingDemandReceivedEvents => _teachingDemandReceivedEvents;
+    public IReadOnlyCollection<TeachingAssignmentProposedEvent> TeachingAssignmentProposedEvents => _teachingAssignmentProposedEvents;
+    public IReadOnlyCollection<TeachingAssignmentApprovedEvent> TeachingAssignmentApprovedEvents => _teachingAssignmentApprovedEvents;
+    public IReadOnlyCollection<TeachingAssignmentCancelledEvent> TeachingAssignmentCancelledEvents => _teachingAssignmentCancelledEvents;
+    public IReadOnlyCollection<TeachingAssignmentCompletedEvent> TeachingAssignmentCompletedEvents => _teachingAssignmentCompletedEvents;
+    public IReadOnlyCollection<TeachingSubstitutionAssignedEvent> TeachingSubstitutionAssignedEvents => _teachingSubstitutionAssignedEvents;
+    public IReadOnlyCollection<WorkloadExceptionApprovedEvent> WorkloadExceptionApprovedEvents => _workloadExceptionApprovedEvents;
 
     /// <summary>
     /// Clears all captured notifications.
@@ -287,6 +308,13 @@ public sealed class TestEventCollector :
         _teachingAuthorizationGrantedEvents.Clear();
         _teachingAuthorizationStatusChangedEvents.Clear();
         _teachingRecordCorrectedEvents.Clear();
+        _teachingDemandReceivedEvents.Clear();
+        _teachingAssignmentProposedEvents.Clear();
+        _teachingAssignmentApprovedEvents.Clear();
+        _teachingAssignmentCancelledEvents.Clear();
+        _teachingAssignmentCompletedEvents.Clear();
+        _teachingSubstitutionAssignedEvents.Clear();
+        _workloadExceptionApprovedEvents.Clear();
     }
 
     /// <inheritdoc />
@@ -582,6 +610,62 @@ public sealed class TestEventCollector :
     {
         ArgumentNullException.ThrowIfNull(notification);
         _teachingRecordCorrectedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingDemandReceivedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingDemandReceivedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAssignmentProposedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAssignmentProposedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAssignmentApprovedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAssignmentApprovedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAssignmentCancelledEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAssignmentCancelledEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingAssignmentCompletedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingAssignmentCompletedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(TeachingSubstitutionAssignedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _teachingSubstitutionAssignedEvents.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task Handle(WorkloadExceptionApprovedEvent notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _workloadExceptionApprovedEvents.Add(notification);
         return Task.CompletedTask;
     }
 }

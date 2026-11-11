@@ -27,7 +27,7 @@ public sealed partial class DemoDataOrchestrator : IDisposable
     private readonly ITeachingDemoDataPurger _teachingPurger;
     private readonly IOperationsDemoDataPurger _operationsPurger;
 
-    // Domain seeders (forward topological order: Operations → Teaching → Academics Structure → Finance Policy → Students → Finance Transactions → Academics Activities)
+    // Domain seeders (forward topological order: Operations → Teaching → Academics Structure → Finance Policy → Students → Finance Transactions → Academics Activities → Teaching Assignments)
     private readonly IOperationsDemoDataSeeder _operationsSeeder;
     private readonly ITeachingDemoDataSeeder _teachingSeeder;
     private readonly IAcademicsStructureDemoDataSeeder _academicsStructureSeeder;
@@ -35,6 +35,7 @@ public sealed partial class DemoDataOrchestrator : IDisposable
     private readonly IStudentsDemoDataSeeder _studentsSeeder;
     private readonly IFinanceTransactionsDemoDataSeeder _financeTransactionsSeeder;
     private readonly IAcademicsActivitiesDemoDataSeeder _academicsActivitiesSeeder;
+    private readonly ITeachingAssignmentsDemoDataSeeder _teachingAssignmentsSeeder;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DemoDataOrchestrator"/> class.
@@ -54,7 +55,8 @@ public sealed partial class DemoDataOrchestrator : IDisposable
         IFinancePolicyDemoDataSeeder financePolicySeeder,
         IStudentsDemoDataSeeder studentsSeeder,
         IFinanceTransactionsDemoDataSeeder financeTransactionsSeeder,
-        IAcademicsActivitiesDemoDataSeeder academicsActivitiesSeeder)
+        IAcademicsActivitiesDemoDataSeeder academicsActivitiesSeeder,
+        ITeachingAssignmentsDemoDataSeeder teachingAssignmentsSeeder)
     {
         _logger = logger;
         _environment = environment;
@@ -71,6 +73,7 @@ public sealed partial class DemoDataOrchestrator : IDisposable
         _studentsSeeder = studentsSeeder;
         _financeTransactionsSeeder = financeTransactionsSeeder;
         _academicsActivitiesSeeder = academicsActivitiesSeeder;
+        _teachingAssignmentsSeeder = teachingAssignmentsSeeder;
     }
 
     /// <summary>
@@ -236,6 +239,22 @@ public sealed partial class DemoDataOrchestrator : IDisposable
             seededDomains++;
             LogAcademicsActivitiesSeeded(_logger, academicsActivitiesResult.ParticipationsCreated, academicsActivitiesResult.AttendanceRecordsCreated, academicsActivitiesResult.ResultsCreated, academicsActivitiesResult.ReportCardsCreated, academicsActivitiesResult.TranscriptsCreated);
 
+            // 7. TeachingAssignmentsSeeder.SeedTeachingAssignmentsAsync(OperationsSeedResult, AcademicsStructureSeedResult, StudentsSeedResult, TeachingSeedResult) → TeachingAssignmentsSeedResult (TD-08, P5-S16)
+            LogSeedingTeachingAssignments(_logger);
+            var teachingAssignmentsResult = await _teachingAssignmentsSeeder.SeedTeachingAssignmentsAsync(
+                operationsResult,
+                academicsStructureResult,
+                studentsResult,
+                teachingResult,
+                cancellationToken);
+            seededDomains++;
+            LogTeachingAssignmentsSeeded(
+                _logger,
+                teachingAssignmentsResult.DemandsCreated,
+                teachingAssignmentsResult.AssignmentsCreated,
+                teachingAssignmentsResult.WorkloadCommitmentsCreated,
+                teachingAssignmentsResult.SubstitutionsCreated);
+
             LogSeedPhaseComplete(_logger, seededDomains, seedStopwatch.ElapsedMilliseconds);
 
             stopwatch.Stop();
@@ -371,4 +390,10 @@ public sealed partial class DemoDataOrchestrator : IDisposable
 
     [LoggerMessage(EventId = 31, Level = LogLevel.Information, Message = "Teaching seeded: Teachers={Teachers}, Qualifications={Qualifications}, Authorizations={Authorizations}")]
     private static partial void LogTeachingSeeded(ILogger logger, int teachers, int qualifications, int authorizations);
+
+    [LoggerMessage(EventId = 32, Level = LogLevel.Information, Message = "Seeding Teaching assignments (demands, evaluations, assignments, workload, substitutions)...")]
+    private static partial void LogSeedingTeachingAssignments(ILogger logger);
+
+    [LoggerMessage(EventId = 33, Level = LogLevel.Information, Message = "Teaching assignments seeded: Demands={Demands}, Assignments={Assignments}, Commitments={Commitments}, Substitutions={Substitutions}")]
+    private static partial void LogTeachingAssignmentsSeeded(ILogger logger, int demands, int assignments, int commitments, int substitutions);
 }

@@ -24,6 +24,45 @@ using Elsasa.Sis.Teaching.Features.TeachingAuthorizations.ResolveSupervisionRequ
 using Elsasa.Sis.Teaching.Features.RecordCorrections.ApplyRecordCorrection;
 using Elsasa.Sis.Teaching.Features.RecordCorrections.ApproveRecordCorrection;
 using Elsasa.Sis.Teaching.Features.RecordCorrections.GetRecordCorrections;
+using Elsasa.Sis.Teaching.Features.TeachingDemands.CreateTeachingDemand;
+using Elsasa.Sis.Teaching.Features.TeachingDemands.GetTeachingDemandById;
+using Elsasa.Sis.Teaching.Features.TeachingDemands.GetTeachingDemands;
+using Elsasa.Sis.Teaching.Features.TeacherEligibility.EvaluateCandidateEligibility;
+using Elsasa.Sis.Teaching.Features.TeacherEligibility.GetCandidateEvaluations;
+using Elsasa.Sis.Teaching.Features.TeachingDemands.UpdateTeachingDemand;
+using Elsasa.Sis.Teaching.Features.TeachingDemands.UpdateTeachingDemandStatus;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.ProposeTeachingAssignment;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.ApproveTeachingAssignment;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.AcknowledgeTeachingAssignment;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.UpdateTeachingAssignmentStatus;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.GetTeachingAssignments;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.GetTeachingAssignmentById;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.GetAssignmentRoles;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.GetCapacityConflicts;
+using Elsasa.Sis.Teaching.Features.TeachingAssignments.ResolveCapacityConflict;
+using Elsasa.Sis.Teaching.Features.Workload.CancelUnavailabilityWindow;
+using Elsasa.Sis.Teaching.Features.Workload.CreateUnavailabilityWindow;
+using Elsasa.Sis.Teaching.Features.Workload.DeclareTeacherAvailability;
+using Elsasa.Sis.Teaching.Features.Workload.GetTeacherAvailability;
+using Elsasa.Sis.Teaching.Features.Workload.GetTeacherUnavailabilityWindows;
+using Elsasa.Sis.Teaching.Features.Workload.GetWorkloadCommitments;
+using Elsasa.Sis.Teaching.Features.Workload.ApproveWorkloadException;
+using Elsasa.Sis.Teaching.Features.Workload.GetWorkloadExceptions;
+using Elsasa.Sis.Teaching.Features.Workload.GetWorkloadPolicies;
+using Elsasa.Sis.Teaching.Features.Workload.RecalculatePeriodWorkload;
+using Elsasa.Sis.Teaching.Features.Workload.RequestWorkloadException;
+using Elsasa.Sis.Teaching.Features.AssignmentCompletions.ConcludeTeachingAssignment;
+using Elsasa.Sis.Teaching.Features.AssignmentCompletions.GetAssignmentCompletions;
+using Elsasa.Sis.Teaching.Features.Substitutions.ArrangeEmergencySubstitution;
+using Elsasa.Sis.Teaching.Features.Substitutions.ApproveSubstitutionException;
+using Elsasa.Sis.Teaching.Features.Substitutions.GetTeachingSubstitutions;
+using Elsasa.Sis.Teaching.Features.Substitutions.CancelSubstitution;
+using Elsasa.Sis.Teaching.Features.Reassignments.ProposePermanentReassignment;
+using Elsasa.Sis.Teaching.Features.Reassignments.ApprovePermanentReassignment;
+using Elsasa.Sis.Teaching.Features.Reassignments.ConfirmReassignmentHandover;
+using Elsasa.Sis.Teaching.Features.Reassignments.GetTeachingReassignments;
+using Elsasa.Sis.Teaching.Features.Reassignments.GetTeachingReassignmentById;
+using Elsasa.Sis.Teaching.Features.TeachingHistory.GetTeacherHistory;
 using Elsasa.Sis.Teaching.Services;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
@@ -79,6 +118,65 @@ public static class DependencyInjection
         services.AddScoped<ApproveRecordCorrectionHandler>();
         services.AddScoped<GetRecordCorrectionsHandler>();
 
+        // Teaching Demands slice handlers (TD-02, P2-S04)
+        services.AddScoped<CreateTeachingDemandHandler>();
+        services.AddScoped<UpdateTeachingDemandHandler>();
+        services.AddScoped<UpdateTeachingDemandStatusHandler>();
+        services.AddScoped<GetTeachingDemandsHandler>();
+        services.AddScoped<GetTeachingDemandByIdHandler>();
+
+        // Candidate Eligibility Engine slice handlers (TD-03, P2-S05)
+        services.AddScoped<EvaluateCandidateEligibilityHandler>();
+        services.AddScoped<GetCandidateEvaluationsHandler>();
+
+        // Teaching Assignments Proposal, Approval & Lifecycle handlers (TD-01, TD-04, P3-S06)
+        services.AddScoped<ProposeTeachingAssignmentHandler>();
+        services.AddScoped<ApproveTeachingAssignmentHandler>();
+        services.AddScoped<AcknowledgeTeachingAssignmentHandler>();
+        services.AddScoped<UpdateTeachingAssignmentStatusHandler>();
+        services.AddScoped<GetTeachingAssignmentsHandler>();
+        services.AddScoped<GetTeachingAssignmentByIdHandler>();
+        services.AddScoped<GetAssignmentRolesHandler>();
+        services.AddScoped<GetCapacityConflictsHandler>();
+        services.AddScoped<ResolveCapacityConflictHandler>();
+
+        // Teacher Availability & Unavailability slice handlers (TD-04, P3-S08)
+        services.AddScoped<DeclareTeacherAvailabilityHandler>();
+        services.AddScoped<GetTeacherAvailabilityHandler>();
+        services.AddScoped<CreateUnavailabilityWindowHandler>();
+        services.AddScoped<CancelUnavailabilityWindowHandler>();
+        services.AddScoped<GetTeacherUnavailabilityWindowsHandler>();
+
+        // Workload Policies, Commitments & Recalculation slice handlers (TD-04, P3-S09)
+        services.AddScoped<GetWorkloadPoliciesHandler>();
+        services.AddScoped<GetWorkloadCommitmentsHandler>();
+        services.AddScoped<RecalculatePeriodWorkloadHandler>();
+
+        // Workload Exceptions Governance & Approval slice handlers (TD-04, P3-S10)
+        services.AddScoped<RequestWorkloadExceptionHandler>();
+        services.AddScoped<ApproveWorkloadExceptionHandler>();
+        services.AddScoped<GetWorkloadExceptionsHandler>();
+
+        // Assignment Conclusions & Capacity Release slice handlers (TD-01, TD-04, P4-S13)
+        services.AddScoped<ConcludeTeachingAssignmentHandler>();
+        services.AddScoped<GetAssignmentCompletionsHandler>();
+
+        // Emergency Substitutions & Pre-Authorized Pool Delegation slice handlers (TD-05, P4-S11)
+        services.AddScoped<ArrangeEmergencySubstitutionHandler>();
+        services.AddScoped<ApproveSubstitutionExceptionHandler>();
+        services.AddScoped<GetTeachingSubstitutionsHandler>();
+        services.AddScoped<CancelSubstitutionHandler>();
+
+        // Permanent Reassignments & Handover Management slice handlers (TD-01, TD-04, P4-S12)
+        services.AddScoped<ProposePermanentReassignmentHandler>();
+        services.AddScoped<ApprovePermanentReassignmentHandler>();
+        services.AddScoped<ConfirmReassignmentHandoverHandler>();
+        services.AddScoped<GetTeachingReassignmentsHandler>();
+        services.AddScoped<GetTeachingReassignmentByIdHandler>();
+
+        // Teaching History Append-Only Audit Log slice handlers (TD-07, P4-S14)
+        services.AddScoped<GetTeacherHistoryHandler>();
+
         // Synchronous cross-domain query contract service (ADR-001, ADR-003, ADR-010, TD-08, P5-S15)
         services.AddScoped<ITeachingModule, TeachingModuleImpl>();
 
@@ -87,11 +185,12 @@ public static class DependencyInjection
         services.AddScoped<ITeachingDemoDataPurger, TeachingDemoDataPurger>();
         services.AddScoped<IDemoDataDomainPurger, TeachingDemoDataPurger>();
         services.AddScoped<ITeachingDemoDataSeeder, TeachingDemoDataSeeder>();
+        services.AddScoped<ITeachingAssignmentsDemoDataSeeder, TeachingAssignmentsDemoDataSeeder>();
 
         // FluentValidation validators in Teaching assembly
         services.AddValidatorsFromAssemblyContaining<TeachingAssemblyMarker>();
 
-        // Configure policy-based authorization requirements (ADR-009, P1-S04)
+        // Configure policy-based authorization requirements (ADR-009, P1-S04, P1-S03)
         services.AddAuthorization(options =>
         {
             void AddPermissionPolicy(string permission, params string[] roles)
@@ -133,6 +232,70 @@ public static class DependencyInjection
                 Permissions.Teaching.Faculty.Correct,
                 "TeachingCoordinator", "Teaching Coordinator",
                 "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Assignments.View: Teacher, Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Assignments.View,
+                "Teacher",
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Assignments.Manage: Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Assignments.Manage,
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Assignments.Approve: Teaching Authority, Admin (Kepala Sekolah / VP Academics)
+            AddPermissionPolicy(
+                Permissions.Teaching.Assignments.Approve,
+                "TeachingAuthority", "Teaching Authority",
+                "KepalaSekolah", "Kepala Sekolah",
+                "VPAcademics", "VP Academics");
+
+            // Stage 2: Permissions.Teaching.Substitutions.Arrange: Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Substitutions.Arrange,
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Substitutions.ApproveException: Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Substitutions.ApproveException,
+                "TeachingAuthority", "Teaching Authority",
+                "KepalaSekolah", "Kepala Sekolah",
+                "VPAcademics", "VP Academics");
+
+            // Stage 2: Permissions.Teaching.Workload.View: Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Workload.View,
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Workload.Recalculate: Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Workload.Recalculate,
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Workload.RequestException: Teaching Coordinator, Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Workload.RequestException,
+                "TeachingCoordinator", "Teaching Coordinator",
+                "TeachingAuthority", "Teaching Authority");
+
+            // Stage 2: Permissions.Teaching.Workload.ApproveException: Teaching Authority, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Workload.ApproveException,
+                "TeachingAuthority", "Teaching Authority",
+                "KepalaSekolah", "Kepala Sekolah",
+                "VPAcademics", "VP Academics");
+
+            // Stage 2: Permissions.Teaching.Availability.Declare: Teacher, Teaching Coordinator, Admin
+            AddPermissionPolicy(
+                Permissions.Teaching.Availability.Declare,
+                "Teacher",
+                "TeachingCoordinator", "Teaching Coordinator");
         });
 
         return services;

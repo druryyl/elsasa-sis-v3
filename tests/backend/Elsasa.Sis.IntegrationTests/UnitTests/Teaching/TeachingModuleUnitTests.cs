@@ -47,11 +47,15 @@ public sealed class TeachingModuleUnitTests
         var moduleType = typeof(TeachingModuleImpl);
         var methods = moduleType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
-        // Assert - Only the 3 synchronous contract read methods
+        // Assert - Only the 7 synchronous contract read inquiry methods
         methods.Should().OnlyContain(m =>
             m.Name == nameof(ITeachingModule.GetTeacherProfileAsync) ||
             m.Name == nameof(ITeachingModule.IsTeacherAuthorizedAsync) ||
-            m.Name == nameof(ITeachingModule.GetActiveTeachersAsync));
+            m.Name == nameof(ITeachingModule.GetActiveTeachersAsync) ||
+            m.Name == nameof(ITeachingModule.GetApprovedAssignmentForLearningUnitAsync) ||
+            m.Name == nameof(ITeachingModule.GetTeacherActiveAssignmentsAsync) ||
+            m.Name == nameof(ITeachingModule.GetTeacherAvailabilityAsync) ||
+            m.Name == nameof(ITeachingModule.IsTeacherAssignedToScopeAsync));
     }
 
     [Fact]
@@ -142,5 +146,138 @@ public sealed class TeachingModuleUnitTests
         result.IsFailure.Should().BeTrue();
         result.Error.Should().NotBeNull();
         result.Error!.Code.Should().Be("Teaching.ActiveTeachersQueryFailed");
+    }
+
+    [Fact]
+    public async Task GetApprovedAssignmentForLearningUnitAsync_Should_ReturnSuccessNull_When_LearningUnitIdIsEmpty()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetApprovedAssignmentForLearningUnitAsync(Guid.Empty, new DateOnly(2026, 8, 1));
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetApprovedAssignmentForLearningUnitAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetApprovedAssignmentForLearningUnitAsync(Guid.NewGuid(), new DateOnly(2026, 8, 1));
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("Teaching.ApprovedAssignmentQueryFailed");
+    }
+
+    [Fact]
+    public async Task GetTeacherActiveAssignmentsAsync_Should_ReturnEmptyList_When_ParametersAreEmpty()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetTeacherActiveAssignmentsAsync(Guid.Empty, Guid.Empty);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetTeacherActiveAssignmentsAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetTeacherActiveAssignmentsAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("Teaching.TeacherActiveAssignmentsQueryFailed");
+    }
+
+    [Fact]
+    public async Task GetTeacherAvailabilityAsync_Should_ReturnSuccessNull_When_TeacherIdIsEmpty()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetTeacherAvailabilityAsync(Guid.Empty, Guid.NewGuid());
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetTeacherAvailabilityAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.GetTeacherAvailabilityAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("Teaching.TeacherAvailabilityQueryFailed");
+    }
+
+    [Fact]
+    public async Task IsTeacherAssignedToScopeAsync_Should_ReturnSuccessFalse_When_TeacherIdIsEmpty()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.IsTeacherAssignedToScopeAsync(Guid.Empty, "learning_unit", Guid.NewGuid(), new DateOnly(2026, 8, 1));
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task IsTeacherAssignedToScopeAsync_Should_ReturnSuccessFalse_When_ScopeTypeIsBlank(string? scopeType)
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.IsTeacherAssignedToScopeAsync(Guid.NewGuid(), scopeType!, Guid.NewGuid(), new DateOnly(2026, 8, 1));
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsTeacherAssignedToScopeAsync_Should_ReturnFailure_When_DatabaseThrows()
+    {
+        // Arrange
+        var module = new TeachingModuleImpl(new FaultyConnectionFactory());
+
+        // Act
+        var result = await module.IsTeacherAssignedToScopeAsync(Guid.NewGuid(), "learning_unit", Guid.NewGuid(), new DateOnly(2026, 8, 1));
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().NotBeNull();
+        result.Error!.Code.Should().Be("Teaching.ScopeAssignmentCheckFailed");
     }
 }
