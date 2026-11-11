@@ -18,6 +18,10 @@ export type WorkloadExceptionStatus =
   | 'approved'
   | 'rejected';
 
+export type CapacityConflictSeverity = 'advisory' | 'blocking';
+
+export type CapacityConflictStatus = 'unresolved' | 'resolved' | 'waived_with_exception';
+
 /**
  * Strongly-typed DTO representing an institutional workload policy (WorkloadPolicyDto).
  */
@@ -114,6 +118,27 @@ export interface WorkloadExceptionDto {
   createdAt: string;
 }
 
+/**
+ * Strongly-typed DTO representing a capacity/schedule conflict condition (CapacityConflictDto).
+ */
+export interface CapacityConflictDto {
+  id: string;
+  teachingAssignmentId?: string | null;
+  teachingDemandId?: string | null;
+  teacherProfileId: string;
+  conflictType: string;
+  conflictClassification: string;
+  severity: CapacityConflictSeverity | string;
+  description: string;
+  detectedDate: string;
+  status: CapacityConflictStatus | string;
+  resolutionAction?: string | null;
+  resolvedBy?: string | null;
+  resolvedDate?: string | null;
+  resolutionNotes?: string | null;
+  createdAt: string;
+}
+
 // ============================================================================
 // Query Parameters
 // ============================================================================
@@ -134,6 +159,15 @@ export interface GetWorkloadExceptionsParams {
   academicPeriodId?: string | null;
   teacherProfileId?: string | null;
   status?: string | null;
+}
+
+export interface GetCapacityConflictsParams {
+  academicPeriodId?: string | null;
+  severity?: string | null;
+  status?: string | null;
+  teacherProfileId?: string | null;
+  page?: number;
+  pageSize?: number;
 }
 
 // ============================================================================

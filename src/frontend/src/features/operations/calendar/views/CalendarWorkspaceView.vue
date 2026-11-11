@@ -33,6 +33,7 @@ import {
   FormField,
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { CALENDAR_PERMISSIONS } from '../constants/permissions';
 import {
@@ -81,6 +82,24 @@ const canDeclareClosure = computed(
 // 3. Ephemeral UI State (Tabs & Modals)
 // --------------------------------------------------------------------------
 const activeTab = ref<string>('matrix');
+const amendmentReviewedFilter = ref<'all' | 'false' | 'true'>('all');
+
+useRouteQueryHydration((query) => {
+  const tab = getQueryString(query, 'tab')?.toLowerCase();
+  if (tab === 'amendments' || tab === 'closures') {
+    activeTab.value = 'closures';
+  } else if (tab === 'matrix' || tab === 'periods') {
+    activeTab.value = tab;
+  }
+
+  const reviewed = getQueryString(query, 'reviewed')?.toLowerCase();
+  if (reviewed === 'false' || reviewed === 'true' || reviewed === 'all') {
+    amendmentReviewedFilter.value = reviewed;
+    if (!tab) {
+      activeTab.value = 'closures';
+    }
+  }
+});
 const isCreateYearModalOpen = ref(false);
 const isApproveModalOpen = ref(false);
 const isActivateModalOpen = ref(false);
@@ -546,6 +565,7 @@ function handleCreateYear(): void {
             <ClosuresAmendmentsTab
               :academic-year-id="selectedAcademicYearId"
               :calendar-id="selectedCalendar?.id ?? null"
+              :initial-reviewed-filter="amendmentReviewedFilter"
             />
           </TabPanel>
         </TabPanels>

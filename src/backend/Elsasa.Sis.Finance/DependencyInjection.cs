@@ -2,9 +2,11 @@ namespace Elsasa.Sis.Finance;
 
 using Elsasa.Sis.Contracts.DemoData;
 using Elsasa.Sis.Contracts.Finance;
+using Elsasa.Sis.Contracts.Kpis;
 using Elsasa.Sis.Finance.Features.Accounts.GetStudentFinancialAccount;
 using Elsasa.Sis.Finance.Features.Accounts.SearchStudentFinancialAccounts;
 using Elsasa.Sis.Finance.Features.DemoData;
+using Elsasa.Sis.Finance.Features.Kpis.GetFinanceKpiDashboard;
 using Elsasa.Sis.Finance.Features.Obligations.AssessAdHocObligation;
 using Elsasa.Sis.Finance.Features.Obligations.BatchAssessObligations;
 using Elsasa.Sis.Finance.Features.Obligations.GetObligations;
@@ -112,6 +114,11 @@ public static class DependencyInjection
         services.AddScoped<AllocatePaymentHandler>();
         services.AddScoped<ReallocatePaymentHandler>();
         services.AddScoped<GetStudentReceivablesHandler>();
+
+        // Finance KPI Dashboard & Executive Summary Provider (CR-KPI-EXECUTIVE-DOMAIN-DASHBOARDS P2-S05)
+        services.AddScoped<GetFinanceKpiDashboardHandler>();
+        services.AddScoped<FinanceKpiSummaryProvider>();
+        services.AddScoped<IDomainKpiSummaryProvider, FinanceKpiSummaryProvider>();
 
         // Configure policy-based authorization requirements (GAP-008, TD-07, ADR-009)
         services.AddAuthorization(options =>
@@ -224,6 +231,20 @@ public static class DependencyInjection
                 "FinanceAuthority", "Finance Authority",
                 "FinanceOfficer", "Finance Officer",
                 "Admin");
+
+            // Level 2 Finance KPI Dashboard access (TD-05, DEC-006)
+            options.AddPolicy(GetFinanceKpiDashboardEndpoint.AuthorizationPolicyName, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && (
+                    ctx.User.HasClaim(c => (c.Type == "permission" || c.Type == "permissions")
+                        && (c.Value == Permissions.Obligations.View || c.Value == "*"))
+                    || ctx.User.IsInRole("Admin")
+                    || ctx.User.IsInRole("SuperAdmin")
+                    || ctx.User.IsInRole("FinanceAuthority")
+                    || ctx.User.IsInRole("Finance Authority")
+                    || ctx.User.IsInRole("FinanceOfficer")
+                    || ctx.User.IsInRole("Finance Officer")
+                    || ctx.User.IsInRole("FinanceStaff")
+                    || ctx.User.IsInRole("Finance Staff"))));
         });
 
         return services;

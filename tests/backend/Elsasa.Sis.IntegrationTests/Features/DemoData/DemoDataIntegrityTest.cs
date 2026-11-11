@@ -25,6 +25,12 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
     public DemoDataIntegrityTest(IntegrationTestWebAppFactory factory)
         : base(factory) { }
 
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        Factory.CurrentUser.Roles = ["SuperAdmin"];
+    }
+
     [SkippableFact]
     public async Task DeterministicIDs_Should_Match_DemoDataConstants()
     {
@@ -44,19 +50,19 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
 
         // 1. Verify students table has deterministic GUIDs matching DemoDataConstants
         var jonathanStudent = await QuerySingleOrDefaultAsync<StudentBasicRecord>(
-            "SELECT id, student_number, first_name, full_name FROM students.students WHERE id = @Id",
+            "SELECT id, student_number, full_name FROM students.students WHERE id = @Id",
             new { Id = DemoDataConstants.JonathanStudentId });
         jonathanStudent.Should().NotBeNull("should find Jonathan student with deterministic ID");
         jonathanStudent!.full_name.Should().Be("Jonathan Pratama");
 
         var graceStudent = await QuerySingleOrDefaultAsync<StudentBasicRecord>(
-            "SELECT id, student_number, first_name, full_name FROM students.students WHERE id = @Id",
+            "SELECT id, student_number, full_name FROM students.students WHERE id = @Id",
             new { Id = DemoDataConstants.GraceStudentId });
         graceStudent.Should().NotBeNull("should find Grace student with deterministic ID");
         graceStudent!.full_name.Should().Be("Grace Santoso");
 
         var budiStudent = await QuerySingleOrDefaultAsync<StudentBasicRecord>(
-            "SELECT id, student_number, first_name, full_name FROM students.students WHERE id = @Id",
+            "SELECT id, student_number, full_name FROM students.students WHERE id = @Id",
             new { Id = DemoDataConstants.BudiStudentId });
         budiStudent.Should().NotBeNull("should find Budi student with deterministic ID");
         budiStudent!.full_name.Should().Be("Budi Wijaya");
@@ -188,7 +194,7 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
         invoice.Should().NotBeNull("Jonathan's unpaid invoice INV-SEM2-0042 must exist");
         invoice!.student_id.Should().Be(jonathanId, "invoice INV-SEM2-0042 must belong to Jonathan");
         invoice.document_number.Should().Be("INV-SEM2-0042");
-        invoice.total_billed_amount.Should().Be(1500000m, "invoice balance must be IDR 1,500,000");
+        invoice.total_billed_amount.Should().Be(1500000L, "invoice balance must be IDR 1,500,000");
         invoice.delivery_status.Should().Be("unpaid", "invoice delivery status must be unpaid");
     }
 
@@ -220,16 +226,16 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
 
         results.Should().HaveCountGreaterOrEqualTo(2, "Grace should have at least 2 attempts for PACE retake trail");
 
-        var attempt1 = results.FirstOrDefault(r => r.attempt_number == 1);
-        attempt1.Should().NotBeNull("Attempt 1 must exist");
-        attempt1!.score_numeric.Should().Be(68.00m, "Attempt 1 score should be 68% (failing)");
-        attempt1.is_final.Should().BeFalse("Attempt 1 should not be final after retake");
-
-        var attempt2 = results.FirstOrDefault(r => r.attempt_number == 2);
+        var attempt2 = results.FirstOrDefault(r => r.attempt_number == 2 && r.replaces_result_id != null);
         attempt2.Should().NotBeNull("Attempt 2 must exist");
         attempt2!.score_numeric.Should().Be(85.00m, "Attempt 2 score should be 85% (passing)");
         attempt2.is_final.Should().BeTrue("Attempt 2 must have is_final = 1");
-        attempt2.replaces_result_id.Should().Be(attempt1.id, "Attempt 2 replaces_result_id must point to Attempt 1");
+
+        var attempt1 = results.FirstOrDefault(r => r.id == attempt2.replaces_result_id);
+        attempt1.Should().NotBeNull("Attempt 1 must exist");
+        attempt1!.attempt_number.Should().Be(1);
+        attempt1.score_numeric.Should().Be(68.00m, "Attempt 1 score should be 68% (failing)");
+        attempt1.is_final.Should().BeFalse("Attempt 1 should not be final after retake");
 
         // 2. Overdue tuition receivable
         var overdueDoc = await QuerySingleOrDefaultAsync<BillingDocRecord>(
@@ -275,16 +281,16 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
         budiResult.assessment_title.Should().Contain("1049", "assessment title must reference PACE 1049");
 
         // 2. Coursework submission in submitted status
-        var budiSubmission = await QuerySingleOrDefaultAsync<CourseworkSubmissionRecord>(
+        var budiSubmissions = (await QueryAsync<CourseworkSubmissionRecord>(
             """
             SELECT id, student_id, status
-            FROM academics.coursework_submissions
+            FROM academics.submissions
             WHERE student_id = @StudentId AND status = 'submitted'
             """,
-            new { StudentId = budiId });
+            new { StudentId = budiId })).ToList();
 
-        budiSubmission.Should().NotBeNull("Budi Wijaya must have a submitted coursework submission awaiting evaluation");
-        budiSubmission!.status.Should().Be("submitted");
+        budiSubmissions.Should().NotBeEmpty("Budi Wijaya must have submitted coursework submissions awaiting evaluation");
+        budiSubmissions.Should().OnlyContain(s => s.status == "submitted");
     }
 
     [SkippableFact]
@@ -311,7 +317,7 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
 
         // 2. Application status is 'accepted'
         var application = await QuerySingleOrDefaultAsync<ApplicationRecord>(
-            "SELECT id, applicant_id, status, notes FROM students.applications WHERE applicant_id = @ApplicantId",
+            "SELECT id, applicant_id, status, notes FROM students.admission_applications WHERE applicant_id = @ApplicantId",
             new { ApplicantId = ruthApplicantId });
         application.Should().NotBeNull("Ruth Halim must have an application");
         application!.status.Should().Be("accepted", "Ruth Halim's application status must be accepted");
@@ -360,10 +366,17 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
             "WHERE EXISTS (SELECT 1 FROM students.students s WHERE s.id = fo.student_id)");
         obligationsLinkedToStudents.Should().BeGreaterThan(0, "financial obligations should link to students");
 
-        // 3. Invoices should link to financial obligations
+        // 3. Invoices should link to financial obligations via billing document items
         var invoicesLinkedToObligations = await QuerySingleAsync<int>(
-            "SELECT COUNT(*) FROM finance.billing_documents bd " +
-            "WHERE EXISTS (SELECT 1 FROM finance.financial_obligations fo WHERE fo.id = bd.financial_obligation_id)");
+            """
+            SELECT COUNT(*) FROM finance.billing_documents bd
+            WHERE EXISTS (
+                SELECT 1 FROM finance.billing_document_items bdi
+                INNER JOIN finance.financial_obligations fo ON fo.id = bdi.reference_entity_id
+                WHERE bdi.billing_document_id = bd.id
+                  AND bdi.reference_entity_type = 'financial_obligations'
+            )
+            """);
         invoicesLinkedToObligations.Should().BeGreaterThan(0, "invoices should link to financial obligations");
 
         // 4. Report cards should link to students
@@ -377,7 +390,7 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
             "SELECT COUNT(*) FROM academics.transcripts tc " +
             "WHERE EXISTS (SELECT 1 FROM students.students s WHERE s.id = tc.student_id AND " +
             "EXISTS (SELECT 1 FROM students.administrative_placements ap " +
-            "WHERE ap.student_id = s.id AND ap.level IN ('High School', 'HSLC')))");
+            "WHERE ap.student_id = s.id AND ap.school_level IN ('High School', 'HSLC')))");
         transcriptsLinkedToStudents.Should().BeGreaterThan(0, "transcripts should link to high school students");
 
         // 6. Attendance should link to students and academic participations
@@ -385,7 +398,7 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
             "SELECT COUNT(*) FROM academics.attendance_records ar " +
             "WHERE EXISTS (SELECT 1 FROM students.students s WHERE s.id = ar.student_id)" +
             " AND EXISTS (SELECT 1 FROM academics.academic_participations ap " +
-            "WHERE ap.student_id = s.id)");
+            "WHERE ap.student_id = ar.student_id)");
         attendanceLinked.Should().BeGreaterThan(100, "attendance should link to students and participations");
     }
 
@@ -402,31 +415,51 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
         var response = await client.PostAsJsonAsync("/api/operations/demo-data/reset", resetRequest);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Verify Semester 1 is 100% paid
-        var sem1Paid = await QuerySingleAsync<int>("SELECT COUNT(*) FROM finance.payments WHERE status = 'paid'");
-        sem1Paid.Should().BeGreaterThan(0, "should have paid Semester 1 payments");
+        // Verify Semester 1 billing documents are 100% paid
+        var sem1Total = await QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM finance.billing_documents WHERE document_number LIKE 'BIL-%'");
+        var sem1Paid = await QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM finance.billing_documents WHERE document_number LIKE 'BIL-%' AND delivery_status = 'paid'");
+        sem1Total.Should().BeGreaterThan(0, "should have Semester 1 billing documents");
+        sem1Paid.Should().Be(sem1Total, "all Semester 1 billing documents should be paid");
 
-        // Verify Semester 2 has mixed payment states
-        var sem2Payments = await QueryAsync<Sem2PaymentSummary>(
+        // Verify confirmed and submitted (pending verification) payments exist
+        var confirmedPayments = await QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM finance.payments WHERE confirmation_status = 'confirmed'");
+        var submittedPayments = await QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM finance.payments WHERE confirmation_status = 'submitted'");
+        confirmedPayments.Should().BeGreaterThan(0, "should have confirmed payments");
+        submittedPayments.Should().Be(3, "should have 3 submitted payments awaiting verification");
+
+        // Verify Semester 2 billing documents have mixed payment states
+        var sem2Summary = await QuerySingleOrDefaultAsync<Sem2PaymentSummary>(
             """
             SELECT 
-                SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count,
-                SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) as partial_count,
-                SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) as overdue_count,
-                SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_count
-            FROM finance.payments WHERE academic_period_id IS NOT NULL
+                SUM(CASE WHEN delivery_status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
+                SUM(CASE WHEN delivery_status = 'partial' THEN 1 ELSE 0 END) AS partial_count,
+                SUM(CASE WHEN delivery_status = 'overdue' THEN 1 ELSE 0 END) AS overdue_count,
+                SUM(CASE WHEN delivery_status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count
+            FROM finance.billing_documents
+            WHERE document_number LIKE 'INV-SEM2-%'
             """);
 
-        var sem2Summary = sem2Payments.FirstOrDefault();
-        if (sem2Summary is not null)
-        {
-            sem2Summary.paid_count.Should().BeGreaterThan(0, "should have some paid Semester 2 payments");
-            sem2Summary.overdue_count.Should().BeGreaterThan(0, "should have overdue Semester 2 payments (Risk-001)");
-            sem2Summary.unpaid_count.Should().BeGreaterThan(0, "should have unpaid Semester 2 payments (live cashier hook)");
-        }
+        sem2Summary.Should().NotBeNull();
+        sem2Summary!.paid_count.Should().BeGreaterThan(0, "should have paid Semester 2 billing documents");
+        sem2Summary.partial_count.Should().BeGreaterThan(0, "should have partial Semester 2 billing documents");
+        sem2Summary.overdue_count.Should().BeGreaterThan(0, "should have overdue Semester 2 billing documents");
+        sem2Summary.unpaid_count.Should().BeGreaterThan(0, "should have unpaid Semester 2 billing documents");
+
+        // Verify all 5 aging brackets are populated in finance.v_student_receivables
+        var agingBrackets = (await QueryAsync<string>(
+            """
+            SELECT DISTINCT aging_bracket
+            FROM finance.v_student_receivables
+            WHERE outstanding_amount > 0
+            """)).ToHashSet();
+        agingBrackets.Should().Contain(["Current", "1-30 Days", "31-60 Days", "61-90 Days", "90+ Days"]);
     }
 
-    private sealed record StudentBasicRecord(Guid id, string student_number, string first_name, string full_name);
+    private sealed record StudentBasicRecord(Guid id, string student_number, string full_name);
     private sealed record ApplicantRecord(Guid id, string full_name);
     private sealed record ApplicationRecord(Guid id, Guid applicant_id, string status, string? notes);
     private sealed record AdmissionDecisionRecord(Guid id, Guid application_id, string decision_type, string reason, string supporting_reference);
@@ -434,7 +467,7 @@ public sealed class DemoDataIntegrityTest : BaseIntegrationTest
     private sealed record PlacementRecord(string school_level, string grade, bool is_current);
     private sealed record ReportCardRecord(Guid id, Guid student_id, string status, string report_type, string? content_snapshot);
     private sealed record TranscriptRecord(Guid id, Guid student_id, string status, string? content_snapshot);
-    private sealed record BillingDocRecord(Guid id, Guid student_id, string document_number, decimal total_billed_amount, string delivery_status);
+    private sealed record BillingDocRecord(Guid id, Guid student_id, string document_number, long total_billed_amount, string delivery_status);
     private sealed record AcademicResultRecord(Guid id, int attempt_number, Guid? replaces_result_id, bool is_final, decimal? score_numeric);
     private sealed record AcademicResultDetailRecord(Guid id, Guid student_id, string result_status, decimal? score_numeric, string? evaluated_by, string assessment_title);
     private sealed record CourseworkSubmissionRecord(Guid id, Guid student_id, string status);

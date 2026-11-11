@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router';
 import { RouterView } from 'vue-router';
+import { LEVEL2_DASHBOARD_ACCESS } from './dashboardAccess';
 
 /**
  * Authoritative hierarchical route configuration for Elsasa SIS V3.
@@ -54,6 +55,70 @@ export const routes: RouteRecordRaw[] = [
         name: 'dashboard',
         component: () => import('@/features/dashboard/views/DashboardView.vue'),
         meta: { title: 'Dashboard' },
+      },
+      {
+        path: 'dashboard/students',
+        name: 'dashboard.students',
+        component: () => import('@/features/dashboard/views/StudentsKpiDashboardView.vue'),
+        meta: {
+          requiresAuth: true,
+          authMode: 'any',
+          ...LEVEL2_DASHBOARD_ACCESS.students,
+          title: 'Students KPI Dashboard',
+        },
+      },
+      {
+        path: 'dashboard/academics',
+        name: 'dashboard.academics',
+        component: () => import('@/features/dashboard/views/AcademicsKpiDashboardView.vue'),
+        meta: {
+          requiresAuth: true,
+          authMode: 'any',
+          ...LEVEL2_DASHBOARD_ACCESS.academics,
+          title: 'Academics KPI Dashboard',
+        },
+      },
+      {
+        path: 'dashboard/finance',
+        name: 'dashboard.finance',
+        component: () => import('@/features/dashboard/views/FinanceKpiDashboardView.vue'),
+        meta: {
+          requiresAuth: true,
+          authMode: 'any',
+          ...LEVEL2_DASHBOARD_ACCESS.finance,
+          title: 'Finance KPI Dashboard',
+        },
+      },
+      {
+        path: 'dashboard/teaching',
+        name: 'dashboard.teaching',
+        component: () => import('@/features/dashboard/views/TeachingKpiDashboardView.vue'),
+        meta: {
+          requiresAuth: true,
+          authMode: 'any',
+          ...LEVEL2_DASHBOARD_ACCESS.teaching,
+          title: 'Teaching KPI Dashboard',
+        },
+      },
+      {
+        path: 'dashboard/operations',
+        name: 'dashboard.operations',
+        component: () => import('@/features/dashboard/views/OperationsKpiDashboardView.vue'),
+        meta: {
+          requiresAuth: true,
+          authMode: 'any',
+          ...LEVEL2_DASHBOARD_ACCESS.operations,
+          title: 'Operations KPI Dashboard',
+        },
+      },
+      {
+        path: 'dashboard/development',
+        name: 'dashboard.development',
+        component: () => import('@/features/dashboard/views/DevelopmentPlaceholderView.vue'),
+        meta: {
+          requiresAuth: true,
+          title: 'Student Development Dashboard (Stage 3)',
+        },
       },
       // STAGE 2: ACADEMICS DOMAIN (SCR-ACD-03, SCR-ACD-05, SCR-ACD-01, SCR-ACD-02, SCR-ACD-06, SCR-ACD-09)
       {

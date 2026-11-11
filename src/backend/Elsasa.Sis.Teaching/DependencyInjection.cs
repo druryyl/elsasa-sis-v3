@@ -1,8 +1,10 @@
 namespace Elsasa.Sis.Teaching;
 
 using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Contracts.Kpis;
 using Elsasa.Sis.Contracts.Teaching;
 using Elsasa.Sis.Teaching.Features.DemoData;
+using Elsasa.Sis.Teaching.Features.Kpis.GetTeachingKpiDashboard;
 using Elsasa.Sis.Teaching.Features.QualificationEvidence.GetQualificationTypes;
 using Elsasa.Sis.Teaching.Features.QualificationEvidence.RejectQualificationEvidence;
 using Elsasa.Sis.Teaching.Features.QualificationEvidence.SubmitQualificationEvidence;
@@ -177,6 +179,10 @@ public static class DependencyInjection
         // Teaching History Append-Only Audit Log slice handlers (TD-07, P4-S14)
         services.AddScoped<GetTeacherHistoryHandler>();
 
+        // KPI Dashboard slice handler & Executive Summary provider (CR-KPI-EXECUTIVE-DOMAIN-DASHBOARDS, P3-S07)
+        services.AddScoped<GetTeachingKpiDashboardHandler>();
+        services.AddScoped<IDomainKpiSummaryProvider, TeachingKpiSummaryProvider>();
+
         // Synchronous cross-domain query contract service (ADR-001, ADR-003, ADR-010, TD-08, P5-S15)
         services.AddScoped<ITeachingModule, TeachingModuleImpl>();
 
@@ -296,6 +302,23 @@ public static class DependencyInjection
                 Permissions.Teaching.Availability.Declare,
                 "Teacher",
                 "TeachingCoordinator", "Teaching Coordinator");
+
+            // Level 2 Teaching KPI Dashboard policy (TD-05, P3-S07)
+            options.AddPolicy(TeachingKpiPolicies.DashboardView, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && (
+                    ctx.User.HasClaim(c => (c.Type == "permission" || c.Type == "permissions")
+                        && (c.Value == Permissions.Teaching.Faculty.View
+                            || c.Value == Permissions.Teaching.Workload.View
+                            || c.Value == "*"))
+                    || ctx.User.IsInRole("Admin")
+                    || ctx.User.IsInRole("SuperAdmin")
+                    || ctx.User.IsInRole("AcademicCoordinator")
+                    || ctx.User.IsInRole("AcademicAuthority")
+                    || ctx.User.IsInRole("TeachingAuthority")
+                    || ctx.User.IsInRole("Teaching Authority")
+                    || ctx.User.IsInRole("TeachingCoordinator")
+                    || ctx.User.IsInRole("Teaching Coordinator")
+                    || ctx.User.IsInRole("Teacher"))));
         });
 
         return services;

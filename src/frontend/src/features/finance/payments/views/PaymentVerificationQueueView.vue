@@ -37,6 +37,7 @@ import {
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatIDR } from '@/shared/utils/currencyUtils';
 import { formatDisplayDate, formatDisplayDateTime, formatDateOnly } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import {
   FINANCE_PAYMENT_PERMISSIONS,
@@ -102,6 +103,16 @@ const statusTabs = [
   { label: 'Confirmed', value: 'confirmed' },
   { label: 'Rejected', value: 'rejected' },
 ] as const;
+
+const validStatusValues = new Set(['all', 'submitted', 'confirmed', 'rejected']);
+
+useRouteQueryHydration((query) => {
+  const status = getQueryString(query, 'status')?.toLowerCase();
+  if (status && validStatusValues.has(status)) {
+    selectedStatusTab.value = status;
+    pageNumber.value = 1;
+  }
+});
 
 const queryFilters = computed<GetPaymentsParams>(() => {
   const params: GetPaymentsParams = {

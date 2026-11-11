@@ -1,7 +1,10 @@
 import { apiClient } from '@/shared/services/http';
+import type { PaginatedResponse } from '@/shared/types/common';
 import type {
   ApproveWorkloadExceptionRequest,
   ApproveWorkloadExceptionResponse,
+  CapacityConflictDto,
+  GetCapacityConflictsParams,
   GetWorkloadCommitmentsParams,
   GetWorkloadExceptionsParams,
   GetWorkloadPoliciesParams,
@@ -151,6 +154,42 @@ export async function approveWorkloadException(
   return response;
 }
 
+/**
+ * Retrieves unresolved or historical faculty capacity conflicts (P5-S12, SCR-TCH-03).
+ * GET /api/v1/teaching/conflicts
+ */
+export async function getCapacityConflicts(
+  params?: GetCapacityConflictsParams,
+): Promise<PaginatedResponse<CapacityConflictDto>> {
+  const cleanParams: Record<string, unknown> = {};
+
+  if (params?.academicPeriodId?.trim()) {
+    cleanParams.academicPeriodId = params.academicPeriodId.trim();
+  }
+  if (params?.severity?.trim() && params.severity !== 'all') {
+    cleanParams.severity = params.severity.trim();
+  }
+  if (params?.status?.trim() && params.status !== 'all') {
+    cleanParams.status = params.status.trim();
+  }
+  if (params?.teacherProfileId?.trim()) {
+    cleanParams.teacherProfileId = params.teacherProfileId.trim();
+  }
+  if (params?.page !== undefined) {
+    cleanParams.page = params.page;
+  }
+  if (params?.pageSize !== undefined) {
+    cleanParams.pageSize = params.pageSize;
+  }
+
+  const response = (await apiClient.get(
+    '/v1/teaching/conflicts',
+    Object.keys(cleanParams).length > 0 ? { params: cleanParams } : undefined,
+  )) as unknown as PaginatedResponse<CapacityConflictDto>;
+
+  return response;
+}
+
 export const workloadApi = {
   getWorkloadPolicies,
   getWorkloadCommitments,
@@ -158,6 +197,7 @@ export const workloadApi = {
   getWorkloadExceptions,
   requestWorkloadException,
   approveWorkloadException,
+  getCapacityConflicts,
 };
 
 export default workloadApi;

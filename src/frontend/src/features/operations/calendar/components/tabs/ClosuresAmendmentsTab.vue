@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue';
+import { ref, computed, toRef, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Timeline from 'primevue/timeline';
@@ -38,6 +38,7 @@ import DeclareClosureModal from '../modals/DeclareClosureModal.vue';
 const props = defineProps<{
   academicYearId?: string | null;
   calendarId?: string | null;
+  initialReviewedFilter?: 'all' | 'false' | 'true';
 }>();
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,29 @@ const {
   data: amendments,
   isLoading: isLoadingAmendments,
 } = useCalendarAmendmentsQuery(calendarRef);
+
+const reviewedFilter = ref<'all' | 'false' | 'true'>(props.initialReviewedFilter ?? 'all');
+
+watch(
+  () => props.initialReviewedFilter,
+  (val) => {
+    if (val) {
+      reviewedFilter.value = val;
+    }
+  },
+  { immediate: true },
+);
+
+const filteredAmendments = computed(() => {
+  const list = amendments.value ?? [];
+  if (reviewedFilter.value === 'false') {
+    return list.filter((a) => !a.downstreamImpactReviewed);
+  }
+  if (reviewedFilter.value === 'true') {
+    return list.filter((a) => Boolean(a.downstreamImpactReviewed));
+  }
+  return list;
+});
 
 const {
   data: corrections,
@@ -356,7 +380,36 @@ function formatDateTime(dateStr?: string | null): string {
         data-testid="card-calendar-amendments"
       >
         <template #header-actions>
-          <div class="flex items-center gap-1.5 text-xs text-slate-500">
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-medium">
+              <button
+                type="button"
+                class="px-2 py-1 rounded-md cursor-pointer transition"
+                :class="reviewedFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'"
+                data-testid="amendments-filter-all"
+                @click="reviewedFilter = 'all'"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1 rounded-md cursor-pointer transition"
+                :class="reviewedFilter === 'false' ? 'bg-white text-amber-800 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'"
+                data-testid="amendments-filter-unreviewed"
+                @click="reviewedFilter = 'false'"
+              >
+                Unreviewed
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1 rounded-md cursor-pointer transition"
+                :class="reviewedFilter === 'true' ? 'bg-white text-emerald-700 shadow-2xs font-semibold' : 'text-slate-600 hover:text-slate-900'"
+                data-testid="amendments-filter-reviewed"
+                @click="reviewedFilter = 'true'"
+              >
+                Reviewed
+              </button>
+            </div>
             <History class="w-4 h-4 text-teal-600" />
             <span>TD-05 Audit Trail</span>
           </div>
@@ -385,20 +438,20 @@ function formatDateTime(dateStr?: string | null): string {
 
         <!-- Empty Amendments -->
         <div
-          v-else-if="!amendments || amendments.length === 0"
+          v-else-if="filteredAmendments.length === 0"
           class="py-6"
           data-testid="amendments-empty-state"
         >
           <EmptyState
             title="No Calendar Amendments Recorded"
-            description="The selected calendar is currently at its initial version. Any subsequent holiday additions, date shifts, or campus closures will generate versioned amendments here."
+            description="The selected calendar has no amendments matching the active review filter."
           />
         </div>
 
         <!-- Timeline Visualization -->
         <div v-else class="pt-2 pb-4" data-testid="amendments-timeline-wrapper">
           <Timeline
-            :value="amendments"
+            :value="filteredAmendments"
             class="customized-timeline"
             data-testid="amendments-timeline"
           >

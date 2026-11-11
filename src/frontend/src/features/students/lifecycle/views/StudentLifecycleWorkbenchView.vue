@@ -19,6 +19,7 @@ import {
   UserCheck,
 } from 'lucide-vue-next';
 import { PageHeader, EmptyState } from '@/shared/components';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useStudentSearchQuery } from '@/features/students/records/composables/useStudentRecordsQueries';
 import type { StudentListItem, StudentSearchParams } from '@/features/students/records/types/records.types';
 import ProgressionRecommendationBadge from '../components/ProgressionRecommendationBadge.vue';
@@ -31,6 +32,23 @@ const searchFilters = reactive<StudentSearchParams>({
   status: 'active',
   pageNumber: 1,
   pageSize: 25,
+});
+
+useRouteQueryHydration((query) => {
+  const status = getQueryString(query, 'status');
+  if (status) {
+    searchFilters.status = status;
+  }
+
+  const campus = getQueryString(query, 'campus');
+  if (campus) {
+    searchFilters.campus = campus;
+  }
+
+  const level = getQueryString(query, 'schoolLevel') ?? getQueryString(query, 'level');
+  if (level) {
+    searchFilters.level = level;
+  }
 });
 
 const {
@@ -56,15 +74,30 @@ function handlePlacementSuccess() {
 
 const campusOptions = [
   { label: 'All Campuses', value: 'all' },
+  { label: 'Main Campus (campus-main)', value: 'campus-main' },
+  { label: 'East Campus (campus-east)', value: 'campus-east' },
   { label: 'Hagios Main Campus', value: 'Hagios Main Campus' },
   { label: 'West Campus', value: 'West Campus' },
 ];
 
 const levelOptions = [
   { label: 'All Levels', value: 'all' },
+  { label: 'ELC (Early Learning)', value: 'ELC' },
+  { label: 'JHLC (Junior High)', value: 'JHLC' },
+  { label: 'HSLC (Senior High)', value: 'HSLC' },
   { label: 'Primary School / SD', value: 'Primary' },
   { label: 'Junior High / SMP', value: 'Junior High' },
   { label: 'Senior High / SMA', value: 'Senior High' },
+];
+
+const statusOptions = [
+  { label: 'All Statuses', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Enrolled', value: 'enrolled' },
+  { label: 'On Leave', value: 'on_leave' },
+  { label: 'Withdrawn', value: 'withdrawn' },
+  { label: 'Transferred Out', value: 'transferred_out' },
+  { label: 'Graduated', value: 'graduated' },
 ];
 </script>
 
@@ -112,7 +145,7 @@ const levelOptions = [
 
     <!-- Filter Bar -->
     <div class="p-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xs space-y-3">
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
         <!-- Search Input -->
         <div class="sm:col-span-2">
           <span class="text-surface-500 block mb-1 font-medium">Search Student</span>
@@ -150,6 +183,19 @@ const levelOptions = [
             option-value="value"
             class="w-full text-xs"
             data-testid="select-level-filter"
+          />
+        </div>
+
+        <!-- Status Selector -->
+        <div>
+          <span class="text-surface-500 block mb-1 font-medium">Student Status</span>
+          <Select
+            v-model="searchFilters.status"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full text-xs"
+            data-testid="select-status-filter"
           />
         </div>
       </div>
@@ -221,8 +267,8 @@ const levelOptions = [
         <Column header="Enrollment Status" style="min-width: 120px">
           <template #body="{ data }">
             <Tag
-              :value="data.status || 'Active'"
-              severity="success"
+              :value="data.currentStatus || data.status || 'Active'"
+              :severity="(data.currentStatus || data.status) === 'withdrawn' || (data.currentStatus || data.status) === 'transferred_out' ? 'danger' : (data.currentStatus || data.status) === 'on_leave' ? 'warn' : 'success'"
               class="!text-[10px] !px-2 !py-0.5"
             />
           </template>

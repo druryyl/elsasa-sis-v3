@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { refDebounced } from '@vueuse/core';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
@@ -33,6 +33,7 @@ export interface FacultyQueueSidebarProps {
   /** Optional override for testing or external state management */
   teachers?: TeacherSummaryDto[];
   isLoading?: boolean;
+  initialQueueFilter?: FacultyQueueFilter;
 }
 
 const props = withDefaults(defineProps<FacultyQueueSidebarProps>(), {
@@ -40,6 +41,7 @@ const props = withDefaults(defineProps<FacultyQueueSidebarProps>(), {
   canRegister: true,
   teachers: undefined,
   isLoading: undefined,
+  initialQueueFilter: 'all',
 });
 
 const emit = defineEmits<{
@@ -63,7 +65,17 @@ const queueFilterPills: QueueFilterPill[] = [
   { id: 'corrections', label: 'Corrections' },
 ];
 
-const activeQueueFilter = ref<FacultyQueueFilter>('all');
+const activeQueueFilter = ref<FacultyQueueFilter>(props.initialQueueFilter || 'all');
+
+watch(
+  () => props.initialQueueFilter,
+  (val) => {
+    if (val) {
+      activeQueueFilter.value = val;
+    }
+  },
+  { immediate: true },
+);
 
 function setQueueFilter(filter: FacultyQueueFilter) {
   activeQueueFilter.value = filter;

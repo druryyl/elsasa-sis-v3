@@ -30,7 +30,9 @@ using Elsasa.Sis.Students.Features.Records.Status.ChangeStudentStatus;
 using Elsasa.Sis.Students.Features.Records.UpdateStudentIdentity;
 using Elsasa.Sis.Students.Services;
 using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Contracts.Kpis;
 using Elsasa.Sis.Students.Features.DemoData;
+using Elsasa.Sis.Students.Features.Kpis.GetStudentsKpiDashboard;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -98,6 +100,10 @@ public static class DependencyInjection
         services.AddScoped<GetStudentAdministrativeHistoryHandler>();
         services.AddScoped<ChangeAdministrativePlacementHandler>();
         services.AddScoped<ChangeStudentStatusHandler>();
+
+        // Students KPI vertical slice & executive summary provider (IS016 P2-S04)
+        services.AddScoped<GetStudentsKpiDashboardHandler>();
+        services.AddScoped<IDomainKpiSummaryProvider, StudentsKpiSummaryProvider>();
 
         // Configure policy-based authorization requirements (ADR-009)
         services.AddAuthorization(options =>

@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-vue-next';
 import { PageHeader } from '@/shared/components';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import {
@@ -80,6 +81,49 @@ const preselectedDemandId = ref<string | null>(
   typeof route.query.demandId === 'string' ? route.query.demandId : null,
 );
 
+const demandStatusFilter = ref<string>(
+  typeof route.query.status === 'string' && route.query.status.trim()
+    ? route.query.status.trim()
+    : 'all',
+);
+
+const capabilityFilter = ref<string>(
+  typeof route.query.capability === 'string' && route.query.capability.trim()
+    ? route.query.capability.trim()
+    : '',
+);
+
+useRouteQueryHydration((query) => {
+  const tab = getQueryString(query, 'tab');
+  if (tab && validTabs.includes(tab)) {
+    activeTab.value = tab;
+  }
+
+  const periodId = getQueryString(query, 'periodId');
+  if (periodId) selectedPeriodId.value = periodId;
+
+  const campus = getQueryString(query, 'campus');
+  if (campus) selectedCampus.value = campus;
+
+  const q = getQueryString(query, 'q');
+  if (q !== null) searchQuery.value = q;
+
+  const demandId = getQueryString(query, 'demandId');
+  if (demandId) preselectedDemandId.value = demandId;
+
+  const status = getQueryString(query, 'status');
+  if (status) {
+    demandStatusFilter.value = status;
+    if (!tab) activeTab.value = 'demands';
+  }
+
+  const capability = getQueryString(query, 'capability');
+  if (capability) {
+    capabilityFilter.value = capability;
+    if (!tab) activeTab.value = 'demands';
+  }
+});
+
 // Sync changes to URL
 function syncRoute() {
   router.replace({
@@ -90,6 +134,8 @@ function syncRoute() {
       campus: selectedCampus.value !== 'all' ? selectedCampus.value : undefined,
       q: searchQuery.value.trim() || undefined,
       demandId: preselectedDemandId.value || undefined,
+      status: demandStatusFilter.value !== 'all' ? demandStatusFilter.value : undefined,
+      capability: capabilityFilter.value || undefined,
     },
   });
 }
@@ -231,6 +277,8 @@ function handleProposeAssignment(data: {
               :campus-scope="selectedCampus"
               :search="searchQuery"
               :can-manage="canManage"
+              :initial-status="demandStatusFilter"
+              :initial-capability="capabilityFilter"
               @evaluate-demand="handleEvaluateDemand"
             />
           </TabPanel>

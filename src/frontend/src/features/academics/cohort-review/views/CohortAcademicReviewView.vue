@@ -44,6 +44,7 @@ import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import {
   useEvaluateStandingQuery,
   useEvaluateProgressionQuery,
@@ -122,8 +123,24 @@ const defaultPeriodId = computed(
 
 const selectedPeriodId = ref<string>(defaultPeriodId.value);
 const selectedGradeLevel = ref<string>('Grade 4');
+const selectedStandingFilter = ref<string>('all');
 const activeTab = ref<'standingProgression' | 'achievements'>('standingProgression');
 const searchFilter = ref('');
+
+const standingFilterOptions = [
+  { label: 'All Standings', value: 'all' },
+  { label: 'Good Standing', value: 'good_standing' },
+  { label: 'Conditional Standing', value: 'conditional_standing' },
+  { label: 'Not in Good Standing', value: 'not_in_good_standing' },
+];
+
+useRouteQueryHydration((query) => {
+  const standing = getQueryString(query, 'standing');
+  if (standing) {
+    selectedStandingFilter.value = standing;
+    activeTab.value = 'standingProgression';
+  }
+});
 
 watch(
   () => appContextStore.activeAcademicPeriodId,
@@ -344,9 +361,14 @@ const combinedReviewRows = computed<StudentReviewItem[]>(() => {
   });
 });
 
-// Search filter
+// Standing & Search filter
 const filteredReviewRows = computed(() => {
   let list = combinedReviewRows.value;
+  if (selectedStandingFilter.value !== 'all') {
+    list = list.filter(
+      (r) => r.standing?.toLowerCase() === selectedStandingFilter.value.toLowerCase(),
+    );
+  }
   if (searchFilter.value.trim()) {
     const term = searchFilter.value.trim().toLowerCase();
     list = list.filter((r) =>
@@ -611,6 +633,21 @@ function formatAchievementType(type: string): string {
             option-value="value"
             class="w-44 text-xs"
             data-testid="select-cohort-grade-level"
+          />
+        </div>
+
+        <!-- Academic Standing Filter -->
+        <div>
+          <label class="block text-[11px] font-semibold text-surface-500 uppercase tracking-wider mb-1">
+            Academic Standing
+          </label>
+          <Select
+            v-model="selectedStandingFilter"
+            :options="standingFilterOptions"
+            option-label="label"
+            option-value="value"
+            class="w-48 text-xs"
+            data-testid="select-cohort-standing-filter"
           />
         </div>
       </div>

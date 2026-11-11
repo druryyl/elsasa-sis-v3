@@ -756,7 +756,7 @@ public sealed class TeachingWorkloadAndSubstitutionsIntegrationTests(Integration
         {
             // Verify Hagios personas seeded (Budi Hartono, Siti Nurhaliza)
             var teacherCount = await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM teaching.teacher_profiles WHERE full_name IN ('Budi Hartono, M.Pd.', 'Siti Nurhaliza, S.Pd.');");
+                "SELECT COUNT(1) FROM teaching.teacher_profiles WHERE display_name IN ('Budi Hartono, M.Pd.', 'Siti Nurhaliza, S.Pd.');");
             teacherCount.Should().Be(2, "Flagship Hagios personas are seeded");
 
             // Verify assignment roles and workload policies exist

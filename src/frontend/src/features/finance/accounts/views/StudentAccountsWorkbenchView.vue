@@ -40,6 +40,7 @@ import {
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDateOnly } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { formatIdr } from '../../shared/currency.utils';
 import { getAccountStatusDescriptor } from '../../shared/financeStatus.utils';
 import { useAuthStore } from '@/app/stores/auth.store';
@@ -113,6 +114,19 @@ const canReallocate = computed(() =>
 const selectedStudentId = ref<string>('');
 const searchInput = ref('');
 const debouncedSearch = refDebounced(searchInput, 300);
+const directoryFilter = ref<'all' | 'unallocated' | 'overdue'>('all');
+
+useRouteQueryHydration((query) => {
+  const filter = getQueryString(query, 'filter')?.toLowerCase();
+  if (filter === 'unallocated' || filter === 'overdue' || filter === 'all') {
+    directoryFilter.value = filter;
+  }
+
+  const queryStudentId = getQueryString(query, 'studentId');
+  if (queryStudentId) {
+    selectedStudentId.value = queryStudentId;
+  }
+});
 
 // AutoComplete selection model
 const selectedStudentSuggestion = ref<StudentFinancialAccountDto | null>(null);
@@ -120,7 +134,7 @@ const selectedStudentSuggestion = ref<StudentFinancialAccountDto | null>(null);
 // Search Query
 const searchParams = computed(() => ({
   searchTerm: debouncedSearch.value || undefined,
-  pageSize: 20,
+  pageSize: directoryFilter.value !== 'all' ? 100 : 20,
 }));
 
 const {
@@ -129,9 +143,34 @@ const {
   refetch: refetchSearch,
 } = useSearchStudentAccountsQuery(searchParams);
 
-const studentAccountsList = computed<StudentFinancialAccountDto[]>(
-  () => accountsListResponse.value?.items ?? [],
+// Query confirmed payments only when unallocated filter is active
+const { data: unallocatedPaymentsResponse } = usePaymentsQuery(
+  computed(() => ({ status: 'confirmed', pageSize: 100 })),
+  { enabled: computed(() => directoryFilter.value === 'unallocated') },
 );
+
+const unallocatedStudentIds = computed(() => {
+  const ids = new Set<string>();
+  const items = unallocatedPaymentsResponse.value?.items ?? [];
+  for (const p of items) {
+    if ((p.unallocatedAmount || 0) > 0 && p.studentId) {
+      ids.add(p.studentId);
+    }
+  }
+  return ids;
+});
+
+const studentAccountsList = computed<StudentFinancialAccountDto[]>(() => {
+  const items = accountsListResponse.value?.items ?? [];
+  if (directoryFilter.value === 'overdue') {
+    return items.filter((acc) => (acc.currentBalance || 0) > 0);
+  }
+  if (directoryFilter.value === 'unallocated') {
+    if (unallocatedPaymentsResponse.value === undefined) return items;
+    return items.filter((acc) => unallocatedStudentIds.value.has(acc.studentId));
+  }
+  return items;
+});
 
 // ---------------------------------------------------------------------------
 // 4. Student Financial Account Dossier Query (TD-02)
@@ -631,16 +670,44 @@ function handleRefreshAll() {
     <!-- Case 3: No Student Selected - Show Directory / Overview Table -->
     <div v-else class="space-y-4">
       <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div class="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <Wallet class="w-5 h-5 text-indigo-600" />
             <h3 class="text-base font-semibold text-slate-800">
               Enrolled Student Financial Accounts Directory
             </h3>
           </div>
-          <span class="text-xs text-slate-500 font-medium">
-            Select a student to inspect ledger details, assess fees, or issue billing statements.
-          </span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-medium text-slate-600">
+              <button
+                type="button"
+                class="px-3 py-1 rounded-md transition cursor-pointer"
+                :class="directoryFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'hover:text-slate-900'"
+                data-testid="accounts-filter-all"
+                @click="directoryFilter = 'all'"
+              >
+                All Accounts
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1 rounded-md transition cursor-pointer"
+                :class="directoryFilter === 'overdue' ? 'bg-white text-amber-800 shadow-2xs font-semibold' : 'hover:text-slate-900'"
+                data-testid="accounts-filter-overdue"
+                @click="directoryFilter = 'overdue'"
+              >
+                Overdue / Balance Due
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1 rounded-md transition cursor-pointer"
+                :class="directoryFilter === 'unallocated' ? 'bg-white text-indigo-700 shadow-2xs font-semibold' : 'hover:text-slate-900'"
+                data-testid="accounts-filter-unallocated"
+                @click="directoryFilter = 'unallocated'"
+              >
+                Unallocated Cash
+              </button>
+            </div>
+          </div>
         </div>
 
         <DataTable

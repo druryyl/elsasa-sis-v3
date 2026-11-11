@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
@@ -35,17 +35,27 @@ export interface EnrolledStudent {
   applicantId?: string | null;
 }
 
+export type ResultStatusFilterValue =
+  | 'all'
+  | 'provisional'
+  | 'approved'
+  | 'published'
+  | 'unscored'
+  | 'failing';
+
 interface Props {
   assessment: Assessment;
   enrolledStudents: EnrolledStudent[];
   results: AcademicResult[];
   isLoading?: boolean;
   canEvaluate?: boolean;
+  initialStatusFilter?: ResultStatusFilterValue;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isLoading: false,
   canEvaluate: true,
+  initialStatusFilter: 'all',
 });
 
 const emit = defineEmits<{
@@ -55,7 +65,17 @@ const emit = defineEmits<{
 
 // Search and Filter State
 const searchQuery = ref('');
-const statusFilter = ref<'all' | 'provisional' | 'approved' | 'published' | 'unscored' | 'failing'>('all');
+const statusFilter = ref<ResultStatusFilterValue>(props.initialStatusFilter || 'all');
+
+watch(
+  () => props.initialStatusFilter,
+  (val) => {
+    if (val) {
+      statusFilter.value = val;
+    }
+  },
+  { immediate: true },
+);
 
 // Evaluation Modal State
 const isScoreModalOpen = ref(false);

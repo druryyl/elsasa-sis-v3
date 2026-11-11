@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
@@ -42,12 +42,14 @@ export interface QualificationEvidenceTabProps {
   teacher: TeacherProfileDto | null;
   canManage?: boolean;
   canVerify?: boolean;
+  initialVerificationState?: string;
 }
 
 const props = withDefaults(defineProps<QualificationEvidenceTabProps>(), {
   teacher: null,
   canManage: false,
   canVerify: false,
+  initialVerificationState: '',
 });
 
 const emit = defineEmits<{
@@ -97,8 +99,27 @@ function getQualificationTypeName(typeId: string): string {
   return type ? `${type.name} (${type.code})` : typeId;
 }
 
+const verificationStateFilter = ref<string>(props.initialVerificationState || '');
+
+watch(
+  () => props.initialVerificationState,
+  (val) => {
+    verificationStateFilter.value = val ?? '';
+  },
+  { immediate: true },
+);
+
 const qualificationsList = computed<QualificationEvidenceDto[]>(() => {
-  return props.teacher?.qualifications ?? [];
+  const all = props.teacher?.qualifications ?? [];
+  if (!verificationStateFilter.value) return all;
+  const target = verificationStateFilter.value.toLowerCase();
+  return all.filter((q) => {
+    const state = q.verificationState?.toLowerCase() ?? '';
+    if (target === 'submitted') {
+      return state === 'submitted' || state === 'claimed';
+    }
+    return state === target;
+  });
 });
 
 const pendingVerificationCount = computed(() => {

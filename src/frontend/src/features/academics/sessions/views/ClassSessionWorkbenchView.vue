@@ -23,6 +23,7 @@ import {
   RotateCw,
 } from 'lucide-vue-next';
 import { PageHeader, EmptyState, LoadingSpinner } from '@/shared/components';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useTeacherDailyActivitiesQuery } from '../composables/useLearningActivities';
@@ -103,10 +104,21 @@ function goToToday() {
 // 4. Session Filter & Queries
 // --------------------------------------------------------------------------
 const filterMode = ref<'all' | 'homeroom'>('all');
+const lowAttendanceFilter = ref<boolean>(false);
 const filterOptions = [
   { label: 'All Sessions', value: 'all' },
   { label: 'Homeroom Daily Roll Call', value: 'homeroom' },
 ];
+
+useRouteQueryHydration((query) => {
+  const filter = getQueryString(query, 'filter');
+  if (filter === 'low-attendance') {
+    lowAttendanceFilter.value = true;
+  } else if (filter === 'homeroom') {
+    filterMode.value = 'homeroom';
+    lowAttendanceFilter.value = false;
+  }
+});
 
 const {
   data: activitiesData,
@@ -118,10 +130,17 @@ const {
 const activities = computed(() => activitiesData.value ?? []);
 
 const filteredActivities = computed(() => {
+  let list = activities.value;
   if (filterMode.value === 'homeroom') {
-    return activities.value.filter((a) => a.activityType === 'homeroom_session');
+    list = list.filter((a) => a.activityType === 'homeroom_session');
   }
-  return activities.value;
+  if (lowAttendanceFilter.value) {
+    const attendanceRequired = list.filter((a) => a.isAttendanceRequired);
+    if (attendanceRequired.length > 0) {
+      list = attendanceRequired;
+    }
+  }
+  return list;
 });
 
 // --------------------------------------------------------------------------
@@ -279,7 +298,18 @@ function getStatusSeverity(status: string): 'info' | 'success' | 'warn' | 'dange
         </div>
 
         <!-- Filter Mode: All Sessions vs Homeroom Roll Call -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <Button
+            v-if="lowAttendanceFilter"
+            type="button"
+            label="Low Attendance Filter Active (Clear)"
+            size="small"
+            severity="warn"
+            variant="outlined"
+            class="text-xs"
+            data-testid="btn-clear-low-attendance-filter"
+            @click="lowAttendanceFilter = false"
+          />
           <SelectButton
             v-model="filterMode"
             :options="filterOptions"

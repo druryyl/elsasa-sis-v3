@@ -1,8 +1,10 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { CACHE_TIERS } from '@/app/providers/queryClient';
+import type { PaginatedResponse } from '@/shared/types/common';
 import {
   approveWorkloadException,
+  getCapacityConflicts,
   getWorkloadCommitments,
   getWorkloadExceptions,
   getWorkloadPolicies,
@@ -13,6 +15,8 @@ import { workloadKeys } from '../api/queryKeys';
 import type {
   ApproveWorkloadExceptionRequest,
   ApproveWorkloadExceptionResponse,
+  CapacityConflictDto,
+  GetCapacityConflictsParams,
   GetWorkloadCommitmentsParams,
   GetWorkloadExceptionsParams,
   GetWorkloadPoliciesParams,
@@ -104,6 +108,28 @@ export function useWorkloadExceptions(
     staleTime: CACHE_TIERS.TRANSACTIONAL.staleTime,
     gcTime: CACHE_TIERS.TRANSACTIONAL.gcTime,
     refetchOnWindowFocus: CACHE_TIERS.TRANSACTIONAL.refetchOnWindowFocus,
+  });
+}
+
+/**
+ * Reactive TanStack Query hook fetching capacity conflicts worklist (P5-S12, SCR-TCH-03).
+ * Uses ACTIVE_QUEUE cache tier.
+ */
+export function useCapacityConflicts(
+  params?: MaybeRefOrGetter<GetCapacityConflictsParams | undefined>,
+  options?: WorkloadQueryOptions,
+) {
+  const resolvedParams = computed(() => toValue(params));
+
+  return useQuery<PaginatedResponse<CapacityConflictDto>>({
+    queryKey: computed(() => workloadKeys.conflictList(resolvedParams.value)),
+    queryFn: () => getCapacityConflicts(resolvedParams.value),
+    enabled: computed(() => {
+      return options?.enabled !== undefined ? toValue(options.enabled) : true;
+    }),
+    staleTime: CACHE_TIERS.ACTIVE_QUEUE.staleTime,
+    gcTime: CACHE_TIERS.ACTIVE_QUEUE.gcTime,
+    refetchOnWindowFocus: CACHE_TIERS.ACTIVE_QUEUE.refetchOnWindowFocus,
   });
 }
 

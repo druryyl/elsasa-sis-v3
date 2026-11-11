@@ -506,6 +506,301 @@ describe('Navigation Guards & Router Integration', () => {
     });
   });
 
+  describe('Level 2 Domain Dashboard Authorization (P5-S11, TD-05)', () => {
+    const ALL_DOMAIN_ROUTES = [
+      '/dashboard/students',
+      '/dashboard/academics',
+      '/dashboard/finance',
+      '/dashboard/teaching',
+      '/dashboard/operations',
+    ] as const;
+
+    it('redirects unauthenticated users accessing Level 2 dashboards to /auth/login', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+
+      await router.push('/dashboard/teaching');
+
+      expect(router.currentRoute.value.path).toBe('/auth/login');
+      expect(router.currentRoute.value.query.redirect).toBe('/dashboard/teaching');
+    });
+
+    it('grants SuperAdmin and role-only Admin access to all Level 2 domain dashboards', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      for (const role of ['SuperAdmin', 'Admin']) {
+        authStore.setSession(
+          'valid-token',
+          createTestUser({
+            roles: [role],
+            permissions: [],
+          }),
+        );
+
+        for (const path of ALL_DOMAIN_ROUTES) {
+          await router.push(path);
+          expect(
+            router.currentRoute.value.path,
+            `Expected ${role} to access ${path}`,
+          ).toBe(path);
+        }
+      }
+    });
+
+    it('allows AcademicCoordinator (with academics permissions only) to access academics, teaching, and operations dashboards while blocking students and finance', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['AcademicCoordinator', 'AcademicAuthority'],
+          permissions: ['academics.participations.view', 'academics.curriculum.view'],
+        }),
+      );
+
+      for (const allowedPath of [
+        '/dashboard/academics',
+        '/dashboard/teaching',
+        '/dashboard/operations',
+      ]) {
+        await router.push(allowedPath);
+        expect(router.currentRoute.value.path).toBe(allowedPath);
+      }
+
+      for (const deniedPath of ['/dashboard/students', '/dashboard/finance']) {
+        await router.push(deniedPath);
+        expect(router.currentRoute.value.path).toBe('/403');
+      }
+    });
+
+    it('allows Teacher to access academics and teaching dashboards while blocking students, finance, and operations', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Teacher', 'AcademicStaff'],
+          permissions: ['academics.participations.view', 'Permissions.Academics.Coursework.View'],
+        }),
+      );
+
+      for (const allowedPath of ['/dashboard/academics', '/dashboard/teaching']) {
+        await router.push(allowedPath);
+        expect(router.currentRoute.value.path).toBe(allowedPath);
+      }
+
+      for (const deniedPath of [
+        '/dashboard/students',
+        '/dashboard/finance',
+        '/dashboard/operations',
+      ]) {
+        await router.push(deniedPath);
+        expect(router.currentRoute.value.path).toBe('/403');
+      }
+    });
+
+    it('grants role-only domain officers and authorities access to their authorized Level 2 dashboards without explicit permissions', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      const cases: Array<{ role: string; allowed: string[]; denied: string[] }> = [
+        {
+          role: 'AdmissionOfficer',
+          allowed: ['/dashboard/students'],
+          denied: ['/dashboard/academics', '/dashboard/finance', '/dashboard/teaching', '/dashboard/operations'],
+        },
+        {
+          role: 'StudentAdminOfficer',
+          allowed: ['/dashboard/students'],
+          denied: ['/dashboard/finance', '/dashboard/operations'],
+        },
+        {
+          role: 'SchoolLeadership',
+          allowed: ['/dashboard/students'],
+          denied: ['/dashboard/finance', '/dashboard/operations'],
+        },
+        {
+          role: 'FinanceOfficer',
+          allowed: ['/dashboard/finance'],
+          denied: ['/dashboard/students', '/dashboard/academics', '/dashboard/teaching', '/dashboard/operations'],
+        },
+        {
+          role: 'FinanceStaff',
+          allowed: ['/dashboard/finance'],
+          denied: ['/dashboard/students', '/dashboard/operations'],
+        },
+        {
+          role: 'FinanceAuthority',
+          allowed: ['/dashboard/finance'],
+          denied: ['/dashboard/students', '/dashboard/operations'],
+        },
+        {
+          role: 'TeachingAuthority',
+          allowed: ['/dashboard/teaching'],
+          denied: ['/dashboard/students', '/dashboard/finance', '/dashboard/operations'],
+        },
+        {
+          role: 'TeachingCoordinator',
+          allowed: ['/dashboard/teaching'],
+          denied: ['/dashboard/students', '/dashboard/finance', '/dashboard/operations'],
+        },
+        {
+          role: 'OperationsAuthority',
+          allowed: ['/dashboard/operations'],
+          denied: ['/dashboard/students', '/dashboard/academics', '/dashboard/finance', '/dashboard/teaching'],
+        },
+        {
+          role: 'AcademicAdmin',
+          allowed: ['/dashboard/academics', '/dashboard/operations'],
+          denied: ['/dashboard/students', '/dashboard/finance'],
+        },
+      ];
+
+      for (const testCase of cases) {
+        authStore.setSession(
+          'valid-token',
+          createTestUser({
+            roles: [testCase.role],
+            permissions: [],
+          }),
+        );
+
+        for (const path of testCase.allowed) {
+          await router.push(path);
+          expect(
+            router.currentRoute.value.path,
+            `Expected role ${testCase.role} to access ${path}`,
+          ).toBe(path);
+        }
+
+        for (const path of testCase.denied) {
+          await router.push(path);
+          expect(
+            router.currentRoute.value.path,
+            `Expected role ${testCase.role} to be blocked from ${path}`,
+          ).toBe('/403');
+        }
+      }
+    });
+
+    it('grants permission-bearing non-role staff access to their authorized Level 2 dashboards', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      const cases: Array<{ role: string; permission: string; allowed: string; denied: string }> = [
+        {
+          role: 'OperationsStaff',
+          permission: 'Permissions.Operations.Calendar.Manage',
+          allowed: '/dashboard/operations',
+          denied: '/dashboard/students',
+        },
+        {
+          role: 'OperationsStaff',
+          permission: 'Permissions.Operations.Calendar.View',
+          allowed: '/dashboard/operations',
+          denied: '/dashboard/finance',
+        },
+        {
+          role: 'Staff',
+          permission: 'Permissions.Students.Records.View',
+          allowed: '/dashboard/students',
+          denied: '/dashboard/teaching',
+        },
+        {
+          role: 'Staff',
+          permission: 'Permissions.Academics.Coursework.View',
+          allowed: '/dashboard/academics',
+          denied: '/dashboard/finance',
+        },
+        {
+          role: 'Staff',
+          permission: 'Permissions.Finance.Obligations.View',
+          allowed: '/dashboard/finance',
+          denied: '/dashboard/academics',
+        },
+        {
+          role: 'Staff',
+          permission: 'Permissions.Teaching.Workload.View',
+          allowed: '/dashboard/teaching',
+          denied: '/dashboard/operations',
+        },
+      ];
+
+      for (const testCase of cases) {
+        authStore.setSession(
+          'valid-token',
+          createTestUser({
+            roles: [testCase.role],
+            permissions: [testCase.permission],
+          }),
+        );
+
+        await router.push(testCase.allowed);
+        expect(router.currentRoute.value.path).toBe(testCase.allowed);
+
+        await router.push(testCase.denied);
+        expect(router.currentRoute.value.path).toBe('/403');
+      }
+    });
+
+    it('blocks Guest, Student, and Parent from all Level 2 operational domain dashboards even with self-service view permissions', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+
+      const blockedUsers: Array<{ label: string; roles: string[]; permissions: string[] }> = [
+        { label: 'Guest', roles: ['Guest'], permissions: [] },
+        {
+          label: 'Student',
+          roles: ['Student'],
+          permissions: ['academics.participations.view', 'Permissions.SelfService.Student'],
+        },
+        {
+          label: 'Parent',
+          roles: ['Parent'],
+          permissions: [
+            'academics.participations.view',
+            'Permissions.Finance.Obligations.View',
+            'Permissions.SelfService.Parent',
+          ],
+        },
+      ];
+
+      for (const user of blockedUsers) {
+        authStore.setSession(
+          'valid-token',
+          createTestUser({
+            roles: user.roles,
+            permissions: user.permissions,
+          }),
+        );
+
+        for (const path of ALL_DOMAIN_ROUTES) {
+          await router.push(path);
+          expect(
+            router.currentRoute.value.path,
+            `Expected ${user.label} to be blocked from ${path}`,
+          ).toBe('/403');
+        }
+      }
+    });
+
+    it('allows authenticated users to access /dashboard/development Stage 3 placeholder', async () => {
+      const router = createAppRouter({ history: createMemoryHistory() });
+      const authStore = useAuthStore();
+      authStore.setSession(
+        'valid-token',
+        createTestUser({
+          roles: ['Guest'],
+          permissions: [],
+        }),
+      );
+
+      await router.push('/dashboard/development');
+      expect(router.currentRoute.value.path).toBe('/dashboard/development');
+      expect(router.currentRoute.value.name).toBe('dashboard.development');
+    });
+  });
+
   describe('Router Instance & Scroll Behavior', () => {
     it('scrollBehavior restores savedPosition if available', () => {
       const router = createAppRouter({ history: createMemoryHistory() });

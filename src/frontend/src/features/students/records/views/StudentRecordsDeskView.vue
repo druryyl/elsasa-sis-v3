@@ -45,6 +45,7 @@ import {
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate, formatDisplayDateTime } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { RECORDS_PERMISSIONS } from '../constants/permissions';
 import type { StudentSearchParams } from '../types/records.types';
@@ -93,15 +94,21 @@ const debouncedSearch = refDebounced(searchInput, 300);
 const selectedCampus = ref('');
 const selectedLevel = ref('');
 const selectedStatus = ref('');
+const selectedCohort = ref('');
 
 const campusOptions = [
   { label: 'All Campuses', value: '' },
+  { label: 'Main Campus (campus-main)', value: 'campus-main' },
+  { label: 'East Campus (campus-east)', value: 'campus-east' },
   { label: 'Main Campus (Kampus A)', value: 'Main Campus (Kampus A)' },
   { label: 'East Campus (Kampus B)', value: 'East Campus (Kampus B)' },
 ];
 
 const levelOptions = [
   { label: 'All School Levels', value: '' },
+  { label: 'ELC (Early Learning)', value: 'ELC' },
+  { label: 'JHLC (Junior High)', value: 'JHLC' },
+  { label: 'HSLC (Senior High)', value: 'HSLC' },
   { label: 'TK-A', value: 'TK-A' },
   { label: 'TK-B', value: 'TK-B' },
   { label: 'Grade 1', value: 'Grade 1' },
@@ -124,6 +131,7 @@ const statusOptions = [
   { label: 'Active', value: 'active' },
   { label: 'On Leave', value: 'on_leave' },
   { label: 'Withdrawn', value: 'withdrawn' },
+  { label: 'Transferred Out', value: 'transferred_out' },
   { label: 'Graduated', value: 'graduated' },
 ];
 
@@ -132,7 +140,22 @@ function resetFilters() {
   selectedCampus.value = '';
   selectedLevel.value = '';
   selectedStatus.value = '';
+  selectedCohort.value = '';
 }
+
+useRouteQueryHydration((query) => {
+  const status = getQueryString(query, 'status');
+  if (status) selectedStatus.value = status;
+
+  const campus = getQueryString(query, 'campus');
+  if (campus) selectedCampus.value = campus;
+
+  const schoolLevel = getQueryString(query, 'schoolLevel') ?? getQueryString(query, 'level');
+  if (schoolLevel) selectedLevel.value = schoolLevel;
+
+  const cohort = getQueryString(query, 'cohort');
+  if (cohort) selectedCohort.value = cohort;
+});
 
 const searchParams = computed<StudentSearchParams>(() => {
   const params: StudentSearchParams = {
@@ -330,9 +353,18 @@ function openChangeStatusModal() {
 
           <!-- Reset Filter Button -->
           <div class="flex items-center justify-between pt-1 text-xs">
-            <span class="text-surface-500">
-              Showing <strong>{{ candidates.length }}</strong> match{{ candidates.length === 1 ? '' : 'es' }}
-            </span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-surface-500">
+                Showing <strong>{{ candidates.length }}</strong> match{{ candidates.length === 1 ? '' : 'es' }}
+              </span>
+              <span
+                v-if="selectedCohort"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-medium"
+                data-testid="active-cohort-chip"
+              >
+                Cohort: {{ selectedCohort }}
+              </span>
+            </div>
             <Button
               size="small"
               variant="text"

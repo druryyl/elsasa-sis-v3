@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
@@ -31,6 +31,8 @@ export interface DemandsIntakeTabProps {
   campusScope?: string;
   search?: string;
   canManage?: boolean;
+  initialStatus?: string;
+  initialCapability?: string;
 }
 
 const props = withDefaults(defineProps<DemandsIntakeTabProps>(), {
@@ -38,6 +40,8 @@ const props = withDefaults(defineProps<DemandsIntakeTabProps>(), {
   campusScope: undefined,
   search: '',
   canManage: true,
+  initialStatus: 'all',
+  initialCapability: '',
 });
 
 const emit = defineEmits<{
@@ -46,10 +50,28 @@ const emit = defineEmits<{
 
 // Filters state
 const searchQuery = ref<string>('');
-const selectedStatus = ref<string>('all');
+const selectedStatus = ref<string>(props.initialStatus || 'all');
+const selectedCapability = ref<string>(props.initialCapability || '');
+
+watch(
+  () => props.initialStatus,
+  (val) => {
+    if (val) selectedStatus.value = val;
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.initialCapability,
+  (val) => {
+    selectedCapability.value = val ?? '';
+  },
+  { immediate: true },
+);
 
 const statusFilterOptions = [
   { label: 'All Statuses', value: 'all' },
+  { label: 'Unstaffed (Open)', value: 'unstaffed' },
   { label: 'Received (Awaiting Action)', value: 'received' },
   { label: 'Accepted for Staffing', value: 'accepted_for_staffing' },
   { label: 'Clarification Needed', value: 'returned_for_clarification' },
@@ -61,7 +83,10 @@ const statusFilterOptions = [
 const queryParams = computed(() => ({
   academicPeriodId: props.academicPeriodId,
   campusScope: props.campusScope && props.campusScope !== 'all' ? props.campusScope : undefined,
-  status: selectedStatus.value !== 'all' ? selectedStatus.value : undefined,
+  status:
+    selectedStatus.value !== 'all' && selectedStatus.value !== 'unstaffed'
+      ? selectedStatus.value
+      : undefined,
   search: searchQuery.value.trim() || (props.search ? props.search.trim() : undefined),
 }));
 
@@ -72,12 +97,28 @@ const {
   refetch,
 } = useDemands(queryParams);
 
+const unstaffedStatuses = new Set(['received', 'accepted_for_staffing', 'changed']);
+
 const demands = computed<TeachingDemandDto[]>(() => {
   if (!demandsData.value) return [];
-  // Supports either PaginatedResponse or raw array
-  return Array.isArray(demandsData.value)
+  const raw = Array.isArray(demandsData.value)
     ? demandsData.value
     : (demandsData.value as { items?: TeachingDemandDto[] }).items || [];
+
+  return raw.filter((d) => {
+    if (selectedStatus.value === 'unstaffed' && !unstaffedStatuses.has(d.status)) {
+      return false;
+    }
+    if (selectedCapability.value.trim()) {
+      const cap = selectedCapability.value.trim().toLowerCase();
+      const codeMatch = d.requiredCapabilityCode?.toLowerCase() === cap;
+      const nameMatch = d.requiredCapabilityName?.toLowerCase().includes(cap);
+      if (!codeMatch && !nameMatch) {
+        return false;
+      }
+    }
+    return true;
+  });
 });
 
 // Modal state
@@ -158,6 +199,19 @@ function getDemandStatusMeta(status: string) {
         >
           <RotateCcw class="w-3.5 h-3.5 mr-1" />
           Refresh
+        </Button>
+
+        <Button
+          v-if="selectedCapability"
+          severity="info"
+          variant="outlined"
+          size="small"
+          class="!text-xs !py-1.5"
+          data-testid="btn-clear-capability-filter"
+          @click="selectedCapability = ''"
+        >
+          <span>Capability: {{ selectedCapability }}</span>
+          <XCircle class="w-3.5 h-3.5 ml-1.5" />
         </Button>
       </div>
 

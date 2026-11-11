@@ -30,6 +30,7 @@ import {
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { COURSEWORK_PERMISSIONS } from '../constants/permissions';
 import {
@@ -86,8 +87,35 @@ const canException = computed(() =>
 // ---------------------------------------------------------------------------
 const unitSearch = ref('');
 const statusFilter = ref<string>('all');
+const submissionStatusFilter = ref<string>('all');
 const selectedUnitId = ref<string | null>(null);
 const selectedAssignmentId = ref<string | null>(null);
+
+const submissionStatusValues = new Set([
+  'submitted',
+  'late',
+  'missing',
+  'excused',
+  'exempted',
+  'pending',
+]);
+const assignmentStatusValues = new Set(['all', 'draft', 'released', 'closed']);
+
+useRouteQueryHydration((query) => {
+  const unitId = getQueryString(query, 'unitId');
+  if (unitId) {
+    selectedUnitId.value = unitId;
+  }
+
+  const status = getQueryString(query, 'status')?.toLowerCase();
+  if (status) {
+    if (submissionStatusValues.has(status)) {
+      submissionStatusFilter.value = status;
+    } else if (assignmentStatusValues.has(status)) {
+      statusFilter.value = status;
+    }
+  }
+});
 
 // Modal & Drawer State
 const isCreateDrawerOpen = ref(false);
@@ -696,6 +724,7 @@ function onExceptionSaved() {
             :is-loading="isLoadingSubmissions"
             :is-error="isSubmissionsError"
             :error-message="submissionsError instanceof Error ? submissionsError.message : null"
+            :initial-status-filter="submissionStatusFilter"
             @inspect="openInspectDrawer"
             @grant-exception="openExceptionModal"
             @refresh="refetchSubmissions"

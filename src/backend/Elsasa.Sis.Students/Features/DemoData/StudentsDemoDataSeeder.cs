@@ -25,6 +25,7 @@ public sealed class StudentsDemoDataSeeder(
 
     private const string _createdBy = "demo-data-seeder";
     private const string _campusMain = "campus-main";
+    private const string _campusEast = "campus-east";
 
     private const string _insertApplicantSql = """
         INSERT INTO students.applicants (
@@ -738,7 +739,7 @@ public sealed class StudentsDemoDataSeeder(
                     ApplicationNumber = $"APP-2026-{1004 + i:D4}",
                     ApplicationType = "new",
                     RequestedEntryLevel = p.Grade,
-                    RequestedCampus = _campusMain,
+                    RequestedCampus = p.Campus,
                     RequestedProgram = $"ACE {p.SchoolLevel} Curriculum",
                     RegistrationDate = DateOnly.FromDateTime(baseDate.AddDays(-190)),
                     Status = "enrolled",
@@ -884,166 +885,79 @@ public sealed class StudentsDemoDataSeeder(
                 _insertAssessmentEvidenceSql, assessmentEvidence, transaction: transaction, cancellationToken: cancellationToken));
 
             // =========================================================================
-            // 6. SEED APPLICANT DOCUMENTS & CONTACTS
+            // 6. SEED APPLICANT DOCUMENTS & CONTACTS (~78% mandatory doc verification)
             // =========================================================================
-            var applicantDocs = new List<object>
+            var applicantDocs = new List<object>();
+
+            void AddApplicantDoc(
+                Guid applicationId,
+                Guid applicantId,
+                string docType,
+                string fileSlug,
+                string submissionStatus,
+                int daysAgoSubmitted,
+                int? daysAgoVerified,
+                string notes)
             {
-                new
+                applicantDocs.Add(new
                 {
                     Id = Guid.NewGuid(),
-                    ApplicationId = danielAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "submitted",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-50)),
-                    VerifiedDate = (DateOnly?)null,
-                    VerifiedBy = (string?)null,
-                    FileReference = $"documents/applicants/{danielApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_daniel.pdf",
+                    ApplicationId = applicationId,
+                    DocumentType = docType,
+                    SubmissionStatus = submissionStatus,
+                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-daysAgoSubmitted)),
+                    VerifiedDate = daysAgoVerified.HasValue
+                        ? (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-daysAgoVerified.Value))
+                        : null,
+                    VerifiedBy = submissionStatus == "verified" ? "demo-admission-officer" : null,
+                    FileReference = $"documents/applicants/{applicantId:N}/{fileSlug}.pdf",
+                    FileName = $"{fileSlug}.pdf",
                     FileSizeBytes = (long?)245760,
                     ContentType = "application/pdf",
-                    Notes = "Pending registrar document verification",
-                    CreatedAt = now.AddDays(-50),
+                    Notes = notes,
+                    CreatedAt = now.AddDays(-daysAgoSubmitted),
                     CreatedBy = _createdBy
-                },
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = mariaAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "submitted",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-40)),
-                    VerifiedDate = (DateOnly?)null,
-                    VerifiedBy = (string?)null,
-                    FileReference = $"documents/applicants/{mariaApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_maria.pdf",
-                    FileSizeBytes = (long?)312400,
-                    ContentType = "application/pdf",
-                    Notes = "Under verification",
-                    CreatedAt = now.AddDays(-40),
-                    CreatedBy = _createdBy
-                },
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = samuelAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "verified",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-30)),
-                    VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-28)),
-                    VerifiedBy = "demo-admission-officer",
-                    FileReference = $"documents/applicants/{samuelApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_samuel.pdf",
-                    FileSizeBytes = (long?)198600,
-                    ContentType = "application/pdf",
-                    Notes = "Verified against civil registry",
-                    CreatedAt = now.AddDays(-30),
-                    CreatedBy = _createdBy
-                },
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = estherAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "verified",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-25)),
-                    VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-22)),
-                    VerifiedBy = "demo-admission-officer",
-                    FileReference = $"documents/applicants/{estherApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_esther.pdf",
-                    FileSizeBytes = (long?)225400,
-                    ContentType = "application/pdf",
-                    Notes = "Verified",
-                    CreatedAt = now.AddDays(-25),
-                    CreatedBy = _createdBy
-                },
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = ruthAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "verified",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-20)),
-                    VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-18)),
-                    VerifiedBy = "demo-admission-officer",
-                    FileReference = $"documents/applicants/{ruthApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_ruth.pdf",
-                    FileSizeBytes = (long?)280100,
-                    ContentType = "application/pdf",
-                    Notes = "Official verified certified copy",
-                    CreatedAt = now.AddDays(-20),
-                    CreatedBy = _createdBy
-                },
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = timotiusAppId,
-                    DocumentType = "Birth Certificate",
-                    SubmissionStatus = "submitted",
-                    SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-60)),
-                    VerifiedDate = (DateOnly?)null,
-                    VerifiedBy = (string?)null,
-                    FileReference = $"documents/applicants/{timotiusApplicantId:N}/akta_kelahiran.pdf",
-                    FileName = "akta_kelahiran_timotius.pdf",
-                    FileSizeBytes = (long?)210400,
-                    ContentType = "application/pdf",
-                    Notes = "Archived due to withdrawal",
-                    CreatedAt = now.AddDays(-60),
-                    CreatedBy = _createdBy
-                }
-            };
+                });
+            }
+
+            // Daniel (submitted): 2 verified, 2 submitted
+            AddApplicantDoc(danielAppId, danielApplicantId, "Birth Certificate", "akta_kelahiran_daniel", "verified", 50, 48, "Verified against civil registry");
+            AddApplicantDoc(danielAppId, danielApplicantId, "Family Card (KK)", "kartu_keluarga_daniel", "verified", 50, 48, "Verified family registration");
+            AddApplicantDoc(danielAppId, danielApplicantId, "Previous Report Card", "rapor_sebelumnya_daniel", "submitted", 49, null, "Pending registrar verification");
+            AddApplicantDoc(danielAppId, danielApplicantId, "Immunization Record", "imunisasi_daniel", "submitted", 49, null, "Pending health record verification");
+
+            // Maria (under_review): 3 verified, 1 submitted
+            AddApplicantDoc(mariaAppId, mariaApplicantId, "Birth Certificate", "akta_kelahiran_maria", "verified", 40, 38, "Verified against civil registry");
+            AddApplicantDoc(mariaAppId, mariaApplicantId, "Family Card (KK)", "kartu_keluarga_maria", "verified", 40, 38, "Verified family registration");
+            AddApplicantDoc(mariaAppId, mariaApplicantId, "Previous Report Card", "rapor_sebelumnya_maria", "verified", 39, 37, "Academic transcript verified");
+            AddApplicantDoc(mariaAppId, mariaApplicantId, "Parent ID Copy", "ktp_wali_maria", "submitted", 39, null, "Under verification");
+
+            // Samuel (entrance_assessed): 3 verified
+            AddApplicantDoc(samuelAppId, samuelApplicantId, "Birth Certificate", "akta_kelahiran_samuel", "verified", 30, 28, "Verified against civil registry");
+            AddApplicantDoc(samuelAppId, samuelApplicantId, "Family Card (KK)", "kartu_keluarga_samuel", "verified", 30, 28, "Verified family registration");
+            AddApplicantDoc(samuelAppId, samuelApplicantId, "Previous Report Card", "rapor_sebelumnya_samuel", "verified", 30, 28, "Academic transcript verified");
+
+            // Esther (accepted awaiting fee): 4 verified, 1 submitted
+            AddApplicantDoc(estherAppId, estherApplicantId, "Birth Certificate", "akta_kelahiran_esther", "verified", 25, 22, "Verified");
+            AddApplicantDoc(estherAppId, estherApplicantId, "Family Card (KK)", "kartu_keluarga_esther", "verified", 25, 22, "Verified");
+            AddApplicantDoc(estherAppId, estherApplicantId, "Previous Report Card", "rapor_sebelumnya_esther", "verified", 25, 22, "Verified");
+            AddApplicantDoc(estherAppId, estherApplicantId, "Parent ID Copy", "ktp_wali_esther", "verified", 25, 22, "Verified");
+            AddApplicantDoc(estherAppId, estherApplicantId, "Immunization Record", "imunisasi_esther", "submitted", 24, null, "Pending health record check");
+
+            // Ruth (accepted fee paid): 5 verified
+            AddApplicantDoc(ruthAppId, ruthApplicantId, "Birth Certificate", "akta_kelahiran_ruth", "verified", 20, 18, "Official verified certified copy");
+            AddApplicantDoc(ruthAppId, ruthApplicantId, "Family Card (KK)", "kartu_keluarga_ruth", "verified", 20, 18, "Verified");
+            AddApplicantDoc(ruthAppId, ruthApplicantId, "Previous Report Card", "rapor_sebelumnya_ruth", "verified", 20, 18, "Verified");
+            AddApplicantDoc(ruthAppId, ruthApplicantId, "Parent ID Copy", "ktp_wali_ruth", "verified", 20, 18, "Verified");
+            AddApplicantDoc(ruthAppId, ruthApplicantId, "Immunization Record", "imunisasi_ruth", "verified", 20, 18, "Verified");
+
+            // Timotius (withdrawn): 1 submitted
+            AddApplicantDoc(timotiusAppId, timotiusApplicantId, "Birth Certificate", "akta_kelahiran_timotius", "submitted", 60, null, "Archived due to withdrawal");
 
             // Verified docs for the 3 flagship enrolled applicants
-            applicantDocs.Add(new
-            {
-                Id = Guid.NewGuid(),
-                ApplicationId = jonathanAppId,
-                DocumentType = "Birth Certificate",
-                SubmissionStatus = "verified",
-                SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-190)),
-                VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-185)),
-                VerifiedBy = "demo-admission-officer",
-                FileReference = $"documents/applicants/{jonathanApplicantId:N}/akta_kelahiran.pdf",
-                FileName = "akta_kelahiran_jonathan.pdf",
-                FileSizeBytes = (long?)256000,
-                ContentType = "application/pdf",
-                Notes = "Verified official birth certificate",
-                CreatedAt = now.AddDays(-190),
-                CreatedBy = _createdBy
-            });
-            applicantDocs.Add(new
-            {
-                Id = Guid.NewGuid(),
-                ApplicationId = graceAppId,
-                DocumentType = "Birth Certificate",
-                SubmissionStatus = "verified",
-                SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-190)),
-                VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-185)),
-                VerifiedBy = "demo-admission-officer",
-                FileReference = $"documents/applicants/{graceApplicantId:N}/akta_kelahiran.pdf",
-                FileName = "akta_kelahiran_grace.pdf",
-                FileSizeBytes = (long?)240000,
-                ContentType = "application/pdf",
-                Notes = "Verified official birth certificate",
-                CreatedAt = now.AddDays(-190),
-                CreatedBy = _createdBy
-            });
-            applicantDocs.Add(new
-            {
-                Id = Guid.NewGuid(),
-                ApplicationId = budiAppId,
-                DocumentType = "Birth Certificate",
-                SubmissionStatus = "verified",
-                SubmittedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-190)),
-                VerifiedDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-185)),
-                VerifiedBy = "demo-admission-officer",
-                FileReference = $"documents/applicants/{budiApplicantId:N}/akta_kelahiran.pdf",
-                FileName = "akta_kelahiran_budi.pdf",
-                FileSizeBytes = (long?)235000,
-                ContentType = "application/pdf",
-                Notes = "Verified official birth certificate",
-                CreatedAt = now.AddDays(-190),
-                CreatedBy = _createdBy
-            });
+            AddApplicantDoc(jonathanAppId, jonathanApplicantId, "Birth Certificate", "akta_kelahiran_jonathan", "verified", 190, 185, "Verified official birth certificate");
+            AddApplicantDoc(graceAppId, graceApplicantId, "Birth Certificate", "akta_kelahiran_grace", "verified", 190, 185, "Verified official birth certificate");
+            AddApplicantDoc(budiAppId, budiApplicantId, "Birth Certificate", "akta_kelahiran_budi", "verified", 190, 185, "Verified official birth certificate");
 
             await connection.ExecuteAsync(new CommandDefinition(
                 _insertApplicantDocSql, applicantDocs, transaction: transaction, cancellationToken: cancellationToken));
@@ -1322,7 +1236,7 @@ public sealed class StudentsDemoDataSeeder(
                     ApplicationId = studentApplicationMap[p.StudentId],
                     EnrollmentType = "initial",
                     EnrollmentDate = DateOnly.FromDateTime(baseDate.AddDays(-180)),
-                    InitialCampus = _campusMain,
+                    InitialCampus = p.Campus,
                     InitialLevel = p.SchoolLevel,
                     InitialAcademicYear = academicYearCode,
                     InitialProgram = $"ACE {p.SchoolLevel} Curriculum",
@@ -1560,7 +1474,7 @@ public sealed class StudentsDemoDataSeeder(
                 {
                     Id = Guid.NewGuid(),
                     StudentId = p.StudentId,
-                    Campus = _campusMain,
+                    Campus = p.Campus,
                     SchoolLevel = p.SchoolLevel,
                     Grade = p.Grade,
                     AcademicYear = academicYearCode,
@@ -1583,7 +1497,7 @@ public sealed class StudentsDemoDataSeeder(
                 _insertPlacementSql, placementsToInsert, transaction: transaction, cancellationToken: cancellationToken));
 
             // =========================================================================
-            // 12. SEED STUDENT STATUSES (students.student_statuses: active, 1 on_leave, 1 transferred)
+            // 12. SEED STUDENT STATUSES (students.student_statuses: 45 active, 1 on_leave, 1 withdrawn, 1 transferred_out)
             // =========================================================================
             var statusesToInsert = new List<object>
             {
@@ -1635,15 +1549,17 @@ public sealed class StudentsDemoDataSeeder(
             {
                 var effectiveDate = p.Status switch
                 {
-                    "on_leave" => DateOnly.FromDateTime(baseDate.AddDays(-30)),
-                    "transferred" => DateOnly.FromDateTime(baseDate.AddDays(-20)),
+                    "on_leave" => DateOnly.FromDateTime(baseDate.AddDays(-21)),
+                    "withdrawn" => DateOnly.FromDateTime(baseDate.AddDays(-18)),
+                    "transferred_out" => DateOnly.FromDateTime(baseDate.AddDays(-20)),
                     _ => DateOnly.FromDateTime(baseDate.AddDays(-180))
                 };
 
                 var reason = p.Status switch
                 {
-                    "on_leave" => "Medical leave approved for Semester 2",
-                    "transferred" => "Relocated with family to external institution",
+                    "on_leave" => "Medical leave approved for Semester 2 (return window expired)",
+                    "withdrawn" => "Family requested formal withdrawal from school",
+                    "transferred_out" => "Relocated with family to external institution",
                     _ => "Active academic enrollment"
                 };
 
@@ -1738,26 +1654,43 @@ public sealed class StudentsDemoDataSeeder(
                     {
                         Id = Guid.NewGuid(),
                         StudentId = p.StudentId,
-                        EventType = "status_change",
-                        EventDate = DateOnly.FromDateTime(baseDate.AddDays(-30)),
-                        Detail = "Student status changed from active to on_leave: Medical leave approved for Semester 2",
+                        EventType = "leave_of_absence",
+                        EventDate = DateOnly.FromDateTime(baseDate.AddDays(-21)),
+                        Detail = "Student status changed from active to on_leave: Medical leave approved for Semester 2 (return window expired)",
                         AuthorizedBy = "demo-academic-coordinator",
                         DecisionReference = $"LEAVE-{p.StudentNumber}",
                         IsCorrection = false,
                         CorrectsEntryId = (Guid?)null,
-                        CreatedAt = now.AddDays(-30),
+                        CreatedAt = now.AddDays(-21),
                         CreatedBy = _createdBy
                     });
                 }
-                else if (p.Status == "transferred")
+                else if (p.Status == "withdrawn")
                 {
                     historyEntries.Add(new
                     {
                         Id = Guid.NewGuid(),
                         StudentId = p.StudentId,
-                        EventType = "status_change",
+                        EventType = "withdrawal",
+                        EventDate = DateOnly.FromDateTime(baseDate.AddDays(-18)),
+                        Detail = "Student status changed from active to withdrawn: Family requested formal withdrawal from school",
+                        AuthorizedBy = "demo-academic-coordinator",
+                        DecisionReference = $"WDR-{p.StudentNumber}",
+                        IsCorrection = false,
+                        CorrectsEntryId = (Guid?)null,
+                        CreatedAt = now.AddDays(-18),
+                        CreatedBy = _createdBy
+                    });
+                }
+                else if (p.Status == "transferred_out")
+                {
+                    historyEntries.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        StudentId = p.StudentId,
+                        EventType = "transfer_out",
                         EventDate = DateOnly.FromDateTime(baseDate.AddDays(-20)),
-                        Detail = "Student status changed from active to transferred: Relocated with family to external institution",
+                        Detail = "Student status changed from active to transferred_out: Relocated with family to external institution",
                         AuthorizedBy = "demo-academic-coordinator",
                         DecisionReference = $"TRANS-{p.StudentNumber}",
                         IsCorrection = false,
@@ -1891,6 +1824,7 @@ public sealed class StudentsDemoDataSeeder(
         string Address,
         string Phone,
         string Email,
+        string Campus,
         string SchoolLevel,
         string Grade,
         string Homeroom,
@@ -1977,8 +1911,18 @@ public sealed class StudentsDemoDataSeeder(
             var birthYear = baseDate.Year - (5 + gradeNum);
             var dob = new DateOnly(birthYear, ((i * 3) % 12) + 1, ((i * 7) % 28) + 1);
 
-            // Exactly 1 on_leave and 1 transferred student
-            var status = i == 20 ? "on_leave" : (i == 35 ? "transferred" : "active");
+            // 8 active students on campus-east (4 ELC: 13..16, 4 JHLC: 27..30)
+            var isEastCampus = (i >= 13 && i <= 16) || (i >= 27 && i <= 30);
+            var campus = isEastCampus ? _campusEast : _campusMain;
+
+            // Exactly 1 expired on_leave and 2 lifecycle exits (1 withdrawn, 1 transferred_out) on campus-main
+            var status = i switch
+            {
+                20 => "on_leave",
+                34 => "withdrawn",
+                35 => "transferred_out",
+                _ => "active"
+            };
 
             var studentNum = $"26{gradeNum:D2}{((i % 5) + 2):D2}";
             var nik = $"34710{i + 10:D2}{dob:ddMMyy}{i:D4}";
@@ -2006,6 +1950,7 @@ public sealed class StudentsDemoDataSeeder(
                 Address: $"Jl. Kaliurang Km {((i % 15) + 1)} No. {i + 10}, Yogyakarta",
                 Phone: phone,
                 Email: email,
+                Campus: campus,
                 SchoolLevel: level,
                 Grade: grade,
                 Homeroom: homeroom,

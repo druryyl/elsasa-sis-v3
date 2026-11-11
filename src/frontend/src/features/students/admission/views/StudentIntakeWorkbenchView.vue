@@ -41,6 +41,7 @@ import {
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { ADMISSION_PERMISSIONS } from '../constants/permissions';
 import { ENROLLMENT_PERMISSIONS } from '../../enrollment/constants/permissions';
@@ -118,6 +119,7 @@ try {
 // ---------------------------------------------------------------------------
 const selectedPeriodId = ref<string>('');
 const selectedStatus = ref<string>('');
+const selectedDocStatus = ref<string>('');
 const selectedEntryLevel = ref<string>('');
 const searchInput = ref<string>('');
 const debouncedSearch = refDebounced(searchInput, 300);
@@ -125,10 +127,26 @@ const debouncedSearch = refDebounced(searchInput, 300);
 const statusFilterPills = [
   { label: 'All', value: '' },
   { label: 'Registered', value: 'registered' },
+  { label: 'Submitted', value: 'submitted' },
   { label: 'Under Review', value: 'under_review' },
+  { label: 'Entrance Assessed', value: 'entrance_assessed' },
+  { label: 'Waitlisted', value: 'waitlisted' },
+  { label: 'Accepted', value: 'accepted' },
   { label: 'Decided', value: 'decided' },
   { label: 'Withdrawn', value: 'withdrawn' },
 ] as const;
+
+useRouteQueryHydration((query) => {
+  const status = getQueryString(query, 'status');
+  if (status) {
+    selectedStatus.value = status;
+  }
+
+  const docStatus = getQueryString(query, 'docStatus');
+  if (docStatus) {
+    selectedDocStatus.value = docStatus;
+  }
+});
 
 const entryLevelOptions = [
   { label: 'All Entry Levels', value: '' },
@@ -203,7 +221,11 @@ const statusCounts = computed(() => {
   const counts: Record<string, number> = {
     all: applications.value?.length ?? 0,
     registered: 0,
+    submitted: 0,
     under_review: 0,
+    entrance_assessed: 0,
+    waitlisted: 0,
+    accepted: 0,
     decided: 0,
     withdrawn: 0,
   };
@@ -221,6 +243,7 @@ const statusCounts = computed(() => {
 function resetFilters() {
   selectedPeriodId.value = '';
   selectedStatus.value = '';
+  selectedDocStatus.value = '';
   selectedEntryLevel.value = '';
   searchInput.value = '';
 }
@@ -234,7 +257,7 @@ const activeDossierTab = ref<string>('info');
 
 function openDossier(applicationId: string) {
   selectedApplicationId.value = applicationId;
-  activeDossierTab.value = 'info';
+  activeDossierTab.value = selectedDocStatus.value === 'pending' ? 'documents' : 'info';
   lastEnrolledStudent.value = null;
   isDossierOpen.value = true;
 }
@@ -444,16 +467,34 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
           </button>
         </div>
 
-        <button
-          v-if="selectedPeriodId || selectedStatus || selectedEntryLevel || searchInput"
-          type="button"
-          class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
-          data-testid="reset-filters-button"
-          @click="resetFilters"
-        >
-          <RotateCcw class="w-3 h-3" />
-          <span>Reset Filters</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="selectedDocStatus"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+            data-testid="filter-doc-status-chip"
+          >
+            <span>Documents: {{ selectedDocStatus }}</span>
+            <button
+              type="button"
+              class="text-amber-600 hover:text-amber-900 cursor-pointer"
+              title="Clear document filter"
+              @click="selectedDocStatus = ''"
+            >
+              <XCircle class="w-3.5 h-3.5" />
+            </button>
+          </span>
+
+          <button
+            v-if="selectedPeriodId || selectedStatus || selectedDocStatus || selectedEntryLevel || searchInput"
+            type="button"
+            class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+            data-testid="reset-filters-button"
+            @click="resetFilters"
+          >
+            <RotateCcw class="w-3 h-3" />
+            <span>Reset Filters</span>
+          </button>
+        </div>
       </div>
 
       <!-- Row 2: Secondary Dropdown Filters & Search Input -->

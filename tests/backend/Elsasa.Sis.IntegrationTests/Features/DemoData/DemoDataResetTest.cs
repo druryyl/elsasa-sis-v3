@@ -22,6 +22,12 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
     public DemoDataResetTest(IntegrationTestWebAppFactory factory)
         : base(factory) { }
 
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        Factory.CurrentUser.Roles = ["SuperAdmin"];
+    }
+
     [SkippableFact]
     public async Task FullResetAndSeed_Should_PurgeAllDomains_And_SeedWithCorrectCounts()
     {
@@ -42,10 +48,10 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
         summary.Should().NotBeNull();
 
         // 2. Verify purge counts
-        summary!.PurgedSchemas.Should().Be(4, "should purge all 4 domains: operations, students, finance, academics");
+        summary!.PurgedSchemas.Should().Be(5, "should purge all 5 domains: academics, finance, students, teaching, operations");
 
         // 3. Verify seeded domains
-        summary.SeededDomains.Should().Be(6, "should seed all 6 domains");
+        summary.SeededDomains.Should().Be(8, "should seed all 8 domain seeder phases");
 
         // 4. Verify student counts (approximately 48 enrolled + 6 staged applicants)
         summary.TotalStudentsSeeded.Should().BeGreaterThan(40, "should seed ~48 enrolled students");
@@ -72,8 +78,8 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
         secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var secondSummary = await secondResponse.Content.ReadFromJsonAsync<DemoResetSummary>()!;
         secondSummary.Should().NotBeNull();
-        secondSummary!.PurgedSchemas.Should().Be(4, "second reset should also purge 4 schemas");
-        secondSummary.SeededDomains.Should().Be(6, "second reset should also seed 6 domains");
+        secondSummary!.PurgedSchemas.Should().Be(5, "second reset should also purge 5 schemas");
+        secondSummary.SeededDomains.Should().Be(8, "second reset should also seed 8 domains");
 
         // 10. Verify complete reset and seeding finishes in under 5 seconds (Criteria 1, bullet 6, MAJOR-002)
         summary.ElapsedMilliseconds.Should().BeLessThan(5000, "reset and seed should complete in under 5 seconds");
@@ -86,9 +92,9 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
                 (SELECT COUNT(*) FROM academics.transcripts tr WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = tr.student_id)) +
                 (SELECT COUNT(*) FROM academics.attendance_records att WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = att.student_id)) +
                 (SELECT COUNT(*) FROM academics.academic_participations ap WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = ap.student_id)) +
-                (SELECT COUNT(*) FROM finance.financial_obligations fo WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = fo.student_id)) +
+                (SELECT COUNT(*) FROM finance.financial_obligations fo WHERE fo.student_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = fo.student_id)) +
                 (SELECT COUNT(*) FROM finance.billing_documents bd WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = bd.student_id)) +
-                (SELECT COUNT(*) FROM finance.student_accounts sa WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = sa.student_id)) +
+                (SELECT COUNT(*) FROM finance.student_financial_accounts sfa WHERE sfa.student_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = sfa.student_id)) +
                 (SELECT COUNT(*) FROM students.student_guardian_relationships sgr WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = sgr.student_id)) +
                 (SELECT COUNT(*) FROM students.student_guardian_relationships sgr WHERE NOT EXISTS (SELECT 1 FROM students.guardians g WHERE g.id = sgr.guardian_id)) +
                 (SELECT COUNT(*) FROM students.administrative_placements ap WHERE NOT EXISTS (SELECT 1 FROM students.students s WHERE s.id = ap.student_id))
@@ -113,7 +119,7 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
 
         var cleanSummary = await cleanResponse.Content.ReadFromJsonAsync<DemoResetSummary>()!;
         cleanSummary.Should().NotBeNull();
-        cleanSummary!.PurgedSchemas.Should().Be(4, "clean-only should purge 4 schemas");
+        cleanSummary!.PurgedSchemas.Should().Be(5, "clean-only should purge 5 schemas");
         cleanSummary.SeededDomains.Should().Be(0, "clean-only should seed 0 domains");
 
         // Now execute full reset
@@ -123,8 +129,8 @@ public sealed class DemoDataResetTest : BaseIntegrationTest
 
         var fullSummary = await fullResponse.Content.ReadFromJsonAsync<DemoResetSummary>()!;
         fullSummary.Should().NotBeNull();
-        fullSummary!.PurgedSchemas.Should().Be(4, "full reset should purge 4 schemas");
-        fullSummary.SeededDomains.Should().Be(6, "full reset should seed 6 domains");
+        fullSummary!.PurgedSchemas.Should().Be(5, "full reset should purge 5 schemas");
+        fullSummary.SeededDomains.Should().Be(8, "full reset should seed 8 domains");
         fullSummary.TotalStudentsSeeded.Should().BeGreaterThan(40, "should have enrolled students after full reset");
         fullSummary.ElapsedMilliseconds.Should().BeLessThan(5000, "reset and seed should complete in under 5 seconds");
     }

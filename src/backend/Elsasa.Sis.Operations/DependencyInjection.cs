@@ -29,7 +29,9 @@ using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.GetSchoolClo
 using Elsasa.Sis.Operations.Features.CalendarPeriods.SchoolClosures.LiftSchoolClosure;
 using Elsasa.Sis.Operations.Services;
 using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Contracts.Kpis;
 using Elsasa.Sis.Operations.Features.DemoData;
+using Elsasa.Sis.Operations.Features.Kpis.GetOperationsKpiDashboard;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -96,6 +98,12 @@ public static class DependencyInjection
         // Cross-domain query services (ADR-001, ADR-003, TD-03)
         services.AddScoped<IOperationsCalendarQueryService, OperationsCalendarQueryService>();
         services.AddScoped<IOperationsModule, OperationsCalendarQueryService>();
+        services.AddScoped<IKpiPeriodResolver, KpiPeriodResolver>();
+
+        // KPI dashboard handler & executive summary provider (P2-S03)
+        services.AddScoped<GetOperationsKpiDashboardHandler>();
+        services.AddScoped<OperationsKpiSummaryProvider>();
+        services.AddScoped<IDomainKpiSummaryProvider, OperationsKpiSummaryProvider>();
 
         // Configure policy-based authorization requirements (ADR-009)
         services.AddAuthorization(options =>

@@ -40,6 +40,7 @@ import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { formatDisplayDate, formatDisplayDateTime } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import {
   useActiveInterventionsQuery,
   useAtRiskLearnersQuery,
@@ -105,6 +106,26 @@ const selectedGradeLevel = ref<string>('all');
 const activeTab = ref<'interventions' | 'atRisk'>('interventions');
 const searchFilter = ref('');
 const statusFilter = ref<string>('all');
+const onlyUnaddressed = ref<boolean>(false);
+
+useRouteQueryHydration((query) => {
+  const filter = getQueryString(query, 'filter');
+  const status = getQueryString(query, 'status');
+
+  if (filter === 'unaddressed') {
+    activeTab.value = 'atRisk';
+    onlyUnaddressed.value = true;
+  } else {
+    onlyUnaddressed.value = false;
+  }
+
+  if (status) {
+    statusFilter.value = status;
+    if (!filter) {
+      activeTab.value = 'interventions';
+    }
+  }
+});
 
 // Keep synchronized if context period changes
 watch(
@@ -196,6 +217,15 @@ const filteredInterventions = computed(() => {
 // Filtered At-Risk Learners
 const filteredAtRisk = computed(() => {
   let list = atRiskData.value ?? [];
+
+  if (onlyUnaddressed.value) {
+    const coveredStudentIds = new Set(
+      (interventionsData.value ?? [])
+        .filter((i) => i.status === 'planned' || i.status === 'in_progress')
+        .map((i) => i.studentId),
+    );
+    list = list.filter((l) => !coveredStudentIds.has(l.studentId));
+  }
 
   if (searchFilter.value.trim()) {
     const term = searchFilter.value.trim().toLowerCase();
@@ -590,14 +620,26 @@ function getTriggerBadge(trigger: TriggerType) {
           <TabPanel value="atRisk" data-testid="panel-at-risk-learners">
             <div class="space-y-4">
               <!-- Early Warning Explanation Banner -->
-              <div class="flex items-start gap-3 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200">
-                <AlertTriangle class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-                <div class="space-y-1">
-                  <span class="font-bold">Dynamic On-Demand Early-Warning Engine (TD-04, GAP-004)</span>
-                  <p class="text-amber-800 dark:text-amber-300">
-                    Students automatically surfaced by real-time academic indicators: failing assessment score below unit threshold, overdue unsubmitted assignments, attendance presence rate &lt; 75%, or prior non-good academic standing.
-                  </p>
+              <div class="flex items-start justify-between gap-3 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+                <div class="flex items-start gap-3">
+                  <AlertTriangle class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                  <div class="space-y-1">
+                    <span class="font-bold">Dynamic On-Demand Early-Warning Engine (TD-04, GAP-004)</span>
+                    <p class="text-amber-800 dark:text-amber-300">
+                      Students automatically surfaced by real-time academic indicators: failing assessment score below unit threshold, overdue unsubmitted assignments, attendance presence rate &lt; 75%, or prior non-good academic standing.
+                    </p>
+                  </div>
                 </div>
+                <Button
+                  v-if="onlyUnaddressed"
+                  label="Unaddressed Only (Show All)"
+                  size="small"
+                  severity="warn"
+                  variant="outlined"
+                  class="text-xs shrink-0"
+                  data-testid="btn-clear-unaddressed-filter"
+                  @click="onlyUnaddressed = false"
+                />
               </div>
 
               <!-- Loading State -->

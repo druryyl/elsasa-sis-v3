@@ -18,6 +18,7 @@ import {
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import {
   useLearningStructures,
   useLearningUnits,
@@ -35,6 +36,7 @@ import AssessmentPlannerModal from '../components/AssessmentPlannerModal.vue';
 import EvidenceIntakeModal from '../components/EvidenceIntakeModal.vue';
 import AssessmentScoringGrid, {
   type EnrolledStudent,
+  type ResultStatusFilterValue,
 } from '../components/AssessmentScoringGrid.vue';
 import AssessmentDetailDrawer from '../components/AssessmentDetailDrawer.vue';
 
@@ -78,9 +80,35 @@ const canEvaluate = computed(() =>
 // ---------------------------------------------------------------------------
 const unitSearch = ref('');
 const statusFilter = ref<string>('all');
+const resultStatusFilter = ref<ResultStatusFilterValue>('all');
 const typeFilter = ref<string>('all');
 const selectedUnitId = ref<string | null>(null);
 const selectedAssessmentId = ref<string | null>(null);
+
+const resultStatusValues = new Set<ResultStatusFilterValue>([
+  'provisional',
+  'approved',
+  'published',
+  'unscored',
+  'failing',
+]);
+const assessmentStatusValues = new Set(['all', 'planned', 'conducted', 'cancelled']);
+
+useRouteQueryHydration((query) => {
+  const unitId = getQueryString(query, 'unitId');
+  if (unitId) {
+    selectedUnitId.value = unitId;
+  }
+
+  const status = getQueryString(query, 'status')?.toLowerCase();
+  if (status) {
+    if (resultStatusValues.has(status as ResultStatusFilterValue)) {
+      resultStatusFilter.value = status as ResultStatusFilterValue;
+    } else if (assessmentStatusValues.has(status)) {
+      statusFilter.value = status;
+    }
+  }
+});
 
 const { data: structuresData } = useLearningStructures();
 
@@ -593,6 +621,7 @@ async function handleQuickConduct(assessment: Assessment) {
             :results="resultsList"
             :is-loading="isLoadingResults"
             :can-evaluate="canEvaluate"
+            :initial-status-filter="resultStatusFilter"
             @record-evidence="openEvidenceModalForStudent"
             @evaluated="onEvaluationSaved"
           />

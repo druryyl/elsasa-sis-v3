@@ -196,18 +196,61 @@ public sealed class FinanceTransactionsDemoDataSeeder(
         var pastoralStudentId = allStudentIds
             .FirstOrDefault(id => id != jonathanId && id != graceId && id != budiId);
 
-        // Assign each student a state
+        // Assign each student a state and deterministic aging bracket for unpaid S2 receivables
         var studentStates = new Dictionary<Guid, string>(totalStudents);
+        var studentAgingOffsetDays = new Dictionary<Guid, int>(totalStudents);
         var idx = 0;
+        var unpaidSeq = 0;
+        var partialSeq = 0;
         foreach (var sid in allStudentIds)
         {
-            if (sid == jonathanId) { studentStates[sid] = "unpaid"; continue; }
-            if (sid == graceId)    { studentStates[sid] = "overdue"; continue; }
-            if (sid == pastoralStudentId) { studentStates[sid] = "unpaid"; continue; }
+            if (sid == jonathanId)
+            {
+                studentStates[sid] = "unpaid";
+                studentAgingOffsetDays[sid] = 14; // Current
+                continue;
+            }
+            if (sid == graceId)
+            {
+                studentStates[sid] = "overdue";
+                studentAgingOffsetDays[sid] = -15; // 1-30 Days
+                continue;
+            }
+            if (sid == pastoralStudentId)
+            {
+                studentStates[sid] = "unpaid";
+                studentAgingOffsetDays[sid] = 14; // Current
+                continue;
+            }
 
-            if (idx < paidFullCount) { studentStates[sid] = "paid_full"; }
-            else if (idx < paidFullCount + partialCount) { studentStates[sid] = "partial"; }
-            else { studentStates[sid] = "unpaid"; }
+            if (idx < paidFullCount)
+            {
+                studentStates[sid] = "paid_full";
+            }
+            else if (idx < paidFullCount + partialCount)
+            {
+                studentStates[sid] = "partial";
+                studentAgingOffsetDays[sid] = partialSeq switch
+                {
+                    0 => -75, // 61-90 Days
+                    1 => -95, // 90+ Days
+                    _ => 14   // Current
+                };
+                partialSeq++;
+            }
+            else
+            {
+                studentStates[sid] = "unpaid";
+                studentAgingOffsetDays[sid] = unpaidSeq switch
+                {
+                    0 or 1 => 14,  // Current
+                    2 or 3 => -15, // 1-30 Days
+                    4 or 5 => -45, // 31-60 Days
+                    6 => -75,      // 61-90 Days
+                    _ => -95       // 90+ Days
+                };
+                unpaidSeq++;
+            }
             idx++;
         }
 
@@ -304,8 +347,7 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                 {
                     // Jonathan Pratama: Live cashier demonstration hook (SCR-FIN-02, TD-06).
                     // Exactly 1 month SPP obligation (IDR 1,500,000) for unpaid invoice INV-SEM2-0042.
-                    var monthAnchor = sem2Start;
-                    var dueDate = new DateOnly(monthAnchor.Year, monthAnchor.Month, Math.Min(10, DateTime.DaysInMonth(monthAnchor.Year, monthAnchor.Month)));
+                    var dueDate = baseDate.AddDays(studentAgingOffsetDays[sid]);
                     var oblId = Guid.NewGuid();
                     allObligations.Add((oblId, sid, accountId, $"SPP Bulanan - {dueDate:MMMM yyyy}", sppMonthlyAmount, dueDate, activePeriodId, sem2Label, "assessed"));
 
@@ -314,21 +356,28 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                 }
                 else
                 {
+                    var s2State = studentStates[sid];
+                    var hasCustomAging = studentAgingOffsetDays.TryGetValue(sid, out var agingOffset);
+
                     // For other students in S2: 5 months of SPP
                     for (int month = 1; month <= 5; month++)
                     {
                         var monthAnchor = sem2Start.AddMonths(month - 1);
-                        var dueDate = new DateOnly(monthAnchor.Year, monthAnchor.Month, Math.Min(10, DateTime.DaysInMonth(monthAnchor.Year, monthAnchor.Month)));
+                        var dueDate = hasCustomAging
+                            ? baseDate.AddDays(agingOffset + (month - 1))
+                            : new DateOnly(monthAnchor.Year, monthAnchor.Month, Math.Min(10, DateTime.DaysInMonth(monthAnchor.Year, monthAnchor.Month)));
                         var oblId = Guid.NewGuid();
-                        allObligations.Add((oblId, sid, accountId, $"SPP Bulanan - {dueDate:MMMM yyyy}", sppMonthlyAmount, dueDate, activePeriodId, sem2Label, "assessed"));
+                        allObligations.Add((oblId, sid, accountId, $"SPP Bulanan - {monthAnchor:MMMM yyyy}", sppMonthlyAmount, dueDate, activePeriodId, sem2Label, "assessed"));
 
                         var schedId = Guid.NewGuid();
                         allDueSchedules.Add((schedId, oblId, month, dueDate, sppMonthlyAmount, "pending"));
                     }
 
                     // PACE fee (S2)
+                    var paceDueDateS2 = hasCustomAging
+                        ? baseDate.AddDays(agingOffset)
+                        : new DateOnly(sem2Start.Year, sem2Start.Month, Math.Min(10, DateTime.DaysInMonth(sem2Start.Year, sem2Start.Month)));
                     var paceOblS2 = Guid.NewGuid();
-                    var paceDueDateS2 = new DateOnly(sem2Start.Year, sem2Start.Month, Math.Min(10, DateTime.DaysInMonth(sem2Start.Year, sem2Start.Month)));
                     allObligations.Add((paceOblS2, sid, accountId, $"Biaya Materi PACE - TP {operationsContext.AcademicYearCode.Replace("AY-", "")}", paceTotalFee, paceDueDateS2, activePeriodId, sem2Label, "assessed"));
 
                     var paceSchedS2 = Guid.NewGuid();
@@ -340,9 +389,9 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                         for (int month = 1; month <= 5; month++)
                         {
                             var monthAnchor = sem2Start.AddMonths(month - 1);
-                            var waiverDueDate = new DateOnly(monthAnchor.Year, monthAnchor.Month, Math.Min(10, DateTime.DaysInMonth(monthAnchor.Year, monthAnchor.Month)));
+                            var waiverDueDate = baseDate.AddDays(14);
                             var waiverOblId = Guid.NewGuid();
-                            allObligations.Add((waiverOblId, sid, accountId, $"Beasiswa Pastoral - Waiver SPP {waiverDueDate:MMMM yyyy}", -sppMonthlyAmount, waiverDueDate, activePeriodId, sem2Label, "assessed"));
+                            allObligations.Add((waiverOblId, sid, accountId, $"Beasiswa Pastoral - Waiver SPP {monthAnchor:MMMM yyyy}", -sppMonthlyAmount, waiverDueDate, activePeriodId, sem2Label, "assessed"));
 
                             var waiverSchedId = Guid.NewGuid();
                             allDueSchedules.Add((waiverSchedId, waiverOblId, month, waiverDueDate, -sppMonthlyAmount, "pending"));
@@ -351,56 +400,57 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                 }
             }
 
-            // ─── Insert obligations ────────────────────────────────────────
-            foreach (var (oblId, sid, accountId, desc, amt, dueDate, periodId, periodLabel, status) in allObligations)
+            // ─── Insert obligations (batched) ──────────────────────────────
+            var obligationRows = allObligations.Select(o =>
             {
-                var ruleId = ResolveChargeRule(desc, status, tuitionRuleId, facilityRuleId, paceMaterialRuleId);
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertObligationSql,
-                    new
-                    {
-                        Id = oblId,
-                        ObligationNumber = $"OBL-{periodId.ToString()[..8].ToUpperInvariant()}-{oblId:N}",
-                        StudentAccountId = accountId,
-                        StudentId = sid,
-                        ChargeRuleId = ruleId,
-                        PolicyId = policyId,
-                        Description = desc,
-                        ChargeType = ResolveChargeType(desc),
-                        IsMandatory = true,
-                        OriginalAmount = amt,
-                        IssueDate = dueDate,
-                        DueDate = dueDate,
-                        AcademicPeriodId = periodId,
-                        AcademicPeriodLabel = periodLabel,
-                        Status = status,
-                        AuthorizedBy = _createdBy,
-                        CreatedAt = now,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
-            }
+                var ruleId = ResolveChargeRule(o.Description, o.Status, tuitionRuleId, facilityRuleId, paceMaterialRuleId);
+                return new
+                {
+                    Id = o.Id,
+                    ObligationNumber = $"OBL-{o.PeriodId.ToString()[..8].ToUpperInvariant()}-{o.Id:N}",
+                    StudentAccountId = o.AccountId,
+                    StudentId = o.StudentId,
+                    ChargeRuleId = ruleId,
+                    PolicyId = policyId,
+                    Description = o.Description,
+                    ChargeType = ResolveChargeType(o.Description),
+                    IsMandatory = true,
+                    OriginalAmount = o.Amount,
+                    IssueDate = o.DueDate,
+                    DueDate = o.DueDate,
+                    AcademicPeriodId = o.PeriodId,
+                    AcademicPeriodLabel = o.PeriodLabel,
+                    Status = o.Status,
+                    AuthorizedBy = _createdBy,
+                    CreatedAt = now,
+                    CreatedBy = _createdBy
+                };
+            }).ToList();
 
-            // ─── Insert due schedules ───────────────────────────────────────
-            foreach (var (schedId, oblId, seq, schedDueDate, schedAmt, schedStatus) in allDueSchedules)
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertObligationSql,
+                obligationRows,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+            // ─── Insert due schedules (batched) ────────────────────────────
+            var dueScheduleRows = allDueSchedules.Select(s => new
             {
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertDueScheduleSql,
-                    new
-                    {
-                        Id = schedId,
-                        ObligationId = oblId,
-                        InstallmentSequence = seq,
-                        DueDate = schedDueDate,
-                        ScheduledAmount = schedAmt,
-                        Status = schedStatus,
-                        CreatedAt = now,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
-            }
+                Id = s.Id,
+                ObligationId = s.ObligationId,
+                InstallmentSequence = s.InstallmentSequence,
+                DueDate = s.DueDate,
+                ScheduledAmount = s.ScheduledAmount,
+                Status = s.Status,
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            }).ToList();
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertDueScheduleSql,
+                dueScheduleRows,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
 
             // ─── Insert payers ─────────────────────────────────────────────
             var payerById = new Dictionary<Guid, Guid>(allStudentIds.Count);
@@ -560,6 +610,9 @@ public sealed class FinanceTransactionsDemoDataSeeder(
 
             // ─── S2 billing documents (active) ─────────────────────────────
             int s2InvoiceSeq = 1;
+            int unallocatedCashCount = 0;
+            int submittedPaymentCount = 0;
+
             foreach (var (sid, s2Obss) in s2ObligationsByStudent.OrderBy(kv => kv.Key))
             {
                 var accountId = accountById[sid];
@@ -623,7 +676,7 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                         BillingPeriodStart = sem2Start,
                         BillingPeriodEnd = sem2End,
                         IssueDate = sem2Start,
-                        PaymentDueDate = sem2Start.AddDays(14),
+                        PaymentDueDate = studentAgingOffsetDays.TryGetValue(sid, out var offset) ? baseDate.AddDays(offset) : sem2Start.AddDays(14),
                         TotalBilledAmount = totalBilled,
                         DeliveryStatus = deliveryStatus,
                         SentAt = (DateTimeOffset?)null,
@@ -692,13 +745,20 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                         transaction: transaction,
                         cancellationToken: cancellationToken));
 
+                    // Leave 2 confirmed payments (first 2 partial students) with unallocated cash balance (500,000 IDR unallocated)
+                    long remaining = paidAmount.Value;
+                    if (state == "partial" && unallocatedCashCount < 2 && remaining > 500_000L)
+                    {
+                        remaining -= 500_000L;
+                        unallocatedCashCount++;
+                    }
+
                     // Allocate pro-rata to obligations
                     var sortedObss = s2Obss
                         .OrderBy(o => o.DueDate)
                         .ThenByDescending(o => o.Amount < 0 ? 1 : 0)
                         .ToList();
 
-                    long remaining = paidAmount.Value;
                     foreach (var obl in sortedObss)
                     {
                         if (remaining <= 0) break;
@@ -726,6 +786,39 @@ public sealed class FinanceTransactionsDemoDataSeeder(
                             cancellationToken: cancellationToken));
                         remaining -= allocAmount;
                     }
+                }
+                else if (state == "unpaid" && !isJonathan && sid != pastoralStudentId && submittedPaymentCount < 3)
+                {
+                    // Seed 3 submitted (unconfirmed) payments awaiting finance verification (FIN_UNVERIFIED_PAYMENTS)
+                    var payId = Guid.NewGuid();
+                    paymentCount++;
+                    var payNumber = PaymentNumberGenerator.Format(paymentCount);
+                    var subDate = baseDate.AddDays(-5 + submittedPaymentCount);
+                    submittedPaymentCount++;
+
+                    await connection.ExecuteAsync(new CommandDefinition(
+                        _insertPaymentSql,
+                        new
+                        {
+                            Id = payId,
+                            PaymentNumber = payNumber,
+                            StudentAccountId = accountId,
+                            StudentId = sid,
+                            PayerId = payerById[sid],
+                            PaymentAmount = sppMonthlyAmount,
+                            PaymentMethod = "bank_transfer",
+                            ExternalReference = $"TRF-PEND-{submittedPaymentCount:D3}",
+                            PaymentDate = subDate,
+                            ConfirmationStatus = "submitted",
+                            ConfirmationDate = (DateTimeOffset?)null,
+                            ConfirmedBy = (string?)null,
+                            ReceiptNumber = (string?)null,
+                            ReceiptIssuedAt = (DateTimeOffset?)null,
+                            CreatedAt = now,
+                            CreatedBy = _createdBy
+                        },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
                 }
             }
 

@@ -18,6 +18,7 @@ public sealed class OperationsDemoDataSeeder(
 {
     private const string _createdBy = "demo-data-seeder";
     private const string _campusMain = "campus-main";
+    private const string _campusEast = "campus-east";
 
     private const string _insertAcademicYearSql = """
         INSERT INTO operations.academic_years (
@@ -125,9 +126,11 @@ public sealed class OperationsDemoDataSeeder(
         var sem2Id = Guid.NewGuid();
         var sem3Id = Guid.NewGuid();
         var schoolCalendarId = Guid.NewGuid();
+        var eastCalendarId = Guid.NewGuid();
         var closure1Id = Guid.NewGuid();
         var closure2Id = Guid.NewGuid();
         var amendmentId = Guid.NewGuid();
+        var amendment2Id = Guid.NewGuid();
 
         var now = DateTimeOffset.UtcNow;
         var academicYearCode = "AY-2026-2027";
@@ -224,45 +227,67 @@ public sealed class OperationsDemoDataSeeder(
                 transaction: transaction,
                 cancellationToken: cancellationToken));
 
-            // 3. School Calendar
+            // 3. School Calendars (Main + East)
             await connection.ExecuteAsync(new CommandDefinition(
                 _insertSchoolCalendarSql,
-                new
+                new[]
                 {
-                    Id = schoolCalendarId,
-                    AcademicYearId = academicYearId,
-                    Name = "Kalender Hagios School of Life 2026/2027 - Campus Main",
-                    ScopeType = "campus",
-                    ScopeReference = "campus-main",
-                    Version = "1.0",
-                    Status = "approved",
-                    PublicationStatus = "published",
-                    PublishedAt = now,
-                    PublishedBy = "Calendar Authority",
-                    ApprovedBy = "Kepala Sekolah",
-                    ApprovedDate = academicYearStartDate,
-                    Notes = "Main campus school calendar for AY 2026/2027",
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
+                    new
+                    {
+                        Id = schoolCalendarId,
+                        AcademicYearId = academicYearId,
+                        Name = "Kalender Hagios School of Life 2026/2027 - Campus Main",
+                        ScopeType = "campus",
+                        ScopeReference = _campusMain,
+                        Version = "1.1",
+                        Status = "approved",
+                        PublicationStatus = "published",
+                        PublishedAt = now,
+                        PublishedBy = "Calendar Authority",
+                        ApprovedBy = "Kepala Sekolah",
+                        ApprovedDate = academicYearStartDate,
+                        Notes = "Main campus school calendar for AY 2026/2027",
+                        CreatedAt = now,
+                        CreatedBy = _createdBy
+                    },
+                    new
+                    {
+                        Id = eastCalendarId,
+                        AcademicYearId = academicYearId,
+                        Name = "CAL-2026-EAST - Kalender Hagios School of Life 2026/2027 - Campus East",
+                        ScopeType = "campus",
+                        ScopeReference = _campusEast,
+                        Version = "1.0",
+                        Status = "approved",
+                        PublicationStatus = "published",
+                        PublishedAt = now,
+                        PublishedBy = "Calendar Authority",
+                        ApprovedBy = "Kepala Sekolah",
+                        ApprovedDate = academicYearStartDate,
+                        Notes = "CAL-2026-EAST: East campus published school calendar for AY 2026/2027",
+                        CreatedAt = now,
+                        CreatedBy = _createdBy
+                    }
                 },
                 transaction: transaction,
                 cancellationToken: cancellationToken));
 
-            // 4. Calendar Entries - Weekday instructional days across Sem 1 and Sem 2
-            // Semester 1 instructional days (sample: first 2 weeks)
-            for (int week = 0; week < 10; week++)
-            {
-                for (int day = 1; day <= 5; day++) // Mon-Fri
-                {
-                    var entryDate = sem1StartDate.AddDays(week * 7 + day - 1);
-                    if (entryDate > sem1EndDate) break;
+            // 4. Calendar Entries - Weekday instructional days across Sem 1 and Sem 2 (batched)
+            var calendarEntries = new List<object>();
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertCalendarEntrySql,
-                        new
+            foreach (var calId in new[] { schoolCalendarId, eastCalendarId })
+            {
+                for (int week = 0; week < 10; week++)
+                {
+                    for (int day = 1; day <= 5; day++) // Mon-Fri
+                    {
+                        var entryDate = sem1StartDate.AddDays(week * 7 + day - 1);
+                        if (entryDate > sem1EndDate) break;
+
+                        calendarEntries.Add(new
                         {
                             Id = Guid.NewGuid(),
-                            CalendarId = schoolCalendarId,
+                            CalendarId = calId,
                             EntryDate = entryDate,
                             EndDate = (DateOnly?)null,
                             Designation = "instructional_day",
@@ -273,26 +298,21 @@ public sealed class OperationsDemoDataSeeder(
                             AppliesTo = "All",
                             CreatedAt = now,
                             CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                        });
+                    }
                 }
-            }
 
-            // Semester 2 instructional days (sample: first 4 weeks to cover Today + future)
-            for (int week = 0; week < 8; week++)
-            {
-                for (int day = 1; day <= 5; day++) // Mon-Fri
+                for (int week = 0; week < 8; week++)
                 {
-                    var entryDate = sem2StartDate.AddDays(week * 7 + day - 1);
-                    if (entryDate > sem2EndDate) break;
+                    for (int day = 1; day <= 5; day++) // Mon-Fri
+                    {
+                        var entryDate = sem2StartDate.AddDays(week * 7 + day - 1);
+                        if (entryDate > sem2EndDate) break;
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertCalendarEntrySql,
-                        new
+                        calendarEntries.Add(new
                         {
                             Id = Guid.NewGuid(),
-                            CalendarId = schoolCalendarId,
+                            CalendarId = calId,
                             EntryDate = entryDate,
                             EndDate = (DateOnly?)null,
                             Designation = "instructional_day",
@@ -303,11 +323,16 @@ public sealed class OperationsDemoDataSeeder(
                             AppliesTo = "All",
                             CreatedAt = now,
                             CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                        });
+                    }
                 }
             }
+
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertCalendarEntrySql,
+                calendarEntries,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
 
             // 5. School Closures
             // Scheduled mid-term retreat closure (10-8 days before Today)
@@ -407,28 +432,51 @@ public sealed class OperationsDemoDataSeeder(
                 transaction: transaction,
                 cancellationToken: cancellationToken));
 
-            // 6. Calendar Amendment for the emergency closure
+            // 6. Calendar Amendments: reviewed emergency closure amendment + unreviewed enrichment amendment
             await connection.ExecuteAsync(new CommandDefinition(
                 _insertCalendarAmendmentSql,
-                new
+                new[]
                 {
-                    Id = amendmentId,
-                    CalendarId = schoolCalendarId,
-                    AmendmentNumber = "AMD-CAL-2026-001",
-                    FromVersion = "1.0",
-                    ToVersion = "1.1",
-                    AmendmentType = "closure_addition",
-                    AffectedEntryId = (Guid?)null,
-                    ChangeSummary = "Added emergency closure entry for severe flooding on " + emergencyDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    PreviousValue = (string?)null,
-                    NewValue = (string?)null,
-                    Reason = "Emergency weather event requiring immediate calendar amendment",
-                    EffectiveDate = emergencyDate,
-                    AuthorizedBy = "Kepala Sekolah",
-                    AuthorizedDate = emergencyDate.AddDays(-1),
-                    DownstreamImpactReviewed = true,
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
+                    new
+                    {
+                        Id = amendmentId,
+                        CalendarId = schoolCalendarId,
+                        AmendmentNumber = "AMD-CAL-2026-001",
+                        FromVersion = "1.0",
+                        ToVersion = "1.1",
+                        AmendmentType = "closure_addition",
+                        AffectedEntryId = (Guid?)null,
+                        ChangeSummary = "Added emergency closure entry for severe flooding on " + emergencyDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        PreviousValue = (string?)null,
+                        NewValue = (string?)null,
+                        Reason = "Emergency weather event requiring immediate calendar amendment",
+                        EffectiveDate = emergencyDate,
+                        AuthorizedBy = "Kepala Sekolah",
+                        AuthorizedDate = emergencyDate.AddDays(-1),
+                        DownstreamImpactReviewed = true,
+                        CreatedAt = now,
+                        CreatedBy = _createdBy
+                    },
+                    new
+                    {
+                        Id = amendment2Id,
+                        CalendarId = schoolCalendarId,
+                        AmendmentNumber = "AMD-CAL-2026-002",
+                        FromVersion = "1.1",
+                        ToVersion = "1.2",
+                        AmendmentType = "add_entry",
+                        AffectedEntryId = (Guid?)null,
+                        ChangeSummary = "Added mid-semester STEM enrichment showcase week pending downstream timetable & assessment impact review",
+                        PreviousValue = (string?)"Standard Instructional Week",
+                        NewValue = (string?)"STEM Enrichment Showcase Week",
+                        Reason = "Curriculum enrichment schedule adjustment awaiting downstream impact review",
+                        EffectiveDate = today.AddDays(14),
+                        AuthorizedBy = "Kepala Sekolah",
+                        AuthorizedDate = today.AddDays(-1),
+                        DownstreamImpactReviewed = false,
+                        CreatedAt = now,
+                        CreatedBy = _createdBy
+                    }
                 },
                 transaction: transaction,
                 cancellationToken: cancellationToken));

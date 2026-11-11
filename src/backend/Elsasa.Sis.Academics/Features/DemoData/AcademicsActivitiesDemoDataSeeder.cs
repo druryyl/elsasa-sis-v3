@@ -2,13 +2,16 @@ namespace Elsasa.Sis.Academics.Features.DemoData;
 
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Dapper;
 using Elsasa.Sis.Contracts.Academics;
 using Elsasa.Sis.Contracts.DemoData;
 using Elsasa.Sis.Contracts.Operations;
 using Elsasa.Sis.Shared.Database;
+using Microsoft.Data.SqlClient;
 
 /// <summary>
 /// Autonomous seeder for the Academics domain activities (ADR-002, ADR-004, TD-02, TD-05, OQ-003, OQ-009, OQ-010).
@@ -369,19 +372,24 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                     cancellationToken: cancellationToken)))
                 .ToDictionary(u => u.Id);
 
-            var studentsList = new List<(Guid Id, string FullName, string? GovId)>();
+            var studentsList = new List<(Guid Id, string FullName, string? GovId, string CurrentStatus)>();
             var studentLookup = new Dictionary<Guid, (string Name, string? Nisn)>();
+            var activeStudentSet = new HashSet<Guid>();
             try
             {
-                var students = await connection.QueryAsync<(Guid Id, string FullName, string? GovId)>(
+                var students = await connection.QueryAsync<(Guid Id, string FullName, string? GovId, string CurrentStatus)>(
                     new CommandDefinition(
-                        "SELECT id, full_name, government_id_number FROM students.students",
+                        "SELECT id, full_name, government_id_number, current_status FROM students.students",
                         transaction: transaction,
                         cancellationToken: cancellationToken));
                 foreach (var s in students)
                 {
                     studentsList.Add(s);
                     studentLookup[s.Id] = (s.FullName, s.GovId);
+                    if (string.Equals(s.CurrentStatus, "active", StringComparison.OrdinalIgnoreCase))
+                    {
+                        activeStudentSet.Add(s.Id);
+                    }
                 }
             }
             catch
@@ -395,16 +403,51 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
             var budiStudent = studentsList.FirstOrDefault(s => s.FullName.Contains("Budi", StringComparison.OrdinalIgnoreCase));
             var budiStudentId = budiStudent != default && budiStudent.Id != Guid.Empty ? budiStudent.Id : BudiSantosoStudentId;
 
-            var timotiusStudent = studentsList.FirstOrDefault(s => s.FullName.Contains("Timotius", StringComparison.OrdinalIgnoreCase));
-            var timotiusId = timotiusStudent != default && timotiusStudent.Id != Guid.Empty ? timotiusStudent.Id : TimotiusStudentId;
+            var timotiusId = TimotiusStudentId;
 
-            studentLookup[rinaId] = ("Rina Kusuma", "0061234567");
-            studentLookup[budiStudentId] = ("Budi Santoso", "0071234567");
+            if (!studentLookup.ContainsKey(rinaId)) studentLookup[rinaId] = ("Rina Kusuma", "0061234567");
+            if (!studentLookup.ContainsKey(budiStudentId)) studentLookup[budiStudentId] = ("Budi Santoso", "0071234567");
             studentLookup[timotiusId] = ("Timotius", "0051234567");
 
+            // Enrolled students only (48 students) so there are 0 FK orphans
             var allTargetStudentIds = enrolledStudentIds.ToList();
-            if (!allTargetStudentIds.Contains(rinaId)) allTargetStudentIds.Add(rinaId);
-            if (!allTargetStudentIds.Contains(timotiusId)) allTargetStudentIds.Add(timotiusId);
+            var activeStudentIds = allTargetStudentIds
+                .Where(id => activeStudentSet.Count == 0 || activeStudentSet.Contains(id))
+                .Take(45)
+                .ToList();
+
+            // Select campus-east active students if available so at-risk/standing spans campuses
+            var eastCampusStudentIds = new HashSet<Guid>();
+            try
+            {
+                var eastIds = await connection.QueryAsync<Guid>(
+                    new CommandDefinition(
+                        "SELECT student_id FROM students.administrative_placements WHERE is_current = 1 AND campus = 'campus-east'",
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+                foreach (var eid in eastIds) eastCampusStudentIds.Add(eid);
+            }
+            catch
+            {
+                // Ignore if cross-schema table unavailable
+            }
+
+            var nonFlagshipActiveIds = activeStudentIds
+                .Where(id => id != jonathanId && id != graceId && id != budiStudentId && id != rinaId)
+                .ToList();
+
+            // Pick 5 unaddressed at-risk learners (including 1 on campus-east if present)
+            var eastCandidate = nonFlagshipActiveIds.FirstOrDefault(id => eastCampusStudentIds.Contains(id));
+            var orderedNonFlagship = eastCandidate != Guid.Empty
+                ? new[] { eastCandidate }.Concat(nonFlagshipActiveIds.Where(id => id != eastCandidate)).ToList()
+                : nonFlagshipActiveIds;
+
+            var unaddressedConditionalIds = orderedNonFlagship.Take(3).ToList();
+            var unaddressedNotInGoodStandingIds = orderedNonFlagship.Skip(3).Take(2).ToList();
+            var s1ConditionalImprovedIds = orderedNonFlagship.Skip(5).Take(1).ToList();
+            var s1NotInGoodImprovedIds = orderedNonFlagship.Skip(6).Take(1).ToList();
+            var chronicAbsenteeismIds = new HashSet<Guid>(
+                unaddressedNotInGoodStandingIds.Concat(unaddressedConditionalIds.Take(1)));
 
             var mathUnits = paceUnitIds
                 .Where(id => unitLookup.TryGetValue(id, out var u) && (u.Code.StartsWith("M", StringComparison.OrdinalIgnoreCase) || u.Name.Contains("Math", StringComparison.OrdinalIgnoreCase)))
@@ -449,6 +492,7 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
             // ====================================================================
             var sem1ActivityIds = new List<Guid>();
             var sem2ActivityIds = new List<Guid>();
+            var learningActivityRows = new List<object>(60);
 
             // S1: Create 30 learning activities spread across the semester
             for (int i = 0; i < 30; i++)
@@ -457,22 +501,17 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 var activityId = Guid.NewGuid();
                 sem1ActivityIds.Add(activityId);
 
-                var activityDate = sem1StartDate.AddDays((i * 5) % 100);
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertLearningActivitySql,
-                    new
-                    {
-                        Id = activityId,
-                        LearningUnitId = unitId,
-                        ActivityType = "lesson",
-                        Title = $"S1 Lesson {i + 1}",
-                        ActivityDate = activityDate,
-                        Status = "conducted",
-                        IsAttendanceRequired = true,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
+                learningActivityRows.Add(new
+                {
+                    Id = activityId,
+                    LearningUnitId = unitId,
+                    ActivityType = "lesson",
+                    Title = $"S1 Lesson {i + 1}",
+                    ActivityDate = sem1StartDate.AddDays((i * 5) % 100),
+                    Status = "conducted",
+                    IsAttendanceRequired = true,
+                    CreatedBy = _createdBy
+                });
             }
 
             // S2: Create 30 learning activities spread across the semester
@@ -482,32 +521,34 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 var activityId = Guid.NewGuid();
                 sem2ActivityIds.Add(activityId);
 
-                var activityDate = sem2StartDate.AddDays((i * 5) % 100);
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertLearningActivitySql,
-                    new
-                    {
-                        Id = activityId,
-                        LearningUnitId = unitId,
-                        ActivityType = "lesson",
-                        Title = $"S2 Lesson {i + 1}",
-                        ActivityDate = activityDate,
-                        Status = "conducted",
-                        IsAttendanceRequired = true,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
+                learningActivityRows.Add(new
+                {
+                    Id = activityId,
+                    LearningUnitId = unitId,
+                    ActivityType = "lesson",
+                    Title = $"S2 Lesson {i + 1}",
+                    ActivityDate = sem2StartDate.AddDays((i * 5) % 28),
+                    Status = "conducted",
+                    IsAttendanceRequired = true,
+                    CreatedBy = _createdBy
+                });
             }
 
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertLearningActivitySql,
+                learningActivityRows,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
             // ====================================================================
-            // 2. Create academic participations for all ~48 enrolled students
+            // 2. Create academic participations for all 48 enrolled students (batched)
             //    S1: completed participations (historical)
             //    S2: in_progress participations (active)
             // ====================================================================
-            var allParticipationIds = new Dictionary<Guid, List<Guid>>(); // studentId -> [participationIds]
+            var allParticipationIds = new Dictionary<Guid, List<Guid>>();
             var allS1ParticipationUnitLinks = new Dictionary<Guid, List<(Guid participationId, Guid unitId)>>();
             var allS2ParticipationUnitLinks = new Dictionary<Guid, List<(Guid participationId, Guid unitId)>>();
+            var participationRows = new List<ParticipationBatchRow>(allTargetStudentIds.Count * paceUnitIds.Count * 2);
 
             foreach (var studentId in allTargetStudentIds)
             {
@@ -515,6 +556,7 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 var s2ParticipationIds = new List<Guid>();
                 var s1Links = new List<(Guid participationId, Guid unitId)>();
                 var s2Links = new List<(Guid participationId, Guid unitId)>();
+                var sectionLabel = GetSectionLabel(studentId, allTargetStudentIds, random, rinaId, budiStudentId, timotiusId);
 
                 // S1: Complete all 30 PACE units as completed participations
                 for (int i = 0; i < paceUnitIds.Count; i++)
@@ -527,27 +569,20 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                     var endDate = sem1EndDate.AddDays(-random.Next(0, 15));
                     if (endDate < startDate) endDate = startDate.AddDays(1);
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertParticipationSql,
-                        new
-                        {
-                            Id = participationId,
-                            StudentId = studentId,
-                            LearningUnitId = paceUnitIds[i],
-                            AcademicPeriodId = sem1Id,
-                            AcademicPeriodLabel = sem1Label,
-                            ParticipationType = "standard",
-                            AttemptNumber = 1,
-                            Source = "assigned",
-                            SectionLabel = GetSectionLabel(studentId, allTargetStudentIds, random, rinaId, budiStudentId, timotiusId),
-                            Status = "completed",
-                            StartDate = startDate,
-                            EndDate = endDate,
-                            CompletionDate = endDate,
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    participationRows.Add(new ParticipationBatchRow(
+                        Id: participationId,
+                        StudentId: studentId,
+                        LearningUnitId: paceUnitIds[i],
+                        AcademicPeriodId: sem1Id,
+                        AcademicPeriodLabel: sem1Label,
+                        ParticipationType: "standard",
+                        AttemptNumber: 1,
+                        Source: "assigned",
+                        SectionLabel: sectionLabel,
+                        Status: "completed",
+                        StartDate: startDate,
+                        EndDate: endDate,
+                        CompletionDate: endDate));
                 }
 
                 // S2: In-progress participations in all 30 PACE units
@@ -557,27 +592,20 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                     s2ParticipationIds.Add(participationId);
                     s2Links.Add((participationId, paceUnitIds[i]));
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertParticipationSql,
-                        new
-                        {
-                            Id = participationId,
-                            StudentId = studentId,
-                            LearningUnitId = paceUnitIds[i],
-                            AcademicPeriodId = sem2Id,
-                            AcademicPeriodLabel = sem2Label,
-                            ParticipationType = "standard",
-                            AttemptNumber = 1,
-                            Source = "assigned",
-                            SectionLabel = GetSectionLabel(studentId, allTargetStudentIds, random, rinaId, budiStudentId, timotiusId),
-                            Status = "in_progress",
-                            StartDate = sem2StartDate,
-                            EndDate = (DateOnly?)null,
-                            CompletionDate = (DateOnly?)null,
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    participationRows.Add(new ParticipationBatchRow(
+                        Id: participationId,
+                        StudentId: studentId,
+                        LearningUnitId: paceUnitIds[i],
+                        AcademicPeriodId: sem2Id,
+                        AcademicPeriodLabel: sem2Label,
+                        ParticipationType: "standard",
+                        AttemptNumber: 1,
+                        Source: "assigned",
+                        SectionLabel: sectionLabel,
+                        Status: "in_progress",
+                        StartDate: sem2StartDate,
+                        EndDate: null,
+                        CompletionDate: null));
                 }
 
                 allParticipationIds[studentId] = s1ParticipationIds.Concat(s2ParticipationIds).ToList();
@@ -586,110 +614,98 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 participationsCreated += s1ParticipationIds.Count + s2ParticipationIds.Count;
             }
 
+            await BatchInsertAcademicParticipationsAsync(connection, transaction, participationRows, _createdBy, cancellationToken);
+
             // ====================================================================
-            // 3. Create ~1,200 attendance records across S1 and S2
-            //    S1: ~700 records, S2: ~500 records
+            // 3. Create ~1,200 attendance records across S1 and S2 (batched)
+            //    S1: 700 records, S2: 499 records (with 3 chronic absenteeism < 80%)
             // ====================================================================
-            await CreateAttendanceRecordsAsync(
+            attendanceRecordsCreated += await CreateS1AttendanceRecordsAsync(
                 connection, transaction, sem1ActivityIds, allTargetStudentIds,
-                jonathanId,
-                sem1StartDate, now, _createdBy, random, targetCount: 700,
+                jonathanId, sem1StartDate, _createdBy, random, targetCount: 700,
                 cancellationToken);
-            attendanceRecordsCreated += 700;
 
-            await CreateAttendanceRecordsAsync(
-                connection, transaction, sem2ActivityIds, allTargetStudentIds,
-                jonathanId,
-                sem2StartDate, now, _createdBy, random, targetCount: 500,
+            attendanceRecordsCreated += await CreateS2AttendanceRecordsAsync(
+                connection, transaction, sem2ActivityIds, activeStudentIds,
+                jonathanId, chronicAbsenteeismIds, sem2StartDate, _createdBy, random,
                 cancellationToken);
-            attendanceRecordsCreated += 500;
 
             // ====================================================================
-            // 4. Create PACE test assessments and academic results
+            // 4. Create PACE test assessments and academic results (batched, < 200 total)
+            //    S1: 112 certified published results (6 for flagships+Rina, 2 for others)
+            //    S2: 51 results (3 provisional with is_final=1, 6 approved, 41 published, + Grace Attempt 1)
             // ====================================================================
             var allS1Results = new Dictionary<Guid, List<(Guid resultId, Guid assessmentId, Guid unitId, decimal score, string gradeLetter, string gradeLabel)>>();
+            var assessmentRows = new List<object>(170);
+            var resultRows = new List<object>(170);
+            var evidenceRows = new List<object>(120);
 
-            // --- S1: Certified results (approved & published) for all students ---
             foreach (var studentId in allTargetStudentIds)
             {
                 var s1Links = allS1ParticipationUnitLinks[studentId];
+                var isHighlight = studentId == jonathanId || studentId == graceId || studentId == budiStudentId || studentId == rinaId;
+                var selectedS1Links = s1Links.Take(isHighlight ? 6 : 2).ToList();
                 var s1Results = new List<(Guid resultId, Guid assessmentId, Guid unitId, decimal score, string gradeLetter, string gradeLabel)>();
 
-                foreach (var (participationId, unitId) in s1Links)
+                foreach (var (_, unitId) in selectedS1Links)
                 {
-                    // Create assessment (PACE Test)
                     var assessmentId = Guid.NewGuid();
                     var evaluatedDate = sem1EndDate.AddDays(-random.Next(0, 10));
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertAssessmentSql,
-                        new
-                        {
-                            Id = assessmentId,
-                            LearningUnitId = unitId,
-                            Title = $"PACE Test - {GetUnitInfo(unitId).Code}",
-                            AssessmentType = "summative",
-                            AssessmentMethod = "written_test",
-                            MaxScore = 100.00m,
-                            PassingScore = 80.00m,
-                            ReassessmentPolicy = "capped_at_passing",
-                            Status = "conducted",
-                            AssessmentDate = evaluatedDate,
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    assessmentRows.Add(new
+                    {
+                        Id = assessmentId,
+                        LearningUnitId = unitId,
+                        Title = $"PACE Test - {GetUnitInfo(unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = evaluatedDate,
+                        CreatedBy = _createdBy
+                    });
 
-                    // Generate deterministic score: majority passing, some failing
                     var score = GenerateS1Score(studentId, unitId, random, rinaId, budiStudentId, timotiusId, mathUnits, bibleUnits);
-
                     var resultId = Guid.NewGuid();
                     var isPassing = score >= 80.0m;
                     var gradeLetter = GetGradeLetter(score);
                     var gradeLabel = GetGradeLabel(score);
 
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertResultSql,
-                        new
-                        {
-                            Id = resultId,
-                            AssessmentId = assessmentId,
-                            StudentId = studentId,
-                            AttemptNumber = 1,
-                            ReplacesResultId = (Guid?)null,
-                            IsFinal = 1,
-                            ScoreNumeric = score,
-                            ScoreMax = 100.00m,
-                            GradeLetter = gradeLetter,
-                            GradeLabel = gradeLabel,
-                            EvaluationModel = "numeric",
-                            EvaluatedBy = "academic-coordinator",
-                            EvaluatedDate = evaluatedDate,
-                            ResultStatus = "approved",
-                            ApprovedBy = "Academic Authority",
-                            ApprovedDate = evaluatedDate.AddDays(1),
-                            PublishedDate = evaluatedDate.AddDays(2),
-                            Notes = isPassing ? "Mastery achieved (KKM 80%)" : "Below KKM - requires remediation",
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    resultRows.Add(new
+                    {
+                        Id = resultId,
+                        AssessmentId = assessmentId,
+                        StudentId = studentId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)score,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)gradeLetter,
+                        GradeLabel = (string?)gradeLabel,
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "academic-coordinator",
+                        EvaluatedDate = evaluatedDate,
+                        ResultStatus = "published",
+                        ApprovedBy = (string?)"Academic Authority",
+                        ApprovedDate = (DateTime?)evaluatedDate.AddDays(1),
+                        PublishedDate = (DateTime?)evaluatedDate.AddDays(2),
+                        Notes = isPassing ? "Mastery achieved (KKM 80%)" : "Below KKM - requires remediation",
+                        CreatedBy = _createdBy
+                    });
 
-                    // Create assessment evidence (test paper)
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertEvidenceSql,
-                        new
-                        {
-                            Id = Guid.NewGuid(),
-                            AssessmentId = assessmentId,
-                            StudentId = studentId,
-                            EvidenceType = "test_paper",
-                            CollectedDate = evaluatedDate,
-                            EvidenceReference = $"evidence/s1/{studentId}/{assessmentId}/paper.pdf",
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    evidenceRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = assessmentId,
+                        StudentId = studentId,
+                        EvidenceType = "test_paper",
+                        CollectedDate = evaluatedDate,
+                        EvidenceReference = $"evidence/s1/{studentId}/{assessmentId}/paper.pdf",
+                        CreatedBy = _createdBy
+                    });
 
                     s1Results.Add((resultId, assessmentId, unitId, score, gradeLetter, gradeLabel));
                     resultsCreated++;
@@ -698,287 +714,469 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 allS1Results[studentId] = s1Results;
             }
 
-            // --- S2: Active results with live hooks for flagship personas ---
-            var allS2Results = new Dictionary<Guid, List<(Guid resultId, Guid assessmentId, Guid unitId)>>();
+            // --- S2: Active results with exactly 3 provisional (is_final = 1) + flagship hooks ---
+            var nonFlagshipProvisionalStudentId = orderedNonFlagship.FirstOrDefault();
+            int nonFlagshipApprovedCounter = 0;
+
             foreach (var studentId in allTargetStudentIds)
             {
                 var s2Links = allS2ParticipationUnitLinks[studentId];
-                var s2Results = new List<(Guid resultId, Guid assessmentId, Guid unitId)>();
 
-                // Only create results for the first 6 PACE units per student for S2
-                // (to keep results manageable while still having the live hooks)
-                var selectedUnits = s2Links.Take(6).ToList();
-
-                foreach (var (participationId, unitId) in selectedUnits)
-                {
-                    var assessmentId = Guid.NewGuid();
-                    var evaluatedDate = baseDate.AddDays(-random.Next(0, 15));
-
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertAssessmentSql,
-                        new
-                        {
-                            Id = assessmentId,
-                            LearningUnitId = unitId,
-                            Title = $"PACE Test - {GetUnitInfo(unitId).Code}",
-                            AssessmentType = "summative",
-                            AssessmentMethod = "written_test",
-                            MaxScore = 100.00m,
-                            PassingScore = 80.00m,
-                            ReassessmentPolicy = "capped_at_passing",
-                            Status = "conducted",
-                            AssessmentDate = evaluatedDate,
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
-
-                    // Default: provisional result awaiting evaluation
-                    var resultId = Guid.NewGuid();
-                    var score = GenerateS2Score(studentId, unitId, random);
-                    var gradeLetter = GetGradeLetter(score);
-                    var gradeLabel = GetGradeLabel(score);
-
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertResultSql,
-                        new
-                        {
-                            Id = resultId,
-                            AssessmentId = assessmentId,
-                            StudentId = studentId,
-                            AttemptNumber = 1,
-                            ReplacesResultId = (Guid?)null,
-                            IsFinal = 0,
-                            ScoreNumeric = score,
-                            ScoreMax = 100.00m,
-                            GradeLetter = gradeLetter,
-                            GradeLabel = gradeLabel,
-                            EvaluationModel = "numeric",
-                            EvaluatedBy = "teacher-01",
-                            EvaluatedDate = evaluatedDate,
-                            ResultStatus = "provisional",
-                            ApprovedBy = (string?)null,
-                            ApprovedDate = (DateOnly?)null,
-                            PublishedDate = (DateOnly?)null,
-                            Notes = "Awaiting supervisor evaluation",
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
-
-                    s2Results.Add((resultId, assessmentId, unitId));
-                    resultsCreated++;
-                }
-
-                // Override for Jonathan Pratama: one result awaiting supervisor approval
                 if (studentId == jonathanId)
                 {
-                    // Find a result to make it await approval (provisional, not evaluated)
-                    if (s2Results.Count > 0)
+                    // Result 1: provisional awaiting approval (provisional #1)
+                    var a1 = Guid.NewGuid();
+                    var d1 = baseDate.AddDays(-2);
+                    assessmentRows.Add(new
                     {
-                        var (jonathanResultId, jonathanAssessmentId, _) = s2Results[0];
-                        await connection.ExecuteAsync(new CommandDefinition(
-                            _updateResultSql,
-                            new
-                            {
-                                Id = jonathanResultId,
-                                AssessmentId = jonathanAssessmentId,
-                                StudentId = jonathanId,
-                                AttemptNumber = 1,
-                                ReplacesResultId = (Guid?)null,
-                                IsFinal = 0,
-                                ScoreNumeric = 92.00m,
-                                ScoreMax = 100.00m,
-                                GradeLetter = "A",
-                                GradeLabel = "Sangat Mahir",
-                                EvaluationModel = "numeric",
-                                EvaluatedBy = "teacher-01",
-                                EvaluatedDate = baseDate.AddDays(-2),
-                                ResultStatus = "provisional",
-                                ApprovedBy = (string?)null,
-                                ApprovedDate = (DateOnly?)null,
-                                PublishedDate = (DateOnly?)null,
-                                Notes = "PACE score awaiting supervisor approval (live hook for SCR-ACD-03)",
-                                CreatedBy = _createdBy
-                            },
-                            transaction: transaction,
-                            cancellationToken: cancellationToken));
-                    }
-                }
+                        Id = a1,
+                        LearningUnitId = s2Links[0].unitId,
+                        Title = $"PACE Test - {GetUnitInfo(s2Links[0].unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d1,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a1,
+                        StudentId = jonathanId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)92.00m,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)"A",
+                        GradeLabel = (string?)"Sangat Mahir",
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d1,
+                        ResultStatus = "provisional",
+                        ApprovedBy = (string?)null,
+                        ApprovedDate = (DateTime?)null,
+                        PublishedDate = (DateTime?)null,
+                        Notes = "PACE score awaiting supervisor approval (live hook for SCR-ACD-03)",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
 
-                // Override for Grace Santoso: retake trail
-                if (studentId == graceId)
+                    // Result 2: published S2 result
+                    var a2 = Guid.NewGuid();
+                    var d2 = baseDate.AddDays(-6);
+                    assessmentRows.Add(new
+                    {
+                        Id = a2,
+                        LearningUnitId = s2Links[1].unitId,
+                        Title = $"PACE Test - {GetUnitInfo(s2Links[1].unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d2,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a2,
+                        StudentId = jonathanId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)94.00m,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)"A",
+                        GradeLabel = (string?)"Sangat Mahir",
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d2,
+                        ResultStatus = "published",
+                        ApprovedBy = (string?)"Academic Authority",
+                        ApprovedDate = (DateTime?)d2.AddDays(1),
+                        PublishedDate = (DateTime?)d2.AddDays(2),
+                        Notes = "Mastery achieved (KKM 80%)",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
+                }
+                else if (studentId == graceId)
                 {
-                    // First attempt: score 68% (failing) - provisional
-                    if (s2Results.Count > 0)
+                    // Attempt 1: 68% failing (is_final = 0)
+                    var a1 = Guid.NewGuid();
+                    var r1 = Guid.NewGuid();
+                    var d1 = baseDate.AddDays(-10);
+                    assessmentRows.Add(new
                     {
-                        var (graceResultId1, graceAssessmentId1, graceUnitId1) = s2Results[0];
-                        await connection.ExecuteAsync(new CommandDefinition(
-                            _updateResultSql,
-                            new
-                            {
-                                Id = graceResultId1,
-                                AssessmentId = graceAssessmentId1,
-                                StudentId = graceId,
-                                AttemptNumber = 1,
-                                ReplacesResultId = (Guid?)null,
-                                IsFinal = 0,
-                                ScoreNumeric = 68.00m,
-                                ScoreMax = 100.00m,
-                                GradeLetter = "D",
-                                GradeLabel = "Kurang",
-                                EvaluationModel = "numeric",
-                                EvaluatedBy = "teacher-01",
-                                EvaluatedDate = baseDate.AddDays(-10),
-                                ResultStatus = "provisional",
-                                ApprovedBy = (string?)null,
-                                ApprovedDate = (DateOnly?)null,
-                                PublishedDate = (DateOnly?)null,
-                                Notes = "Initial attempt - below KKM (68%), failed. Remediation completed.",
-                                CreatedBy = _createdBy
-                            },
-                            transaction: transaction,
-                            cancellationToken: cancellationToken));
-                    }
+                        Id = a1,
+                        LearningUnitId = s2Links[0].unitId,
+                        Title = $"PACE Test - {GetUnitInfo(s2Links[0].unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d1,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = r1,
+                        AssessmentId = a1,
+                        StudentId = graceId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 0,
+                        ScoreNumeric = (decimal?)68.00m,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)"D",
+                        GradeLabel = (string?)"Kurang",
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d1,
+                        ResultStatus = "approved",
+                        ApprovedBy = (string?)"Academic Authority",
+                        ApprovedDate = (DateTime?)d1.AddDays(1),
+                        PublishedDate = (DateTime?)null,
+                        Notes = "Initial attempt - below KKM (68%), failed. Remediation completed.",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
 
-                    // Second attempt (retake): score 85% (passing) with replaces_result_id
-                    if (s2Results.Count > 1)
+                    // Attempt 2: 85% passing (is_final = 1, replaces Attempt 1)
+                    var a2 = Guid.NewGuid();
+                    var d2 = baseDate.AddDays(-5);
+                    assessmentRows.Add(new
                     {
-                        var (graceResultId2, graceAssessmentId2, graceUnitId2) = s2Results[1];
-                        var firstResultId = s2Results[0].resultId;
-                        await connection.ExecuteAsync(new CommandDefinition(
-                            _updateResultSql,
-                            new
-                            {
-                                Id = graceResultId2,
-                                AssessmentId = graceAssessmentId2,
-                                StudentId = graceId,
-                                AttemptNumber = 2,
-                                ReplacesResultId = firstResultId,
-                                IsFinal = 1,
-                                ScoreNumeric = 85.00m,
-                                ScoreMax = 100.00m,
-                                GradeLetter = "B+",
-                                GradeLabel = "Memuaskan",
-                                EvaluationModel = "numeric",
-                                EvaluatedBy = "teacher-01",
-                                EvaluatedDate = baseDate.AddDays(-5),
-                                ResultStatus = "provisional",
-                                ApprovedBy = (string?)null,
-                                ApprovedDate = (DateOnly?)null,
-                                PublishedDate = (DateOnly?)null,
-                                Notes = "Retake attempt - remediation completed, score 85% (passing). Awaiting final approval.",
-                                CreatedBy = _createdBy
-                            },
-                            transaction: transaction,
-                            cancellationToken: cancellationToken));
-                    }
+                        Id = a2,
+                        LearningUnitId = s2Links[1].unitId,
+                        Title = $"PACE Test - {GetUnitInfo(s2Links[1].unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d2,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a2,
+                        StudentId = graceId,
+                        AttemptNumber = 2,
+                        ReplacesResultId = (Guid?)r1,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)85.00m,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)"B+",
+                        GradeLabel = (string?)"Memuaskan",
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d2,
+                        ResultStatus = "published",
+                        ApprovedBy = (string?)"Academic Authority",
+                        ApprovedDate = (DateTime?)d2.AddDays(1),
+                        PublishedDate = (DateTime?)d2.AddDays(2),
+                        Notes = "Retake attempt - remediation completed, score 85% (passing).",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
                 }
-
-                // Override for Budi Wijaya: submitted PACE test awaiting evaluation
-                if (studentId == budiId)
+                else if (studentId == budiStudentId)
                 {
-                    if (s2Results.Count > 0)
+                    // Result 1: Science PACE 1049 submitted awaiting grading (provisional #2, score_numeric = null)
+                    var a1 = Guid.NewGuid();
+                    var d1 = baseDate.AddDays(-2);
+                    assessmentRows.Add(new
                     {
-                        var (budiResultId, budiAssessmentId, _) = s2Results[0];
+                        Id = a1,
+                        LearningUnitId = s2Links[0].unitId,
+                        Title = "PACE Test - Science PACE 1049",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d1,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a1,
+                        StudentId = budiStudentId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)null,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)null,
+                        GradeLabel = (string?)null,
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d1,
+                        ResultStatus = "provisional",
+                        ApprovedBy = (string?)null,
+                        ApprovedDate = (DateTime?)null,
+                        PublishedDate = (DateTime?)null,
+                        Notes = "Live submitted PACE test awaiting supervisor evaluation (live hook for SCR-ACD-04)",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
 
-                        // Update assessment title to explicitly match Science PACE 1049
-                        await connection.ExecuteAsync(new CommandDefinition(
-                            "UPDATE academics.assessments SET title = @Title WHERE id = @AssessmentId",
-                            new { Title = "PACE Test - Science PACE 1049", AssessmentId = budiAssessmentId },
-                            transaction: transaction,
-                            cancellationToken: cancellationToken));
-
-                        await connection.ExecuteAsync(new CommandDefinition(
-                            _updateResultSql,
-                            new
-                            {
-                                Id = budiResultId,
-                                AssessmentId = budiAssessmentId,
-                                StudentId = budiId,
-                                AttemptNumber = 1,
-                                ReplacesResultId = (Guid?)null,
-                                IsFinal = 0,
-                                ScoreNumeric = (decimal?)null,
-                                ScoreMax = 100.00m,
-                                GradeLetter = (string?)null,
-                                GradeLabel = (string?)null,
-                                EvaluationModel = "numeric",
-                                EvaluatedBy = "teacher-01",
-                                EvaluatedDate = baseDate.AddDays(-2),
-                                ResultStatus = "provisional",
-                                ApprovedBy = (string?)null,
-                                ApprovedDate = (DateOnly?)null,
-                                PublishedDate = (DateOnly?)null,
-                                Notes = "Live submitted PACE test awaiting supervisor evaluation (live hook for SCR-ACD-04)",
-                                CreatedBy = _createdBy
-                            },
-                            transaction: transaction,
-                            cancellationToken: cancellationToken));
-                    }
+                    // Result 2: published S2 result
+                    var a2 = Guid.NewGuid();
+                    var d2 = baseDate.AddDays(-7);
+                    assessmentRows.Add(new
+                    {
+                        Id = a2,
+                        LearningUnitId = s2Links[1].unitId,
+                        Title = $"PACE Test - {GetUnitInfo(s2Links[1].unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d2,
+                        CreatedBy = _createdBy
+                    });
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a2,
+                        StudentId = budiStudentId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)88.00m,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)"B+",
+                        GradeLabel = (string?)"Mahir",
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d2,
+                        ResultStatus = "published",
+                        ApprovedBy = (string?)"Academic Authority",
+                        ApprovedDate = (DateTime?)d2.AddDays(1),
+                        PublishedDate = (DateTime?)d2.AddDays(2),
+                        Notes = "Mastery achieved (KKM 80%)",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
                 }
+                else
+                {
+                    var a1 = Guid.NewGuid();
+                    var d1 = baseDate.AddDays(-random.Next(2, 14));
+                    var unitId = s2Links[0].unitId;
+                    assessmentRows.Add(new
+                    {
+                        Id = a1,
+                        LearningUnitId = unitId,
+                        Title = $"PACE Test - {GetUnitInfo(unitId).Code}",
+                        AssessmentType = "summative",
+                        AssessmentMethod = "written_test",
+                        MaxScore = 100.00m,
+                        PassingScore = 80.00m,
+                        ReassessmentPolicy = "capped_at_passing",
+                        Status = "conducted",
+                        AssessmentDate = d1,
+                        CreatedBy = _createdBy
+                    });
 
-                allS2Results[studentId] = s2Results;
+                    var isThirdProvisional = studentId == nonFlagshipProvisionalStudentId;
+                    var score = GenerateS2Score(studentId, unitId, random);
+                    string resultStatus;
+                    if (isThirdProvisional)
+                    {
+                        resultStatus = "provisional"; // provisional #3
+                    }
+                    else if (nonFlagshipApprovedCounter < 6)
+                    {
+                        resultStatus = "approved";
+                        nonFlagshipApprovedCounter++;
+                    }
+                    else
+                    {
+                        resultStatus = "published";
+                    }
+
+                    resultRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssessmentId = a1,
+                        StudentId = studentId,
+                        AttemptNumber = 1,
+                        ReplacesResultId = (Guid?)null,
+                        IsFinal = 1,
+                        ScoreNumeric = (decimal?)score,
+                        ScoreMax = 100.00m,
+                        GradeLetter = (string?)GetGradeLetter(score),
+                        GradeLabel = (string?)GetGradeLabel(score),
+                        EvaluationModel = "numeric",
+                        EvaluatedBy = "teacher-01",
+                        EvaluatedDate = d1,
+                        ResultStatus = resultStatus,
+                        ApprovedBy = resultStatus == "provisional" ? (string?)null : "Academic Authority",
+                        ApprovedDate = resultStatus == "provisional" ? (DateTime?)null : d1.AddDays(1),
+                        PublishedDate = resultStatus == "published" ? (DateTime?)d1.AddDays(2) : null,
+                        Notes = resultStatus == "provisional" ? "Awaiting coordinator review" : "S2 summative assessment",
+                        CreatedBy = _createdBy
+                    });
+                    resultsCreated++;
+                }
             }
 
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.assessments (id, learning_unit_id, title, assessment_type, assessment_method, max_score, passing_score, reassessment_policy, status, assessment_date, created_by)",
+                ["Id", "LearningUnitId", "Title", "AssessmentType", "AssessmentMethod", "MaxScore", "PassingScore", "ReassessmentPolicy", "Status", "AssessmentDate", "CreatedBy"],
+                assessmentRows,
+                cancellationToken);
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.academic_results (id, assessment_id, student_id, attempt_number, replaces_result_id, is_final, score_numeric, score_max, grade_letter, grade_label, evaluation_model, evaluated_by, evaluated_date, result_status, approved_by, approved_date, published_date, notes, created_by)",
+                ["Id", "AssessmentId", "StudentId", "AttemptNumber", "ReplacesResultId", "IsFinal", "ScoreNumeric", "ScoreMax", "GradeLetter", "GradeLabel", "EvaluationModel", "EvaluatedBy", "EvaluatedDate", "ResultStatus", "ApprovedBy", "ApprovedDate", "PublishedDate", "Notes", "CreatedBy"],
+                resultRows,
+                cancellationToken);
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.assessment_evidence (id, assessment_id, student_id, evidence_type, collected_date, evidence_reference, created_by)",
+                ["Id", "AssessmentId", "StudentId", "EvidenceType", "CollectedDate", "EvidenceReference", "CreatedBy"],
+                evidenceRows,
+                cancellationToken);
+
             // ====================================================================
-            // 5. Create coursework assignments and submissions for S2
+            // 5. Create coursework assignments and submissions for S2 (batched)
+            //    6 missing submissions, ~10% late, ~87% submitted
             // ====================================================================
             var s2AssignmentIds = new List<Guid>();
-            foreach (var activityId in sem2ActivityIds.GetRange(0, 10))
+            var assignmentRows = new List<object>(10);
+            for (int aIdx = 0; aIdx < 10; aIdx++)
             {
                 var assignmentId = Guid.NewGuid();
                 s2AssignmentIds.Add(assignmentId);
+                var releaseDate = sem2StartDate.AddDays(aIdx * 3);
+                // First 4 assignments are past due (< Today); remaining 6 are upcoming (>= Today)
+                var dueDate = aIdx < 4 ? baseDate.AddDays(-(4 - aIdx)) : baseDate.AddDays(aIdx - 1);
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertAssignmentSql,
-                    new
-                    {
-                        Id = assignmentId,
-                        LearningActivityId = activityId,
-                        Title = $"Coursework Assignment {s2AssignmentIds.Count}",
-                        Description = "Regular coursework task for S2",
-                        ReleaseDate = sem2StartDate.AddDays((s2AssignmentIds.Count - 1) * 3),
-                        DueDate = sem2StartDate.AddDays((s2AssignmentIds.Count - 1) * 3 + 14),
-                        Status = "released",
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
+                assignmentRows.Add(new
+                {
+                    Id = assignmentId,
+                    LearningActivityId = sem2ActivityIds[aIdx],
+                    Title = $"Coursework Assignment {aIdx + 1}",
+                    Description = "Regular coursework task for S2",
+                    ReleaseDate = releaseDate,
+                    DueDate = dueDate,
+                    Status = "released",
+                    CreatedBy = _createdBy
+                });
             }
 
-            // Create submissions for a subset of students
-            foreach (var assignmentId in s2AssignmentIds)
-            {
-                var selectedStudents = enrolledStudentIds
-                    .OrderBy(_ => random.Next())
-                    .Take(Math.Min(20, enrolledStudentIds.Count))
-                    .ToList();
+            await connection.ExecuteAsync(new CommandDefinition(
+                _insertAssignmentSql, assignmentRows, transaction: transaction, cancellationToken: cancellationToken));
 
-                foreach (var studentId in selectedStudents)
+            // Build deterministic missing submission assignments for the 5 unaddressed at-risk learners (6 total missing)
+            var unaddressedList = unaddressedNotInGoodStandingIds.Concat(unaddressedConditionalIds).ToList();
+            var missingPairs = new HashSet<(Guid StudentId, int AssignmentIdx)>();
+            if (unaddressedList.Count >= 5)
+            {
+                missingPairs.Add((unaddressedList[0], 0));
+                missingPairs.Add((unaddressedList[0], 1));
+                missingPairs.Add((unaddressedList[1], 0));
+                missingPairs.Add((unaddressedList[2], 1));
+                missingPairs.Add((unaddressedList[3], 2));
+                missingPairs.Add((unaddressedList[4], 3));
+            }
+
+            var submissionRows = new List<object>(200);
+            // All 45 active students on past-due assignments 0..3 (180 rows)
+            for (int aIdx = 0; aIdx < 4; aIdx++)
+            {
+                var assignmentId = s2AssignmentIds[aIdx];
+                for (int sIdx = 0; sIdx < activeStudentIds.Count; sIdx++)
                 {
-                    var isBudi = studentId == budiId;
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertSubmissionSql,
-                        new
-                        {
-                            Id = Guid.NewGuid(),
-                            AssignmentId = assignmentId,
-                            StudentId = studentId,
-                            Status = isBudi ? "submitted" : "submitted",
-                            SubmittedDate = DateTime.SpecifyKind(
-                                baseDate.AddDays(-random.Next(0, 7)), DateTimeKind.Utc),
-                            IsResubmission = 0,
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    var studentId = activeStudentIds[sIdx];
+                    string status;
+                    DateTime? submittedDate;
+
+                    if (studentId == budiStudentId)
+                    {
+                        status = "submitted";
+                        submittedDate = DateTime.SpecifyKind(baseDate.AddDays(-1), DateTimeKind.Utc);
+                    }
+                    else if (missingPairs.Contains((studentId, aIdx)))
+                    {
+                        status = "missing";
+                        submittedDate = null;
+                    }
+                    else if ((sIdx + aIdx) % 9 == 0)
+                    {
+                        status = "late";
+                        submittedDate = DateTime.SpecifyKind(baseDate.AddDays(-1), DateTimeKind.Utc);
+                    }
+                    else
+                    {
+                        status = "submitted";
+                        submittedDate = DateTime.SpecifyKind(baseDate.AddDays(-random.Next(2, 7)), DateTimeKind.Utc);
+                    }
+
+                    submissionRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        AssignmentId = assignmentId,
+                        StudentId = studentId,
+                        Status = status,
+                        SubmittedDate = submittedDate,
+                        IsResubmission = 0,
+                        CreatedBy = _createdBy
+                    });
                 }
             }
+
+            // Early submissions on upcoming assignment 4 (20 rows -> 200 total submissions)
+            foreach (var studentId in activeStudentIds.Take(20))
+            {
+                submissionRows.Add(new
+                {
+                    Id = Guid.NewGuid(),
+                    AssignmentId = s2AssignmentIds[4],
+                    StudentId = studentId,
+                    Status = "submitted",
+                    SubmittedDate = (DateTime?)DateTime.SpecifyKind(baseDate.AddDays(-1), DateTimeKind.Utc),
+                    IsResubmission = 0,
+                    CreatedBy = _createdBy
+                });
+            }
+
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.submissions (id, assignment_id, student_id, status, submitted_date, is_resubmission, created_by)",
+                ["Id", "AssignmentId", "StudentId", "Status", "SubmittedDate", "IsResubmission", "CreatedBy"],
+                submissionRows,
+                cancellationToken);
 
             // ====================================================================
             // 6. Semester 1: Create certified report cards ("Buku Rapor Merdeka")
             // ====================================================================
+            var reportCardRows = new List<object>(allTargetStudentIds.Count);
+            var reportCardEntryRows = new List<object>(160);
+
             foreach (var studentId in allTargetStudentIds)
             {
                 var s1Results = allS1Results.TryGetValue(studentId, out var results) ? results : [];
@@ -1024,59 +1222,64 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
 
                 var contentSnapshot = JsonSerializer.Serialize(snapshotDto, _webOptions);
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertReportCardSql,
-                    new
-                    {
-                        Id = cardId,
-                        StudentId = studentId,
-                        AcademicPeriodId = sem1Id,
-                        AcademicPeriodLabel = sem1Label,
-                        ReportType = "end_of_term",
-                        TemplateName = "Buku Rapor Merdeka",
-                        Status = "published",
-                        ApprovedBy = "Academic Authority",
-                        ApprovedDate = sem1EndDate.AddDays(2),
-                        PublishedDate = sem1EndDate.AddDays(3),
-                        NarrativeComments = "Student has completed all required PACE units for Semester 1 with satisfactory mastery.",
-                        ContentSnapshot = contentSnapshot,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
+                reportCardRows.Add(new
+                {
+                    Id = cardId,
+                    StudentId = studentId,
+                    AcademicPeriodId = sem1Id,
+                    AcademicPeriodLabel = sem1Label,
+                    ReportType = "end_of_term",
+                    TemplateName = "Buku Rapor Merdeka",
+                    Status = "published",
+                    ApprovedBy = "Academic Authority",
+                    ApprovedDate = sem1EndDate.AddDays(2),
+                    PublishedDate = sem1EndDate.AddDays(3),
+                    NarrativeComments = "Student has completed all required PACE units for Semester 1 with satisfactory mastery.",
+                    ContentSnapshot = contentSnapshot,
+                    CreatedBy = _createdBy
+                });
                 reportCardsCreated++;
 
-                // Create report card entries
                 displayOrder = 1;
                 foreach (var (resultId, _, unitId, _, _, _) in s1Results)
                 {
-                    var entryId = Guid.NewGuid();
-                    await connection.ExecuteAsync(new CommandDefinition(
-                        _insertReportCardEntrySql,
-                        new
-                        {
-                            Id = entryId,
-                            ReportCardId = cardId,
-                            LearningUnitId = unitId,
-                            AcademicResultId = resultId,
-                            DisplayOrder = displayOrder++,
-                            TeacherComment = "Satisfactory mastery demonstrated.",
-                            CreatedBy = _createdBy
-                        },
-                        transaction: transaction,
-                        cancellationToken: cancellationToken));
+                    reportCardEntryRows.Add(new
+                    {
+                        Id = Guid.NewGuid(),
+                        ReportCardId = cardId,
+                        LearningUnitId = unitId,
+                        AcademicResultId = resultId,
+                        DisplayOrder = displayOrder++,
+                        TeacherComment = "Satisfactory mastery demonstrated.",
+                        CreatedBy = _createdBy
+                    });
                 }
             }
+
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.report_cards (id, student_id, academic_period_id, academic_period_label, report_type, template_name, status, approved_by, approved_date, published_date, narrative_comments, content_snapshot, created_by)",
+                ["Id", "StudentId", "AcademicPeriodId", "AcademicPeriodLabel", "ReportType", "TemplateName", "Status", "ApprovedBy", "ApprovedDate", "PublishedDate", "NarrativeComments", "ContentSnapshot", "CreatedBy"],
+                reportCardRows,
+                cancellationToken);
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.report_card_entries (id, report_card_id, learning_unit_id, academic_result_id, display_order, teacher_comment, created_by)",
+                ["Id", "ReportCardId", "LearningUnitId", "AcademicResultId", "DisplayOrder", "TeacherComment", "CreatedBy"],
+                reportCardEntryRows,
+                cancellationToken);
 
             // ====================================================================
             // 7. Semester 1: Create cumulative transcripts
             // ====================================================================
+            var transcriptRows = new List<object>(allTargetStudentIds.Count);
             foreach (var studentId in allTargetStudentIds)
             {
                 var s1Results = allS1Results.TryGetValue(studentId, out var results) ? results : [];
                 var (studentName, studentNisn) = GetStudentInfo(studentId);
 
-                // Calculate GPA and build course entries from S1 results
                 var courses = new List<TranscriptCourseEntryDto>();
                 decimal totalScore = 0m;
                 int resultCount = 0;
@@ -1096,7 +1299,7 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                     resultCount++;
                 }
 
-                decimal? gpa = resultCount > 0 ? Math.Round(totalScore / resultCount / 20m, 2) : (decimal?)null; // Scale 100 to 5.0
+                decimal? gpa = resultCount > 0 ? Math.Round(totalScore / resultCount / 20m, 2) : (decimal?)null;
 
                 var periodSummary = new TranscriptPeriodSummaryDto(
                     AcademicPeriodId: sem1Id,
@@ -1120,30 +1323,35 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
 
                 var transcriptSnapshot = JsonSerializer.Serialize(transcriptDto, _webOptions);
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertTranscriptSql,
-                    new
-                    {
-                        Id = transcriptId,
-                        StudentId = studentId,
-                        TranscriptType = "official",
-                        PeriodStart = sem1StartDate,
-                        PeriodEnd = sem1EndDate,
-                        Status = "issued",
-                        ApprovedBy = "Academic Authority",
-                        ApprovedDate = sem1EndDate.AddDays(4),
-                        IssuedDate = sem1EndDate.AddDays(5),
-                        Purpose = "Academic Record - Semester 1 Final Transcript",
-                        ContentSnapshot = transcriptSnapshot,
-                        CreatedBy = _createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
+                transcriptRows.Add(new
+                {
+                    Id = transcriptId,
+                    StudentId = studentId,
+                    TranscriptType = "official",
+                    PeriodStart = sem1StartDate,
+                    PeriodEnd = sem1EndDate,
+                    Status = "issued",
+                    ApprovedBy = "Academic Authority",
+                    ApprovedDate = sem1EndDate.AddDays(4),
+                    IssuedDate = sem1EndDate.AddDays(5),
+                    Purpose = "Academic Record - Semester 1 Final Transcript",
+                    ContentSnapshot = transcriptSnapshot,
+                    CreatedBy = _createdBy
+                });
                 transcriptsCreated++;
             }
 
+            await BatchInsertAsync(
+                connection,
+                transaction,
+                "academics.transcripts (id, student_id, transcript_type, period_start, period_end, status, approved_by, approved_date, issued_date, purpose, content_snapshot, created_by)",
+                ["Id", "StudentId", "TranscriptType", "PeriodStart", "PeriodEnd", "Status", "ApprovedBy", "ApprovedDate", "IssuedDate", "Purpose", "ContentSnapshot", "CreatedBy"],
+                transcriptRows,
+                cancellationToken);
+
             // ====================================================================
             // 8. Seed Submodule 4: Standings, Progression, Interventions & Achievements (IS012, TD-08)
+            //    Batch-inserted across all 45 active students for S1 & S2
             // ====================================================================
             await SeedStandingAndProgressionSubmoduleAsync(
                 connection,
@@ -1151,9 +1359,15 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
                 operationsContext,
                 academicsContext,
                 unitLookup,
+                activeStudentIds,
+                jonathanId,
+                graceId,
                 rinaId,
                 budiStudentId,
-                timotiusId,
+                unaddressedConditionalIds,
+                unaddressedNotInGoodStandingIds,
+                s1ConditionalImprovedIds,
+                s1NotInGoodImprovedIds,
                 now,
                 cancellationToken);
 
@@ -1259,9 +1473,15 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
         OperationsSeedResult operationsContext,
         AcademicsStructureSeedResult academicsContext,
         Dictionary<Guid, (Guid Id, string Code, string Name)> unitLookup,
+        IReadOnlyList<Guid> activeStudentIds,
+        Guid jonathanId,
+        Guid graceId,
         Guid rinaId,
         Guid budiStudentId,
-        Guid timotiusId,
+        IReadOnlyList<Guid> unaddressedConditionalIds,
+        IReadOnlyList<Guid> unaddressedNotInGoodStandingIds,
+        IReadOnlyList<Guid> s1ConditionalImprovedIds,
+        IReadOnlyList<Guid> s1NotInGoodImprovedIds,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -1275,491 +1495,296 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
             .Where(id => unitLookup.TryGetValue(id, out var u) && (u.Code.StartsWith("M", StringComparison.OrdinalIgnoreCase) || u.Name.Contains("Math", StringComparison.OrdinalIgnoreCase)))
             .ToList();
         if (mathUnits.Count == 0) mathUnits = paceUnitIds.Take(6).ToList();
-
-        var bibleUnits = paceUnitIds
-            .Where(id => unitLookup.TryGetValue(id, out var u) && (u.Code.StartsWith("B", StringComparison.OrdinalIgnoreCase) || u.Name.Contains("Bible", StringComparison.OrdinalIgnoreCase) || u.Name.Contains("Christian", StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-        if (bibleUnits.Count == 0) bibleUnits = paceUnitIds.Skip(24).Take(6).ToList();
+        var mathUnitSet = new HashSet<Guid>(mathUnits);
 
         var mathSubjectId = academicsContext.SubjectUnitIds.GetValueOrDefault("MATH", mathUnits.FirstOrDefault());
 
-        // ---------------------------------------------------------------------
-        // 1. Learning Progress
-        // ---------------------------------------------------------------------
+        var unaddressedCondSet = new HashSet<Guid>(unaddressedConditionalIds);
+        var unaddressedNgsSet = new HashSet<Guid>(unaddressedNotInGoodStandingIds);
+        var s1CondImpSet = new HashSet<Guid>(s1ConditionalImprovedIds);
+        var s1NgsImpSet = new HashSet<Guid>(s1NotInGoodImprovedIds);
 
-        // 1a. Rina Kusuma: completed all Grade 4 units
-        foreach (var unitId in paceUnitIds)
+        // ---------------------------------------------------------------------
+        // 1. Learning Progress (batched across all 45 active students for S1 & S2)
+        // ---------------------------------------------------------------------
+        var progressRows = new List<LearningProgressBatchRow>(activeStudentIds.Count * paceUnitIds.Count * 2);
+        var s2CompletedDate = DateOnly.FromDateTime(baseDate.AddDays(-5));
+
+        foreach (var studentId in activeStudentIds)
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    StudentId = rinaId,
-                    LearningUnitId = unitId,
-                    AcademicPeriodId = sem1Id,
-                    Status = "completed",
-                    Basis = "assessment_evidence",
-                    CompletionDate = (DateOnly?)sem1EndDate,
-                    Notes = "Completed Grade 4 PACE unit expectations with mastery",
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
+            var isBudi = studentId == budiStudentId;
+            var isRina = studentId == rinaId;
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
+            foreach (var unitId in paceUnitIds)
+            {
+                var isMath = mathUnitSet.Contains(unitId);
+
+                // S1 learning progress
+                if (isBudi && isMath)
                 {
-                    Id = Guid.NewGuid(),
-                    StudentId = rinaId,
-                    LearningUnitId = unitId,
-                    AcademicPeriodId = sem2Id,
-                    Status = "completed",
-                    Basis = "assessment_evidence",
-                    CompletionDate = (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-5)),
-                    Notes = "Completed Grade 4 PACE unit expectations with mastery",
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem1Id,
+                        "needs_remediation", "assessment_evidence", null,
+                        "Assessment score below KKM (80%) in Mathematics; requires remediation packet", now));
+                }
+                else if (unaddressedNgsSet.Contains(studentId) && isMath)
+                {
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem1Id,
+                        "needs_remediation", "assessment_evidence", null,
+                        "Unfulfilled PACE requirements; below passing threshold", now));
+                }
+                else
+                {
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem1Id,
+                        "completed", "assessment_evidence", sem1EndDate,
+                        "Completed Semester 1 PACE unit with mastery", now));
+                }
+
+                // S2 learning progress
+                if (isBudi && isMath)
+                {
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem2Id,
+                        "needs_remediation", "assessment_evidence", null,
+                        "Active Mathematics remediation plan underway", now));
+                }
+                else if (isRina)
+                {
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem2Id,
+                        "completed", "assessment_evidence", s2CompletedDate,
+                        "Completed PACE unit expectations with mastery", now));
+                }
+                else
+                {
+                    progressRows.Add(new LearningProgressBatchRow(
+                        Guid.NewGuid(), studentId, unitId, sem2Id,
+                        "in_progress", "learning_work", null,
+                        "In progress S2 PACE unit", now));
+                }
+            }
         }
 
-        // 1b. Budi Santoso: needs_remediation Math; other units completed
-        foreach (var unitId in paceUnitIds)
+        await BatchInsertLearningProgressAsync(connection, transaction, progressRows, _createdBy, cancellationToken);
+
+        // ---------------------------------------------------------------------
+        // 2. Academic Standings (batched across all 45 active students for S1 & S2)
+        //    S1: 36 good_standing (80.0%), 6 conditional_standing, 3 not_in_good_standing
+        //    S2: 38 good_standing (84.4%, +4.4% delta), 5 conditional_standing, 2 not_in_good_standing
+        // ---------------------------------------------------------------------
+        var standingRows = new List<object>(activeStudentIds.Count * 2);
+        var recRows = new List<object>(6);
+        var sem1DeterminedAt = baseDate.AddDays(-33);
+        var s2DeterminedAt = baseDate.AddDays(-2);
+
+        foreach (var studentId in activeStudentIds)
         {
-            var isMath = mathUnits.Contains(unitId);
-            var status = isMath ? "needs_remediation" : "completed";
-            var compDate = isMath ? (DateOnly?)null : sem1EndDate;
-            var notes = isMath
-                ? "Assessment score below KKM (80%) in Mathematics; requires remediation packet"
-                : "Completed Grade 4 PACE unit";
+            string s1Standing;
+            string s2Standing;
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
+            if (studentId == budiStudentId || studentId == graceId || unaddressedCondSet.Contains(studentId))
+            {
+                s1Standing = "conditional_standing";
+                s2Standing = "conditional_standing";
+            }
+            else if (unaddressedNgsSet.Contains(studentId))
+            {
+                s1Standing = "not_in_good_standing";
+                s2Standing = "not_in_good_standing";
+            }
+            else if (s1CondImpSet.Contains(studentId))
+            {
+                s1Standing = "conditional_standing";
+                s2Standing = "good_standing";
+            }
+            else if (s1NgsImpSet.Contains(studentId))
+            {
+                s1Standing = "not_in_good_standing";
+                s2Standing = "good_standing";
+            }
+            else
+            {
+                s1Standing = "good_standing";
+                s2Standing = "good_standing";
+            }
+
+            var s1Id = Guid.NewGuid();
+            var s2Id = Guid.NewGuid();
+            var isBudi = studentId == budiStudentId;
+
+            standingRows.Add(new
+            {
+                Id = s1Id,
+                StudentId = studentId,
+                AcademicPeriodId = sem1Id,
+                Standing = s1Standing,
+                PolicyReference = "SK-AKAD/2026/POLICY-01",
+                Conditions = s1Standing == "good_standing"
+                    ? (string?)null
+                    : isBudi
+                        ? "Must complete Mathematics remediation during holiday packet and pass reassessment before Grade 5 commencement."
+                        : "Subject to academic progress monitoring and PACE mastery target.",
+                IsException = isBudi,
+                ExceptionReason = isBudi ? "Academic council approval for conditional standing subject to mathematics remediation agreement" : (string?)null,
+                CommitteeReference = isBudi ? "SK-DG/2026/06-01" : (string?)null,
+                AuthorizedBy = "Academic Authority",
+                DeterminedAt = sem1DeterminedAt,
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            });
+
+            standingRows.Add(new
+            {
+                Id = s2Id,
+                StudentId = studentId,
+                AcademicPeriodId = sem2Id,
+                Standing = s2Standing,
+                PolicyReference = "SK-AKAD/2026/POLICY-01",
+                Conditions = s2Standing == "good_standing"
+                    ? (string?)null
+                    : isBudi
+                        ? "Must complete Mathematics remediation during holiday packet and pass reassessment before Grade 5 commencement."
+                        : "Subject to academic progress monitoring and PACE mastery target.",
+                IsException = isBudi,
+                ExceptionReason = isBudi ? "Academic council approval for conditional standing subject to mathematics remediation agreement" : (string?)null,
+                CommitteeReference = isBudi ? "SK-DG/2026/06-01" : (string?)null,
+                AuthorizedBy = "Academic Authority",
+                DeterminedAt = s2DeterminedAt,
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            });
+
+            var firstUnaddressedNgsId = unaddressedNotInGoodStandingIds.Count > 0 ? unaddressedNotInGoodStandingIds[0] : Guid.Empty;
+            if (studentId == rinaId || isBudi || studentId == firstUnaddressedNgsId)
+            {
+                var recType = s2Standing switch
+                {
+                    "good_standing" => "promotion_eligible",
+                    "conditional_standing" => "conditional_promotion",
+                    _ => "retention_recommended"
+                };
+
+                recRows.Add(new
                 {
                     Id = Guid.NewGuid(),
-                    StudentId = budiStudentId,
-                    LearningUnitId = unitId,
+                    StudentId = studentId,
                     AcademicPeriodId = sem1Id,
-                    Status = status,
-                    Basis = "assessment_evidence",
-                    CompletionDate = compDate,
-                    Notes = notes,
+                    AcademicStandingId = (Guid?)s1Id,
+                    Recommendation = recType,
+                    FromLevel = "Grade 4",
+                    RecommendedToLevel = recType == "retention_recommended" ? (string?)null : "Grade 5",
+                    Conditions = isBudi ? "Conditional advancement granted subject to completion of Math remediation tutoring packet prior to term start." : (string?)null,
+                    SupportingEvidence = $"Semester 1 determination ({s1Standing}) per SK-AKAD/2026/POLICY-01.",
+                    IsException = isBudi,
+                    ExceptionReason = isBudi ? "Dewan Guru certified conditional promotion with mandatory mathematics tutoring contract" : (string?)null,
+                    CommitteeReference = isBudi ? "SK-DG/2026/06-01" : (string?)null,
+                    AuthorizedBy = "Academic Authority",
+                    IssuedAt = baseDate.AddDays(-32),
                     CreatedAt = now,
                     CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
+                });
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
+                recRows.Add(new
                 {
                     Id = Guid.NewGuid(),
-                    StudentId = budiStudentId,
-                    LearningUnitId = unitId,
+                    StudentId = studentId,
                     AcademicPeriodId = sem2Id,
-                    Status = isMath ? "needs_remediation" : "in_progress",
-                    Basis = isMath ? "assessment_evidence" : "learning_work",
-                    CompletionDate = (DateOnly?)null,
-                    Notes = isMath ? "Active Mathematics remediation plan underway" : "In progress unit",
+                    AcademicStandingId = (Guid?)s2Id,
+                    Recommendation = recType,
+                    FromLevel = "Grade 4",
+                    RecommendedToLevel = recType == "retention_recommended" ? (string?)null : "Grade 5",
+                    Conditions = isBudi ? "Conditional advancement granted subject to completion of Math remediation tutoring packet prior to term start." : (string?)null,
+                    SupportingEvidence = $"Semester 2 live progression review ({s2Standing}).",
+                    IsException = isBudi,
+                    ExceptionReason = isBudi ? "Dewan Guru certified conditional promotion with mandatory mathematics tutoring contract" : (string?)null,
+                    CommitteeReference = isBudi ? "SK-DG/2026/06-01" : (string?)null,
+                    AuthorizedBy = "Academic Authority",
+                    IssuedAt = baseDate.AddDays(-1),
                     CreatedAt = now,
                     CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
+                });
+            }
         }
 
-        // 1c. Timotius: completed Christian Education with explicit out-of-period completion date
-        var outOfPeriodDate = sem1EndDate.AddDays(14); // 14 days after S1 end date (holiday packet completion)
-        foreach (var unitId in paceUnitIds)
+        await BatchInsertAsync(
+            connection,
+            transaction,
+            "academics.academic_standings (id, student_id, academic_period_id, standing, policy_reference, conditions, is_exception, exception_reason, committee_reference, authorized_by, determined_at, created_at, created_by)",
+            ["Id", "StudentId", "AcademicPeriodId", "Standing", "PolicyReference", "Conditions", "IsException", "ExceptionReason", "CommitteeReference", "AuthorizedBy", "DeterminedAt", "CreatedAt", "CreatedBy"],
+            standingRows,
+            cancellationToken);
+
+        if (recRows.Count > 0)
         {
-            var isBible = bibleUnits.Contains(unitId);
-            var status = isBible ? "completed" : "needs_remediation";
-            var compDate = isBible ? (DateOnly?)outOfPeriodDate : (DateOnly?)null;
-            var notes = isBible
-                ? $"Completed out-of-period via authorized holiday study session on {outOfPeriodDate:yyyy-MM-dd}"
-                : "Unfulfilled PACE requirements; below passing threshold";
-
             await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    StudentId = timotiusId,
-                    LearningUnitId = unitId,
-                    AcademicPeriodId = sem1Id,
-                    Status = status,
-                    Basis = "assessment_evidence",
-                    CompletionDate = compDate,
-                    Notes = notes,
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                _insertLearningProgressSql,
-                new
-                {
-                    Id = Guid.NewGuid(),
-                    StudentId = timotiusId,
-                    LearningUnitId = unitId,
-                    AcademicPeriodId = sem2Id,
-                    Status = isBible ? "completed" : "not_started",
-                    Basis = isBible ? "assessment_evidence" : "learning_work",
-                    CompletionDate = isBible ? (DateOnly?)DateOnly.FromDateTime(baseDate.AddDays(-10)) : (DateOnly?)null,
-                    Notes = isBible ? "Christian Education completed" : "Pending study session",
-                    CreatedAt = now,
-                    CreatedBy = _createdBy
-                },
-                transaction: transaction,
-                cancellationToken: cancellationToken));
+                _insertPromotionRecommendationSql, recRows, transaction: transaction, cancellationToken: cancellationToken));
         }
-
-        // ---------------------------------------------------------------------
-        // 2. Academic Standings
-        // ---------------------------------------------------------------------
-        // S1 Determinations
-        var rinaStandingS1Id = Guid.NewGuid();
-        var budiStandingS1Id = Guid.NewGuid();
-        var timotiusStandingS1Id = Guid.NewGuid();
-
-        // 2a. Rina Kusuma: good_standing
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = rinaStandingS1Id,
-                StudentId = rinaId,
-                AcademicPeriodId = sem1Id,
-                Standing = "good_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = (string?)null,
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = sem1EndDate.AddDays(2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // 2b. Budi Santoso: conditional_standing with SK Dewan Guru SK-DG/2026/06-01 and math conditions
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = budiStandingS1Id,
-                StudentId = budiStudentId,
-                AcademicPeriodId = sem1Id,
-                Standing = "conditional_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = "Must complete Mathematics remediation during holiday packet and pass reassessment before Grade 5 commencement.",
-                IsException = true,
-                ExceptionReason = "Academic council approval for conditional standing subject to mathematics remediation agreement",
-                CommitteeReference = "SK-DG/2026/06-01",
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = sem1EndDate.AddDays(2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // 2c. Timotius: not_in_good_standing
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = timotiusStandingS1Id,
-                StudentId = timotiusId,
-                AcademicPeriodId = sem1Id,
-                Standing = "not_in_good_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = "Multiple learning units below passing threshold and chronic non-attendance (<75%).",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = sem1EndDate.AddDays(2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // S2 Determinations (Live / active period determinations)
-        var rinaStandingS2Id = Guid.NewGuid();
-        var budiStandingS2Id = Guid.NewGuid();
-        var timotiusStandingS2Id = Guid.NewGuid();
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = rinaStandingS2Id,
-                StudentId = rinaId,
-                AcademicPeriodId = sem2Id,
-                Standing = "good_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = (string?)null,
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = baseDate.AddDays(-2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = budiStandingS2Id,
-                StudentId = budiStudentId,
-                AcademicPeriodId = sem2Id,
-                Standing = "conditional_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = "Must complete Mathematics remediation during holiday packet and pass reassessment before Grade 5 commencement.",
-                IsException = true,
-                ExceptionReason = "Academic council approval for conditional standing subject to mathematics remediation agreement",
-                CommitteeReference = "SK-DG/2026/06-01",
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = baseDate.AddDays(-2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertAcademicStandingSql,
-            new
-            {
-                Id = timotiusStandingS2Id,
-                StudentId = timotiusId,
-                AcademicPeriodId = sem2Id,
-                Standing = "not_in_good_standing",
-                PolicyReference = "SK-AKAD/2026/POLICY-01",
-                Conditions = "Multiple learning units below passing threshold and chronic non-attendance (<75%).",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                DeterminedAt = baseDate.AddDays(-2),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // ---------------------------------------------------------------------
-        // 3. Promotion Recommendations
-        // ---------------------------------------------------------------------
-        // S1 Recommendations
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = rinaId,
-                AcademicPeriodId = sem1Id,
-                AcademicStandingId = (Guid?)rinaStandingS1Id,
-                Recommendation = "promotion_eligible",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = "Grade 5",
-                Conditions = (string?)null,
-                SupportingEvidence = "Completed all Grade 4 PACE units with Good Standing and mastery GPA.",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = sem1EndDate.AddDays(3),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = budiStudentId,
-                AcademicPeriodId = sem1Id,
-                AcademicStandingId = (Guid?)budiStandingS1Id,
-                Recommendation = "conditional_promotion",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = "Grade 5",
-                Conditions = "Conditional advancement granted subject to completion of Math remediation tutoring packet prior to term start.",
-                SupportingEvidence = "Conditional standing certified per SK Dewan Guru SK-DG/2026/06-01; acceptable progress in other 4 core subjects.",
-                IsException = true,
-                ExceptionReason = "Dewan Guru certified conditional promotion with mandatory mathematics tutoring contract",
-                CommitteeReference = "SK-DG/2026/06-01",
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = sem1EndDate.AddDays(3),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = timotiusId,
-                AcademicPeriodId = sem1Id,
-                AcademicStandingId = (Guid?)timotiusStandingS1Id,
-                Recommendation = "retention_recommended",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = (string?)null,
-                Conditions = (string?)null,
-                SupportingEvidence = "Not in good standing. Retention recommended to consolidate foundational PACE units in Grade 4.",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = sem1EndDate.AddDays(3),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // S2 Recommendations
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = rinaId,
-                AcademicPeriodId = sem2Id,
-                AcademicStandingId = (Guid?)rinaStandingS2Id,
-                Recommendation = "promotion_eligible",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = "Grade 5",
-                Conditions = (string?)null,
-                SupportingEvidence = "Completed all Grade 4 PACE units with Good Standing and mastery GPA.",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = baseDate.AddDays(-1),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = budiStudentId,
-                AcademicPeriodId = sem2Id,
-                AcademicStandingId = (Guid?)budiStandingS2Id,
-                Recommendation = "conditional_promotion",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = "Grade 5",
-                Conditions = "Conditional advancement granted subject to completion of Math remediation tutoring packet prior to term start.",
-                SupportingEvidence = "Conditional standing certified per SK Dewan Guru SK-DG/2026/06-01; acceptable progress in other 4 core subjects.",
-                IsException = true,
-                ExceptionReason = "Dewan Guru certified conditional promotion with mandatory mathematics tutoring contract",
-                CommitteeReference = "SK-DG/2026/06-01",
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = baseDate.AddDays(-1),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertPromotionRecommendationSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = timotiusId,
-                AcademicPeriodId = sem2Id,
-                AcademicStandingId = (Guid?)timotiusStandingS2Id,
-                Recommendation = "retention_recommended",
-                FromLevel = "Grade 4",
-                RecommendedToLevel = (string?)null,
-                Conditions = (string?)null,
-                SupportingEvidence = "Not in good standing. Retention recommended to consolidate foundational PACE units in Grade 4.",
-                IsException = false,
-                ExceptionReason = (string?)null,
-                CommitteeReference = (string?)null,
-                AuthorizedBy = "Academic Authority",
-                IssuedAt = baseDate.AddDays(-1),
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
 
         // ---------------------------------------------------------------------
         // 4. Academic Interventions
+        //    Cover 2 of the 7 at-risk learners (Budi + Grace), leaving 5 unaddressed
+        //    Plus Rina's extension_work (Rina is good_standing, not at-risk)
         // ---------------------------------------------------------------------
-        // 4a. Budi Santoso: active Math remediation plan
         await connection.ExecuteAsync(new CommandDefinition(
             _insertInterventionSql,
-            new
+            new[]
             {
-                Id = Guid.NewGuid(),
-                StudentId = budiStudentId,
-                LearningUnitId = mathSubjectId,
-                AcademicPeriodId = sem2Id,
-                InterventionType = "remediation",
-                TriggerType = "assessment_below_threshold",
-                TriggerDescription = "Operative score 68/100 below KKM threshold (80%) in Mathematics",
-                PlanDescription = "Weekly 1-on-1 tutoring sessions and holiday remediation packet",
-                Status = "in_progress",
-                InitiatedBy = "Academic Coordinator",
-                InitiatedAt = now.AddDays(-14),
-                ConcludedAt = (DateTimeOffset?)null,
-                OutcomeNotes = (string?)null,
-                CreatedAt = now,
-                CreatedBy = _createdBy
-            },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
-
-        // 4b. Rina Kusuma: extension_work Advanced Math / Olympiad
-        await connection.ExecuteAsync(new CommandDefinition(
-            _insertInterventionSql,
-            new
-            {
-                Id = Guid.NewGuid(),
-                StudentId = rinaId,
-                LearningUnitId = mathSubjectId,
-                AcademicPeriodId = sem2Id,
-                InterventionType = "extension_work",
-                TriggerType = "teacher_referral",
-                TriggerDescription = "Demonstrated advanced mastery in Mathematics PACE series; recommended for Olympiad enrichment",
-                PlanDescription = "Advanced Math enrichment curriculum and weekly Olympiad problem solving packet",
-                Status = "in_progress",
-                InitiatedBy = "Academic Coordinator",
-                InitiatedAt = now.AddDays(-21),
-                ConcludedAt = (DateTimeOffset?)null,
-                OutcomeNotes = (string?)null,
-                CreatedAt = now,
-                CreatedBy = _createdBy
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = budiStudentId,
+                    LearningUnitId = mathSubjectId,
+                    AcademicPeriodId = sem2Id,
+                    InterventionType = "remediation",
+                    TriggerType = "assessment_below_threshold",
+                    TriggerDescription = "Operative score 68/100 below KKM threshold (80%) in Mathematics",
+                    PlanDescription = "Weekly 1-on-1 tutoring sessions and holiday remediation packet",
+                    Status = "in_progress",
+                    InitiatedBy = "Academic Coordinator",
+                    InitiatedAt = now.AddDays(-14),
+                    ConcludedAt = (DateTimeOffset?)null,
+                    OutcomeNotes = (string?)null,
+                    CreatedAt = now,
+                    CreatedBy = _createdBy
+                },
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = graceId,
+                    LearningUnitId = mathSubjectId,
+                    AcademicPeriodId = sem2Id,
+                    InterventionType = "tutoring_recommendation",
+                    TriggerType = "standing_concern",
+                    TriggerDescription = "Conditional standing following PACE Attempt 1 below 80% KKM",
+                    PlanDescription = "Guided PACE mastery coaching and reassessment preparation",
+                    Status = "in_progress",
+                    InitiatedBy = "Academic Coordinator",
+                    InitiatedAt = now.AddDays(-10),
+                    ConcludedAt = (DateTimeOffset?)null,
+                    OutcomeNotes = (string?)null,
+                    CreatedAt = now,
+                    CreatedBy = _createdBy
+                },
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = rinaId,
+                    LearningUnitId = mathSubjectId,
+                    AcademicPeriodId = sem2Id,
+                    InterventionType = "extension_work",
+                    TriggerType = "teacher_referral",
+                    TriggerDescription = "Demonstrated advanced mastery in Mathematics PACE series; recommended for Olympiad enrichment",
+                    PlanDescription = "Advanced Math enrichment curriculum and weekly Olympiad problem solving packet",
+                    Status = "in_progress",
+                    InitiatedBy = "Academic Coordinator",
+                    InitiatedAt = now.AddDays(-21),
+                    ConcludedAt = (DateTimeOffset?)null,
+                    OutcomeNotes = (string?)null,
+                    CreatedAt = now,
+                    CreatedBy = _createdBy
+                }
             },
             transaction: transaction,
             cancellationToken: cancellationToken));
@@ -1892,60 +1917,441 @@ public sealed class AcademicsActivitiesDemoDataSeeder(
         };
     }
 
-    private static async Task CreateAttendanceRecordsAsync(
+    private static async Task BatchInsertAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        string tableAndColumns,
+        string[] propertyNames,
+        IReadOnlyList<object> rows,
+        CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0) return;
+
+        if (connection is SqlConnection sqlConn && transaction is SqlTransaction sqlTx)
+        {
+            var parenIdx = tableAndColumns.IndexOf('(', StringComparison.Ordinal);
+            var tableName = tableAndColumns[..parenIdx].Trim();
+            var colList = tableAndColumns[(parenIdx + 1)..^1]
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            await SqlBulkInsertAsync(sqlConn, sqlTx, tableName, colList, propertyNames, rows, cancellationToken);
+            return;
+        }
+
+        var rowType = rows[0].GetType();
+        var props = propertyNames.Select(n => rowType.GetProperty(n)!).ToArray();
+        var batchSize = Math.Max(1, Math.Min(150, 1900 / props.Length));
+
+        for (int offset = 0; offset < rows.Count; offset += batchSize)
+        {
+            var chunkCount = Math.Min(batchSize, rows.Count - offset);
+            var sb = new StringBuilder();
+            sb.Append("INSERT INTO ").Append(tableAndColumns).AppendLine(" VALUES");
+
+            var parameters = new DynamicParameters();
+            for (int i = 0; i < chunkCount; i++)
+            {
+                var row = rows[offset + i];
+                if (i > 0) sb.Append(',');
+                sb.Append('(');
+                for (int p = 0; p < props.Length; p++)
+                {
+                    if (p > 0) sb.Append(',');
+                    var paramName = $"p{i}_{p}";
+                    sb.Append('@').Append(paramName);
+                    parameters.Add(paramName, props[p].GetValue(row));
+                }
+                sb.Append(')');
+            }
+
+            sb.Append(';');
+            await connection.ExecuteAsync(new CommandDefinition(
+                sb.ToString(), parameters, transaction: transaction, cancellationToken: cancellationToken));
+        }
+    }
+
+    private static async Task SqlBulkInsertAsync<T>(
+        SqlConnection sqlConn,
+        SqlTransaction sqlTx,
+        string tableName,
+        string[] sqlColumns,
+        string[] propertyNames,
+        IReadOnlyList<T> rows,
+        CancellationToken cancellationToken,
+        string? createdByConstant = null,
+        string? createdByColumn = null)
+    {
+        if (rows.Count == 0) return;
+
+        var rowType = rows[0]!.GetType();
+        var props = propertyNames.Select(n => rowType.GetProperty(n)!).ToArray();
+
+        using var dt = new DataTable();
+        using var bulk = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.CheckConstraints, sqlTx)
+        {
+            DestinationTableName = tableName,
+            BatchSize = 1000
+        };
+
+        for (int i = 0; i < props.Length; i++)
+        {
+            var underlying = Nullable.GetUnderlyingType(props[i].PropertyType) ?? props[i].PropertyType;
+            var colType = underlying == typeof(DateOnly) ? typeof(DateTime) : underlying;
+            dt.Columns.Add(sqlColumns[i], colType);
+            bulk.ColumnMappings.Add(sqlColumns[i], sqlColumns[i]);
+        }
+
+        if (createdByColumn is not null)
+        {
+            dt.Columns.Add(createdByColumn, typeof(string));
+            bulk.ColumnMappings.Add(createdByColumn, createdByColumn);
+        }
+
+        foreach (var row in rows)
+        {
+            var values = new object[dt.Columns.Count];
+            for (int i = 0; i < props.Length; i++)
+            {
+                var val = props[i].GetValue(row);
+                values[i] = val switch
+                {
+                    null => DBNull.Value,
+                    DateOnly d => d.ToDateTime(TimeOnly.MinValue),
+                    _ => val
+                };
+            }
+            if (createdByColumn is not null)
+            {
+                values[props.Length] = createdByConstant ?? _createdBy;
+            }
+            dt.Rows.Add(values);
+        }
+
+        await bulk.WriteToServerAsync(dt, cancellationToken);
+    }
+
+    private sealed record ParticipationBatchRow(
+        Guid Id,
+        Guid StudentId,
+        Guid LearningUnitId,
+        Guid AcademicPeriodId,
+        string AcademicPeriodLabel,
+        string ParticipationType,
+        int AttemptNumber,
+        string Source,
+        string SectionLabel,
+        string Status,
+        DateTime StartDate,
+        DateTime? EndDate,
+        DateTime? CompletionDate);
+
+    private sealed record LearningProgressBatchRow(
+        Guid Id,
+        Guid StudentId,
+        Guid LearningUnitId,
+        Guid AcademicPeriodId,
+        string Status,
+        string Basis,
+        DateOnly? CompletionDate,
+        string Notes,
+        DateTimeOffset CreatedAt);
+
+    private sealed record AttendanceBatchRow(
+        Guid Id,
+        Guid LearningActivityId,
+        Guid StudentId,
+        string Status,
+        string RecordedBy,
+        DateTime RecordedDate);
+
+    private static async Task BatchInsertAcademicParticipationsAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        List<ParticipationBatchRow> rows,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (connection is SqlConnection sqlConn && transaction is SqlTransaction sqlTx)
+        {
+            await SqlBulkInsertAsync(
+                sqlConn,
+                sqlTx,
+                "academics.academic_participations",
+                ["id", "student_id", "learning_unit_id", "academic_period_id", "academic_period_label", "participation_type", "attempt_number", "source", "section_label", "status", "start_date", "end_date", "completion_date"],
+                ["Id", "StudentId", "LearningUnitId", "AcademicPeriodId", "AcademicPeriodLabel", "ParticipationType", "AttemptNumber", "Source", "SectionLabel", "Status", "StartDate", "EndDate", "CompletionDate"],
+                rows,
+                cancellationToken,
+                createdBy,
+                "created_by");
+            return;
+        }
+
+        const int batchSize = 100;
+        for (int offset = 0; offset < rows.Count; offset += batchSize)
+        {
+            var chunkCount = Math.Min(batchSize, rows.Count - offset);
+            var sb = new StringBuilder();
+            sb.AppendLine("""
+                INSERT INTO academics.academic_participations (
+                    id, student_id, learning_unit_id, academic_period_id, academic_period_label,
+                    participation_type, attempt_number, source, section_label, status,
+                    start_date, end_date, completion_date, created_by
+                ) VALUES
+                """);
+
+            var parameters = new DynamicParameters();
+            parameters.Add("CreatedBy", createdBy);
+
+            for (int i = 0; i < chunkCount; i++)
+            {
+                var r = rows[offset + i];
+                if (i > 0) sb.Append(',');
+                sb.Append(CultureInfo.InvariantCulture, $"(@Id{i}, @StudentId{i}, @UnitId{i}, @PeriodId{i}, @PeriodLabel{i}, @PType{i}, @Attempt{i}, @Source{i}, @Section{i}, @Status{i}, @Start{i}, @End{i}, @Comp{i}, @CreatedBy)");
+                parameters.Add($"Id{i}", r.Id);
+                parameters.Add($"StudentId{i}", r.StudentId);
+                parameters.Add($"UnitId{i}", r.LearningUnitId);
+                parameters.Add($"PeriodId{i}", r.AcademicPeriodId);
+                parameters.Add($"PeriodLabel{i}", r.AcademicPeriodLabel);
+                parameters.Add($"PType{i}", r.ParticipationType);
+                parameters.Add($"Attempt{i}", r.AttemptNumber);
+                parameters.Add($"Source{i}", r.Source);
+                parameters.Add($"Section{i}", r.SectionLabel);
+                parameters.Add($"Status{i}", r.Status);
+                parameters.Add($"Start{i}", r.StartDate);
+                parameters.Add($"End{i}", r.EndDate);
+                parameters.Add($"Comp{i}", r.CompletionDate);
+            }
+
+            sb.Append(';');
+            await connection.ExecuteAsync(new CommandDefinition(
+                sb.ToString(), parameters, transaction: transaction, cancellationToken: cancellationToken));
+        }
+    }
+
+    private static async Task BatchInsertLearningProgressAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        List<LearningProgressBatchRow> rows,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (connection is SqlConnection sqlConn && transaction is SqlTransaction sqlTx)
+        {
+            await SqlBulkInsertAsync(
+                sqlConn,
+                sqlTx,
+                "academics.learning_progress",
+                ["id", "student_id", "learning_unit_id", "academic_period_id", "status", "basis", "completion_date", "notes", "created_at"],
+                ["Id", "StudentId", "LearningUnitId", "AcademicPeriodId", "Status", "Basis", "CompletionDate", "Notes", "CreatedAt"],
+                rows,
+                cancellationToken,
+                createdBy,
+                "created_by");
+            return;
+        }
+
+        const int batchSize = 150;
+        for (int offset = 0; offset < rows.Count; offset += batchSize)
+        {
+            var chunkCount = Math.Min(batchSize, rows.Count - offset);
+            var sb = new StringBuilder();
+            sb.AppendLine("""
+                INSERT INTO academics.learning_progress (
+                    id, student_id, learning_unit_id, academic_period_id, status,
+                    basis, completion_date, notes, created_at, created_by
+                ) VALUES
+                """);
+
+            var parameters = new DynamicParameters();
+            parameters.Add("CreatedBy", createdBy);
+
+            for (int i = 0; i < chunkCount; i++)
+            {
+                var r = rows[offset + i];
+                if (i > 0) sb.Append(',');
+                sb.Append(CultureInfo.InvariantCulture, $"(@Id{i}, @StudentId{i}, @UnitId{i}, @PeriodId{i}, @Status{i}, @Basis{i}, @CompDate{i}, @Notes{i}, @CreatedAt{i}, @CreatedBy)");
+                parameters.Add($"Id{i}", r.Id);
+                parameters.Add($"StudentId{i}", r.StudentId);
+                parameters.Add($"UnitId{i}", r.LearningUnitId);
+                parameters.Add($"PeriodId{i}", r.AcademicPeriodId);
+                parameters.Add($"Status{i}", r.Status);
+                parameters.Add($"Basis{i}", r.Basis);
+                parameters.Add($"CompDate{i}", r.CompletionDate);
+                parameters.Add($"Notes{i}", r.Notes);
+                parameters.Add($"CreatedAt{i}", r.CreatedAt);
+            }
+
+            sb.Append(';');
+            await connection.ExecuteAsync(new CommandDefinition(
+                sb.ToString(), parameters, transaction: transaction, cancellationToken: cancellationToken));
+        }
+    }
+
+    private static async Task<int> CreateS1AttendanceRecordsAsync(
         IDbConnection connection,
         IDbTransaction transaction,
         List<Guid> activityIds,
         List<Guid> studentIds,
         Guid jonathanId,
         DateTime periodStart,
-        DateTimeOffset now,
         string createdBy,
         Random random,
         int targetCount,
         CancellationToken cancellationToken)
     {
-        int created = 0;
+        var rows = new List<AttendanceBatchRow>(targetCount);
         foreach (var activityId in activityIds)
         {
-            if (created >= targetCount) break;
+            if (rows.Count >= targetCount) break;
 
             var activityDate = periodStart.AddDays(random.Next(0, 100));
+            var countForActivity = Math.Min(25, targetCount - rows.Count);
             var selectedStudents = studentIds
                 .OrderBy(_ => random.Next())
-                .Take(Math.Min(random.Next(10, 30), studentIds.Count - created))
+                .Take(countForActivity)
                 .ToList();
 
             foreach (var studentId in selectedStudents)
             {
-                if (created >= targetCount) break;
-
                 var status = studentId == jonathanId
                     ? "present"
                     : (random.Next(100) switch
                     {
-                        < 95 => "present",
-                        < 98 => "excused_absence",
+                        < 94 => "present",
+                        < 97 => "excused_absence",
                         < 99 => "late",
                         _ => "absent"
                     });
 
-                await connection.ExecuteAsync(new CommandDefinition(
-                    _insertAttendanceSql,
-                    new
-                    {
-                        Id = Guid.NewGuid(),
-                        LearningActivityId = activityId,
-                        StudentId = studentId,
-                        Status = status,
-                        RecordedBy = "teacher-01",
-                        RecordedDate = activityDate,
-                        CreatedBy = createdBy
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken));
-                created++;
+                rows.Add(new AttendanceBatchRow(
+                    Guid.NewGuid(),
+                    activityId,
+                    studentId,
+                    status,
+                    "teacher-01",
+                    activityDate));
             }
+        }
+
+        await BatchInsertAttendanceRecordsAsync(connection, transaction, rows, createdBy, cancellationToken);
+        return rows.Count;
+    }
+
+    private static async Task<int> CreateS2AttendanceRecordsAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        List<Guid> activityIds,
+        IReadOnlyList<Guid> activeStudentIds,
+        Guid jonathanId,
+        HashSet<Guid> chronicAbsenteeismIds,
+        DateTime periodStart,
+        string createdBy,
+        Random random,
+        CancellationToken cancellationToken)
+    {
+        var rows = new List<AttendanceBatchRow>(520);
+
+        for (int sIdx = 0; sIdx < activeStudentIds.Count; sIdx++)
+        {
+            var studentId = activeStudentIds[sIdx];
+            var isChronic = chronicAbsenteeismIds.Contains(studentId);
+            var isJonathan = studentId == jonathanId;
+            var sessionCount = (isChronic || isJonathan) ? 12 : 11;
+
+            for (int k = 0; k < sessionCount; k++)
+            {
+                var activityId = activityIds[(sIdx + k) % activityIds.Count];
+                var recordedDate = periodStart.AddDays((k * 2) + (sIdx % 3));
+
+                string status;
+                if (isJonathan)
+                {
+                    status = "present";
+                }
+                else if (isChronic)
+                {
+                    // 8 present, 4 absent -> 66.7% (< 80% threshold)
+                    status = k < 8 ? "present" : "absent";
+                }
+                else
+                {
+                    // >= 90.9% attendance (10 present + 1 present/excused_absence/late)
+                    status = k < 10
+                        ? "present"
+                        : ((sIdx % 4) switch
+                        {
+                            0 => "excused_absence",
+                            1 => "late",
+                            _ => "present"
+                        });
+                }
+
+                rows.Add(new AttendanceBatchRow(
+                    Guid.NewGuid(),
+                    activityId,
+                    studentId,
+                    status,
+                    "teacher-01",
+                    recordedDate));
+            }
+        }
+
+        await BatchInsertAttendanceRecordsAsync(connection, transaction, rows, createdBy, cancellationToken);
+        return rows.Count;
+    }
+
+    private static async Task BatchInsertAttendanceRecordsAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        List<AttendanceBatchRow> rows,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (connection is SqlConnection sqlConn && transaction is SqlTransaction sqlTx)
+        {
+            await SqlBulkInsertAsync(
+                sqlConn,
+                sqlTx,
+                "academics.attendance_records",
+                ["id", "learning_activity_id", "student_id", "status", "recorded_by", "recorded_date"],
+                ["Id", "LearningActivityId", "StudentId", "Status", "RecordedBy", "RecordedDate"],
+                rows,
+                cancellationToken,
+                createdBy,
+                "created_by");
+            return;
+        }
+
+        const int batchSize = 200;
+        for (int offset = 0; offset < rows.Count; offset += batchSize)
+        {
+            var chunkCount = Math.Min(batchSize, rows.Count - offset);
+            var sb = new StringBuilder();
+            sb.AppendLine("""
+                INSERT INTO academics.attendance_records (
+                    id, learning_activity_id, student_id, status, recorded_by, recorded_date,
+                    created_by
+                ) VALUES
+                """);
+
+            var parameters = new DynamicParameters();
+            parameters.Add("CreatedBy", createdBy);
+
+            for (int i = 0; i < chunkCount; i++)
+            {
+                var r = rows[offset + i];
+                if (i > 0) sb.Append(',');
+                sb.Append(CultureInfo.InvariantCulture, $"(@Id{i}, @ActId{i}, @StdId{i}, @Status{i}, @RecBy{i}, @RecDate{i}, @CreatedBy)");
+                parameters.Add($"Id{i}", r.Id);
+                parameters.Add($"ActId{i}", r.LearningActivityId);
+                parameters.Add($"StdId{i}", r.StudentId);
+                parameters.Add($"Status{i}", r.Status);
+                parameters.Add($"RecBy{i}", r.RecordedBy);
+                parameters.Add($"RecDate{i}", r.RecordedDate);
+            }
+
+            sb.Append(';');
+            await connection.ExecuteAsync(new CommandDefinition(
+                sb.ToString(), parameters, transaction: transaction, cancellationToken: cancellationToken));
         }
     }
 

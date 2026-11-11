@@ -17,7 +17,8 @@ public sealed class TeachingDemoDataSeeder(
     ISqlConnectionFactory connectionFactory) : ITeachingDemoDataSeeder
 {
     private const string _createdBy = "demo-data-seeder";
-    private const string _campusMain = "Kampus Utama";
+    private const string _campusMain = "campus-main";
+    private const string _campusEast = "campus-east";
     private const string _kepalaSekolah = "Kepala Sekolah";
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -39,6 +40,18 @@ public sealed class TeachingDemoDataSeeder(
     private static readonly Guid _johnAuthorizationId = new("00000000-0000-0000-0007-000000000033");
 
     private static readonly Guid _hendraCoachingEvidenceId = new("00000000-0000-0000-0007-000000000041");
+
+    // Additional KPI-enrichment faculty profiles (Dewi Lestari on campus-main, Yohanes Prabowo on campus-east)
+    internal static readonly Guid DewiLestariTeacherId = new("00000000-0000-0000-0006-000000000005");
+    internal static readonly Guid YohanesPrabowoTeacherId = new("00000000-0000-0000-0006-000000000006");
+
+    private static readonly Guid _dewiSciCapabilityId = new("00000000-0000-0000-0007-000000000051");
+    private static readonly Guid _dewiDegreeEvidenceId = new("00000000-0000-0000-0007-000000000052");
+    private static readonly Guid _dewiAuthorizationId = new("00000000-0000-0000-0007-000000000053");
+
+    private static readonly Guid _yohanesMathCapabilityId = new("00000000-0000-0000-0007-000000000061");
+    private static readonly Guid _yohanesDegreeEvidenceId = new("00000000-0000-0000-0007-000000000062");
+    private static readonly Guid _yohanesAuthorizationId = new("00000000-0000-0000-0007-000000000063");
 
     /// <inheritdoc/>
     public async Task<TeachingSeedResult> SeedTeachingAsync(
@@ -67,6 +80,12 @@ public sealed class TeachingDemoDataSeeder(
 
         // 5. Seed Persona 4: Hendra Setiawan (Pending Onboarding Candidate)
         await SeedPersona4HendraSetiawanAsync(connection, baseDate, now, roleMap["GURU_KONTRAK"], qualTypeMap, cancellationToken);
+
+        // 6. Seed Persona 5: Dewi Lestari, S.Pd. (campus-main, Permanent Teacher)
+        await SeedPersona5DewiLestariAsync(connection, baseDate, now, roleMap["GURU_TETAP"], capTypeMap, qualTypeMap, cancellationToken);
+
+        // 7. Seed Persona 6: Yohanes Prabowo, M.Pd. (campus-east, Permanent Teacher)
+        await SeedPersona6YohanesPrabowoAsync(connection, baseDate, now, roleMap["GURU_TETAP"], capTypeMap, qualTypeMap, cancellationToken);
 
         // Aggregate counts
         var rolesCount = await connection.ExecuteScalarAsync<int>(new CommandDefinition("SELECT COUNT(*) FROM teaching.teaching_roles;", cancellationToken: cancellationToken));
@@ -999,5 +1018,349 @@ public sealed class TeachingDemoDataSeeder(
             cancellationToken: cancellationToken));
 
         // Persona 4 has zero authorizations.
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Persona 5: Dewi Lestari, S.Pd. (campus-main)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static async Task SeedPersona5DewiLestariAsync(
+        System.Data.Common.DbConnection connection,
+        DateTime baseDate,
+        DateTimeOffset now,
+        Guid roleId,
+        IReadOnlyDictionary<string, Guid> capTypeMap,
+        IReadOnlyDictionary<string, Guid> qualTypeMap,
+        CancellationToken cancellationToken)
+    {
+        var teacherId = DewiLestariTeacherId;
+        var effectiveFrom = baseDate.AddYears(-3);
+
+        const string insertProfileSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teacher_profiles WHERE id = @Id OR teacher_number = @TeacherNumber)
+            BEGIN
+                INSERT INTO teaching.teacher_profiles (
+                    id, teacher_number, full_name, display_name, employee_ref, national_id_or_external_ref,
+                    email, phone, teaching_role_id, campus_affiliation, department, standing,
+                    effective_from, effective_to, standing_reason, approved_by, approved_date,
+                    notes, created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherNumber, @FullName, @DisplayName, @EmployeeRef, @NationalId,
+                    @Email, @Phone, @TeachingRoleId, @CampusAffiliation, @Department, 'active',
+                    @EffectiveFrom, NULL, @StandingReason, @ApprovedBy, @ApprovedDate,
+                    @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertProfileSql,
+            new
+            {
+                Id = teacherId,
+                TeacherNumber = "TCH-2026-0016",
+                FullName = "Dewi Lestari",
+                DisplayName = "Dewi Lestari, S.Pd.",
+                EmployeeRef = "EMP-00105",
+                NationalId = "3273010404850005",
+                Email = "dewi.lestari@hagios.sch.id",
+                Phone = "+6281277788899",
+                TeachingRoleId = roleId,
+                CampusAffiliation = _campusMain,
+                Department = "Matematika & IPA",
+                EffectiveFrom = effectiveFrom,
+                StandingReason = "Guru Tetap IPA jenjang SD Kampus Utama.",
+                ApprovedBy = _kepalaSekolah,
+                ApprovedDate = effectiveFrom,
+                Notes = "Full-time Natural Sciences teacher on campus-main.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertCapSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_capabilities WHERE id = @Id)
+            BEGIN
+                INSERT INTO teaching.teaching_capabilities (
+                    id, teacher_profile_id, capability_type_id, capability_code, capability_name,
+                    applicable_level, delivery_mode, language_of_instruction, status, notes,
+                    created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherProfileId, @CapabilityTypeId, @CapabilityCode, @CapabilityName,
+                    @ApplicableLevel, @DeliveryMode, @Language, 'active', @Notes,
+                    @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertCapSql,
+            new
+            {
+                Id = _dewiSciCapabilityId,
+                TeacherProfileId = teacherId,
+                CapabilityTypeId = capTypeMap["SUBJECT_INSTRUCTION"],
+                CapabilityCode = "IPA_PRIMARY",
+                CapabilityName = "IPA SD",
+                ApplicableLevel = "SD Kelas 1-6",
+                DeliveryMode = "face_to_face",
+                Language = "id",
+                Notes = "Pengajaran IPA terpadu jenjang dasar.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertEvidenceSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.qualification_evidence WHERE id = @Id)
+            BEGIN
+                INSERT INTO teaching.qualification_evidence (
+                    id, teacher_profile_id, qualification_type_id, title, issuing_authority,
+                    credential_identifier, issue_date, expiry_date, document_reference,
+                    verification_state, verified_by, verified_date, verification_notes,
+                    created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherProfileId, @QualificationTypeId, @Title, @IssuingAuthority,
+                    @CredentialIdentifier, @IssueDate, @ExpiryDate, @DocumentRef,
+                    @VerificationState, @VerifiedBy, @VerifiedDate, @VerificationNotes,
+                    @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertEvidenceSql,
+            new
+            {
+                Id = _dewiDegreeEvidenceId,
+                TeacherProfileId = teacherId,
+                QualificationTypeId = qualTypeMap["IJAZAH_S1"],
+                Title = "Sarjana Pendidikan IPA",
+                IssuingAuthority = "Universitas Negeri Yogyakarta (UNY)",
+                CredentialIdentifier = "UNY-IPA-2016-3318",
+                IssueDate = baseDate.AddYears(-8),
+                ExpiryDate = (DateTime?)null,
+                DocumentRef = "docs/credentials/dewi_lestari_s1.pdf",
+                VerificationState = "verified",
+                VerifiedBy = _kepalaSekolah,
+                VerifiedDate = (DateTime?)effectiveFrom,
+                VerificationNotes = "Ijazah S1 Pendidikan IPA terverifikasi.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertAuthSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_authorizations WHERE id = @Id OR authorization_number = @AuthNumber)
+            BEGIN
+                INSERT INTO teaching.teaching_authorizations (
+                    id, authorization_number, teacher_profile_id, authorized_capability_id,
+                    scope_description, campus_scope, program_scope, level_scope, delivery_mode_scope,
+                    status, unverified_credential_warning, effective_start_date, effective_end_date,
+                    decision_authority, approved_date, notes, created_at, created_by
+                ) VALUES (
+                    @Id, @AuthNumber, @TeacherProfileId, @AuthorizedCapabilityId,
+                    @ScopeDescription, @CampusScope, @ProgramScope, @LevelScope, @DeliveryModeScope,
+                    @Status, 0, @EffectiveStartDate, @EffectiveEndDate,
+                    @DecisionAuthority, @ApprovedDate, @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAuthSql,
+            new
+            {
+                Id = _dewiAuthorizationId,
+                AuthNumber = "AUTH-2026-0048",
+                TeacherProfileId = teacherId,
+                AuthorizedCapabilityId = _dewiSciCapabilityId,
+                ScopeDescription = "IPA SD Kelas 1–6 Tatap Muka",
+                CampusScope = _campusMain,
+                ProgramScope = "SD",
+                LevelScope = "Kelas 1-6",
+                DeliveryModeScope = "face_to_face",
+                Status = "active",
+                EffectiveStartDate = baseDate.AddMonths(-6),
+                EffectiveEndDate = (DateTime?)baseDate.AddMonths(12),
+                DecisionAuthority = _kepalaSekolah,
+                ApprovedDate = baseDate.AddMonths(-6),
+                Notes = "Otorisasi penuh pengajaran IPA SD Kampus Utama.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Persona 6: Yohanes Prabowo, M.Pd. (campus-east)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static async Task SeedPersona6YohanesPrabowoAsync(
+        System.Data.Common.DbConnection connection,
+        DateTime baseDate,
+        DateTimeOffset now,
+        Guid roleId,
+        IReadOnlyDictionary<string, Guid> capTypeMap,
+        IReadOnlyDictionary<string, Guid> qualTypeMap,
+        CancellationToken cancellationToken)
+    {
+        var teacherId = YohanesPrabowoTeacherId;
+        var effectiveFrom = baseDate.AddYears(-2);
+
+        const string insertProfileSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teacher_profiles WHERE id = @Id OR teacher_number = @TeacherNumber)
+            BEGIN
+                INSERT INTO teaching.teacher_profiles (
+                    id, teacher_number, full_name, display_name, employee_ref, national_id_or_external_ref,
+                    email, phone, teaching_role_id, campus_affiliation, department, standing,
+                    effective_from, effective_to, standing_reason, approved_by, approved_date,
+                    notes, created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherNumber, @FullName, @DisplayName, @EmployeeRef, @NationalId,
+                    @Email, @Phone, @TeachingRoleId, @CampusAffiliation, @Department, 'active',
+                    @EffectiveFrom, NULL, @StandingReason, @ApprovedBy, @ApprovedDate,
+                    @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertProfileSql,
+            new
+            {
+                Id = teacherId,
+                TeacherNumber = "TCH-2026-0017",
+                FullName = "Yohanes Prabowo",
+                DisplayName = "Yohanes Prabowo, M.Pd.",
+                EmployeeRef = "EMP-00106",
+                NationalId = "3273010505830006",
+                Email = "yohanes.prabowo@hagios.sch.id",
+                Phone = "+6281266677788",
+                TeachingRoleId = roleId,
+                CampusAffiliation = _campusEast,
+                Department = "Matematika & IPA",
+                EffectiveFrom = effectiveFrom,
+                StandingReason = "Guru Tetap Matematika jenjang SMP Kampus East.",
+                ApprovedBy = _kepalaSekolah,
+                ApprovedDate = effectiveFrom,
+                Notes = "Full-time Mathematics teacher assigned to campus-east.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertCapSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_capabilities WHERE id = @Id)
+            BEGIN
+                INSERT INTO teaching.teaching_capabilities (
+                    id, teacher_profile_id, capability_type_id, capability_code, capability_name,
+                    applicable_level, delivery_mode, language_of_instruction, status, notes,
+                    created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherProfileId, @CapabilityTypeId, @CapabilityCode, @CapabilityName,
+                    @ApplicableLevel, @DeliveryMode, @Language, 'active', @Notes,
+                    @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertCapSql,
+            new
+            {
+                Id = _yohanesMathCapabilityId,
+                TeacherProfileId = teacherId,
+                CapabilityTypeId = capTypeMap["SUBJECT_INSTRUCTION"],
+                CapabilityCode = "MATH_JUNIOR",
+                CapabilityName = "Matematika SMP",
+                ApplicableLevel = "SMP Kelas 7-9",
+                DeliveryMode = "face_to_face",
+                Language = "id",
+                Notes = "Pengajaran Matematika SMP Kampus East.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertEvidenceSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.qualification_evidence WHERE id = @Id)
+            BEGIN
+                INSERT INTO teaching.qualification_evidence (
+                    id, teacher_profile_id, qualification_type_id, title, issuing_authority,
+                    credential_identifier, issue_date, expiry_date, document_reference,
+                    verification_state, verified_by, verified_date, verification_notes,
+                    created_at, created_by
+                ) VALUES (
+                    @Id, @TeacherProfileId, @QualificationTypeId, @Title, @IssuingAuthority,
+                    @CredentialIdentifier, @IssueDate, @ExpiryDate, @DocumentRef,
+                    @VerificationState, @VerifiedBy, @VerifiedDate, @VerificationNotes,
+                    @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertEvidenceSql,
+            new
+            {
+                Id = _yohanesDegreeEvidenceId,
+                TeacherProfileId = teacherId,
+                QualificationTypeId = qualTypeMap["IJAZAH_S2"],
+                Title = "Magister Pendidikan Matematika",
+                IssuingAuthority = "Universitas Sanata Dharma (USD)",
+                CredentialIdentifier = "USD-MAT-2019-1120",
+                IssueDate = baseDate.AddYears(-6),
+                ExpiryDate = (DateTime?)null,
+                DocumentRef = "docs/credentials/yohanes_prabowo_s2.pdf",
+                VerificationState = "verified",
+                VerifiedBy = _kepalaSekolah,
+                VerifiedDate = (DateTime?)effectiveFrom,
+                VerificationNotes = "Ijazah S2 Pendidikan Matematika terverifikasi.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        const string insertAuthSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_authorizations WHERE id = @Id OR authorization_number = @AuthNumber)
+            BEGIN
+                INSERT INTO teaching.teaching_authorizations (
+                    id, authorization_number, teacher_profile_id, authorized_capability_id,
+                    scope_description, campus_scope, program_scope, level_scope, delivery_mode_scope,
+                    status, unverified_credential_warning, effective_start_date, effective_end_date,
+                    decision_authority, approved_date, notes, created_at, created_by
+                ) VALUES (
+                    @Id, @AuthNumber, @TeacherProfileId, @AuthorizedCapabilityId,
+                    @ScopeDescription, @CampusScope, @ProgramScope, @LevelScope, @DeliveryModeScope,
+                    @Status, 0, @EffectiveStartDate, @EffectiveEndDate,
+                    @DecisionAuthority, @ApprovedDate, @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAuthSql,
+            new
+            {
+                Id = _yohanesAuthorizationId,
+                AuthNumber = "AUTH-2026-0049",
+                TeacherProfileId = teacherId,
+                AuthorizedCapabilityId = _yohanesMathCapabilityId,
+                ScopeDescription = "Matematika SMP Kelas 7–9 Kampus East",
+                CampusScope = _campusEast,
+                ProgramScope = "SMP",
+                LevelScope = "Kelas 7-9",
+                DeliveryModeScope = "face_to_face",
+                Status = "active",
+                EffectiveStartDate = baseDate.AddMonths(-6),
+                EffectiveEndDate = (DateTime?)baseDate.AddMonths(12),
+                DecisionAuthority = _kepalaSekolah,
+                ApprovedDate = baseDate.AddMonths(-6),
+                Notes = "Otorisasi penuh pengajaran Matematika SMP Kampus East.",
+                CreatedAt = now,
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
     }
 }

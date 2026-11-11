@@ -553,7 +553,7 @@ public sealed class TeachingAuthorizationsAndModuleIntegrationTests(IntegrationT
         seedResult.RolesCreated.Should().BeGreaterThan(0);
         seedResult.CapabilityTypesCreated.Should().BeGreaterThan(0);
         seedResult.QualificationTypesCreated.Should().BeGreaterThan(0);
-        seedResult.TeacherProfilesCreated.Should().Be(4);
+        seedResult.TeacherProfilesCreated.Should().Be(6);
         seedResult.AuthorizationsCreated.Should().BeGreaterThan(0);
 
         // Verify deterministic persona identifiers match DemoDataConstants

@@ -1,4 +1,5 @@
 import type {
+  GetCapacityConflictsParams,
   GetWorkloadCommitmentsParams,
   GetWorkloadExceptionsParams,
   GetWorkloadPoliciesParams,
@@ -29,6 +30,11 @@ export const workloadKeys = {
     id !== undefined && id !== null && id !== ''
       ? ([...workloadKeys.exceptions(), id] as const)
       : ([...workloadKeys.exceptions()] as const),
+  conflicts: () => [...workloadKeys.all, 'conflicts'] as const,
+  conflictList: (params?: GetCapacityConflictsParams) =>
+    params !== undefined
+      ? ([...workloadKeys.conflicts(), params] as const)
+      : ([...workloadKeys.conflicts()] as const),
 };
 
 export const teachingWorkloadKeys = workloadKeys;

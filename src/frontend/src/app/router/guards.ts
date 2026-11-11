@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router';
 import { useAuthStore } from '@/app/stores/auth.store';
+import { isAuthorizedForAnyRule } from './dashboardAccess';
 
 export const APP_TITLE_SUFFIX = 'Elsasa SIS';
 
@@ -42,71 +43,78 @@ export function setupNavigationGuards(router: Router): void {
       return `/auth/login?redirect=${encodeURIComponent(to.fullPath)}`;
     }
 
-    // 2. Permission barrier: Route requires a specific actor permission
-    if (to.meta.permission) {
-      const isAllowed =
-        authStore.hasPermission(to.meta.permission) ||
-        (to.meta.permission === 'academics.curriculum.view' &&
-          (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
-            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
-        ((to.meta.permission === 'academics:learning-plans:view' ||
-          to.meta.permission === 'academics.learning_plans.view' ||
-          to.meta.permission === 'Permissions.Academics.LearningPlans.View') &&
-          (authStore.hasPermission('Permissions.Academics.LearningPlans.View') ||
-            authStore.hasPermission('academics:learning-plans:view') ||
-            authStore.hasPermission('academics.learning_plans.view') ||
-            authStore.hasAnyRole([
-              'AcademicCoordinator',
-              'AcademicAuthority',
-              'Teacher',
-              'StudentDevelopmentOfficer',
-              'Admin',
-            ]))) ||
-        (to.meta.permission === 'academics.participations.view' &&
-          (authStore.hasPermission('Permissions.Academics.Participations.View') ||
-            authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
-        (to.meta.permission === 'academics.activities.view' &&
-          (authStore.hasPermission('Permissions.Academics.Activities.View') ||
-            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
-        (to.meta.permission === 'academics.assignments.view' &&
-          (authStore.hasPermission('Permissions.Academics.Assignments.View') ||
-            authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
-        (to.meta.permission === 'academics.interventions.view' &&
-          (authStore.hasPermission('Permissions.Academics.Interventions.View') ||
-            authStore.hasAnyRole(['AcademicCoordinator', 'Teacher', 'AcademicAuthority', 'Admin']))) ||
-        (to.meta.permission === 'academics.standings.view' &&
-          (authStore.hasPermission('Permissions.Academics.Standings.View') ||
-            authStore.hasAnyRole(['AcademicAuthority', 'Admin']))) ||
-        ((to.meta.permission === 'Permissions.Teaching.Faculty.View' ||
-          to.meta.permission === 'teaching.faculty.view') &&
-          (authStore.hasPermission('Permissions.Teaching.Faculty.View') ||
-            authStore.hasPermission('teaching.faculty.view') ||
-            authStore.hasAnyRole(['TeachingAuthority', 'TeachingCoordinator', 'Admin']))) ||
-        ((to.meta.permission === 'Permissions.Teaching.Assignments.View' ||
-          to.meta.permission === 'teaching.assignments.view') &&
-          (authStore.hasPermission('Permissions.Teaching.Assignments.View') ||
-            authStore.hasPermission('teaching.assignments.view') ||
-            authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
-        ((to.meta.permission === 'Permissions.Teaching.Workload.View' ||
-          to.meta.permission === 'teaching.workload.view') &&
-          (authStore.hasPermission('Permissions.Teaching.Workload.View') ||
-            authStore.hasPermission('teaching.workload.view') ||
-            authStore.hasAnyRole(['TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
-        ((to.meta.permission === 'Permissions.Teaching.Availability.Declare' ||
-          to.meta.permission === 'teaching.availability.declare') &&
-          (authStore.hasPermission('Permissions.Teaching.Availability.Declare') ||
-            authStore.hasPermission('teaching.availability.declare') ||
-            authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'Admin'])));
-
-      if (!isAllowed) {
+    // 2. OR-based policy barrier (e.g. Level 2 domain dashboards: allowed permission OR allowed role, excluding self-service roles)
+    if (to.meta.authMode === 'any') {
+      if (!isAuthorizedForAnyRule(to.meta, authStore)) {
         return '/403';
       }
-    }
+    } else {
+      // 2a. Permission barrier: Route requires a specific actor permission
+      if (to.meta.permission) {
+        const isAllowed =
+          authStore.hasPermission(to.meta.permission) ||
+          (to.meta.permission === 'academics.curriculum.view' &&
+            (authStore.hasPermission('Permissions.Academics.Curriculum.View') ||
+              authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+          ((to.meta.permission === 'academics:learning-plans:view' ||
+            to.meta.permission === 'academics.learning_plans.view' ||
+            to.meta.permission === 'Permissions.Academics.LearningPlans.View') &&
+            (authStore.hasPermission('Permissions.Academics.LearningPlans.View') ||
+              authStore.hasPermission('academics:learning-plans:view') ||
+              authStore.hasPermission('academics.learning_plans.view') ||
+              authStore.hasAnyRole([
+                'AcademicCoordinator',
+                'AcademicAuthority',
+                'Teacher',
+                'StudentDevelopmentOfficer',
+                'Admin',
+              ]))) ||
+          (to.meta.permission === 'academics.participations.view' &&
+            (authStore.hasPermission('Permissions.Academics.Participations.View') ||
+              authStore.hasAnyRole(['AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+          (to.meta.permission === 'academics.activities.view' &&
+            (authStore.hasPermission('Permissions.Academics.Activities.View') ||
+              authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+          (to.meta.permission === 'academics.assignments.view' &&
+            (authStore.hasPermission('Permissions.Academics.Assignments.View') ||
+              authStore.hasAnyRole(['Teacher', 'AcademicCoordinator', 'AcademicAuthority', 'Admin']))) ||
+          (to.meta.permission === 'academics.interventions.view' &&
+            (authStore.hasPermission('Permissions.Academics.Interventions.View') ||
+              authStore.hasAnyRole(['AcademicCoordinator', 'Teacher', 'AcademicAuthority', 'Admin']))) ||
+          (to.meta.permission === 'academics.standings.view' &&
+            (authStore.hasPermission('Permissions.Academics.Standings.View') ||
+              authStore.hasAnyRole(['AcademicAuthority', 'Admin']))) ||
+          ((to.meta.permission === 'Permissions.Teaching.Faculty.View' ||
+            to.meta.permission === 'teaching.faculty.view') &&
+            (authStore.hasPermission('Permissions.Teaching.Faculty.View') ||
+              authStore.hasPermission('teaching.faculty.view') ||
+              authStore.hasAnyRole(['TeachingAuthority', 'TeachingCoordinator', 'Admin']))) ||
+          ((to.meta.permission === 'Permissions.Teaching.Assignments.View' ||
+            to.meta.permission === 'teaching.assignments.view') &&
+            (authStore.hasPermission('Permissions.Teaching.Assignments.View') ||
+              authStore.hasPermission('teaching.assignments.view') ||
+              authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
+          ((to.meta.permission === 'Permissions.Teaching.Workload.View' ||
+            to.meta.permission === 'teaching.workload.view') &&
+            (authStore.hasPermission('Permissions.Teaching.Workload.View') ||
+              authStore.hasPermission('teaching.workload.view') ||
+              authStore.hasAnyRole(['TeachingCoordinator', 'TeachingAuthority', 'Admin']))) ||
+          ((to.meta.permission === 'Permissions.Teaching.Availability.Declare' ||
+            to.meta.permission === 'teaching.availability.declare') &&
+            (authStore.hasPermission('Permissions.Teaching.Availability.Declare') ||
+              authStore.hasPermission('teaching.availability.declare') ||
+              authStore.hasAnyRole(['Teacher', 'TeachingCoordinator', 'Admin'])));
 
-    // 3. Role barrier: Route requires specific role(s)
-    if (to.meta.roles && Array.isArray(to.meta.roles) && to.meta.roles.length > 0) {
-      if (!authStore.hasAnyRole(to.meta.roles as string[])) {
-        return '/403';
+        if (!isAllowed) {
+          return '/403';
+        }
+      }
+
+      // 2b. Role barrier: Route requires specific role(s)
+      if (to.meta.roles && Array.isArray(to.meta.roles) && to.meta.roles.length > 0) {
+        if (!authStore.hasAnyRole(to.meta.roles as string[])) {
+          return '/403';
+        }
       }
     }
 

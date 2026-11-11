@@ -104,10 +104,12 @@ using Elsasa.Sis.Academics.Features.StudentLearningPlans.SubmitStudentLearningPl
 using Elsasa.Sis.Academics.Features.StudentLearningPlans.SyncSlpParticipations;
 using Elsasa.Sis.Academics.Features.StudentLearningPlans.UpdateStudentLearningPlan;
 using Elsasa.Sis.Academics.Features.DemoData;
+using Elsasa.Sis.Academics.Features.Kpis.GetAcademicsKpiDashboard;
 using Elsasa.Sis.Academics.Services;
 using Elsasa.Sis.Academics.Services.Reassessment;
 using Elsasa.Sis.Contracts.Academics;
 using Elsasa.Sis.Contracts.DemoData;
+using Elsasa.Sis.Contracts.Kpis;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -314,6 +316,10 @@ public static class DependencyInjection
 
         // Assessment Reassessment Policy Evaluator domain service (TD-03, P3-S07)
         services.AddSingleton<IReassessmentPolicyEvaluator, ReassessmentPolicyEvaluator>();
+
+        // Academics KPI Dashboard & Executive Summary Provider (CR-KPI-EXECUTIVE-DOMAIN-DASHBOARDS, P3-S06)
+        services.AddScoped<GetAcademicsKpiDashboardHandler>();
+        services.AddScoped<IDomainKpiSummaryProvider, AcademicsKpiSummaryProvider>();
 
         // FluentValidation validators in Academics assembly
         services.AddValidatorsFromAssemblyContaining<AcademicsAssemblyMarker>();

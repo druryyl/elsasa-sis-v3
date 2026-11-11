@@ -32,7 +32,9 @@ import {
 } from '@/shared/components';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { formatDisplayDate } from '@/shared/utils/dateUtils';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
+import type { FacultyQueueFilter, RegisterTeacherProfileResponse } from '../api/teachingTypes';
 import { TEACHING_PERMISSIONS } from '../constants/permissions';
 import { useTeacherProfileQuery } from '../composables/useFacultyQueries';
 import FacultyQueueSidebar from '../components/FacultyQueueSidebar.vue';
@@ -45,7 +47,6 @@ import AuthorizationsSupervisionTab from '../components/AuthorizationsSupervisio
 import CorrectionsAuditTab from '../components/CorrectionsAuditTab.vue';
 import ChangeStandingModal from '../components/ChangeStandingModal.vue';
 import RecordCorrectionModal from '../components/RecordCorrectionModal.vue';
-import type { RegisterTeacherProfileResponse } from '../api/teachingTypes';
 
 // ---------------------------------------------------------------------------
 // 1. Navigation & Breadcrumbs
@@ -130,8 +131,31 @@ const {
 
 const teacher = computed(() => dossier.value ?? null);
 
-// Active Tab state
+// Active Tab & Verification State Filter
 const activeTab = ref('profile');
+const sidebarQueueFilter = ref<FacultyQueueFilter>('all');
+const verificationStateFilter = ref<string>('');
+
+useRouteQueryHydration((query) => {
+  const teacherId = getQueryString(query, 'teacherId');
+  if (teacherId) {
+    selectedTeacherId.value = teacherId;
+  }
+
+  const verificationState = getQueryString(query, 'verificationState');
+  if (verificationState) {
+    verificationStateFilter.value = verificationState;
+    if (verificationState.toLowerCase() === 'submitted' || verificationState.toLowerCase() === 'pending') {
+      sidebarQueueFilter.value = 'pending_verification';
+    }
+    activeTab.value = 'qualifications';
+  }
+
+  const tab = getQueryString(query, 'tab');
+  if (tab) {
+    activeTab.value = tab;
+  }
+});
 
 // Registration Modal open flag (P8-S24)
 const isRegisterModalOpen = ref(false);
@@ -208,6 +232,7 @@ function handleOpenRecordCorrection() {
         <FacultyQueueSidebar
           :selected-teacher-id="selectedTeacherId"
           :can-register="canManage"
+          :initial-queue-filter="sidebarQueueFilter"
           @select="handleSelectTeacher"
           @register="handleOpenRegister"
         />
@@ -408,6 +433,7 @@ function handleOpenRecordCorrection() {
                     :teacher="teacher"
                     :can-manage="canManage"
                     :can-verify="canVerify"
+                    :initial-verification-state="verificationStateFilter"
                     @refresh="refetchDossier()"
                   />
                 </TabPanel>

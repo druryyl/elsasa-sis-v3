@@ -16,7 +16,8 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
     ISqlConnectionFactory connectionFactory) : ITeachingAssignmentsDemoDataSeeder
 {
     private const string _createdBy = "demo-data-seeder";
-    private const string _campusMain = "Kampus Utama";
+    private const string _campusMain = "campus-main";
+    private const string _campusEast = "campus-east";
     private const string _kepalaSekolah = "Kepala Sekolah";
     private const string _coordinator = "Teaching Coordinator";
 
@@ -43,6 +44,9 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
     private static readonly Guid _demandJohnImmersionId = new("00000000-0000-0000-0007-000000000404");
     private static readonly Guid _demandHendraPendingId = new("00000000-0000-0000-0007-000000000405");
     private static readonly Guid _demandHistoricalConcludedId = new("00000000-0000-0000-0007-000000000406");
+    private static readonly Guid _demandEastOpenId = new("00000000-0000-0000-0007-000000000407");
+    private static readonly Guid _demandDewiSciId = new("00000000-0000-0000-0007-000000000408");
+    private static readonly Guid _demandYohanesMathId = new("00000000-0000-0000-0007-000000000409");
 
     // Deterministic Assignments GUIDs
     private static readonly Guid _assignmentBudiMathId = new("00000000-0000-0000-0007-000000000501");
@@ -51,6 +55,8 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
     private static readonly Guid _assignmentJohnImmersionId = new("00000000-0000-0000-0007-000000000504");
     private static readonly Guid _assignmentHistoricalConcludedId = new("00000000-0000-0000-0007-000000000505");
     private static readonly Guid _assignmentBudiHandoverReplacedId = new("00000000-0000-0000-0007-000000000506");
+    private static readonly Guid _assignmentDewiSciId = new("00000000-0000-0000-0007-000000000507");
+    private static readonly Guid _assignmentYohanesMathId = new("00000000-0000-0000-0007-000000000508");
 
     // Deterministic Operations & Workflow GUIDs
     private static readonly Guid _subBudiMedicalId = new("00000000-0000-0000-0007-000000000601");
@@ -132,6 +138,16 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
             baseDate,
             now,
             activePeriodId,
+            sciUnitId,
+            cancellationToken);
+
+        // 8. Seed KPI-Enriched Faculty Commitments (breached, approaching_limit), Open East Demand, and Unresolved Conflicts
+        await SeedAdditionalFacultyAndConflictsAsync(
+            connection,
+            baseDate,
+            now,
+            activePeriodId,
+            mathUnitId,
             sciUnitId,
             cancellationToken);
 
@@ -826,7 +842,7 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
             },
             cancellationToken: cancellationToken));
 
-        // 5. Workload Commitment for Siti (4 hrs committed)
+        // 5. Workload Commitment for Siti (4 hrs committed -> under_allocated band)
         const string insertCommitmentSql = """
             IF NOT EXISTS (SELECT 1 FROM teaching.workload_commitments WHERE teacher_profile_id = @TeacherId AND academic_period_id = @PeriodId)
             BEGIN
@@ -838,7 +854,7 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
                 ) VALUES (
                     NEWID(), @TeacherId, @PeriodId, @PolicyId,
                     0.00, 4.00, 24.00,
-                    20.00, 'normal', 1, 0,
+                    20.00, 'under_allocated', 1, 0,
                     SYSUTCDATETIME(), @CreatedAt, @CreatedBy
                 );
             END;
@@ -1248,6 +1264,331 @@ public sealed class TeachingAssignmentsDemoDataSeeder(
 
         await RecordHistoryEntryAsync(connection, budiId, "ReassignmentApproved", "teaching_reassignments", _reaBudiToSitiId, effDate, "KepalaSekolah", _kepalaSekolah, "Pengalihan permanen tanggung jawab ajar (REA-2026-0001) kepada Siti Nurhaliza disetujui", now.AddDays(-60), cancellationToken);
         await RecordHistoryEntryAsync(connection, sitiId, "ReassignmentApproved", "teaching_reassignments", _reaBudiToSitiId, effDate, "KepalaSekolah", _kepalaSekolah, "Penerimaan pengalihan tanggung jawab ajar (REA-2026-0001) dari Budi Hartono disetujui", now.AddDays(-60), cancellationToken);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Step 8: Additional Faculty Commitments, East Campus Demand, and Unresolved Conflicts
+    // ─────────────────────────────────────────────────────────────────────────
+    private static async Task SeedAdditionalFacultyAndConflictsAsync(
+        System.Data.Common.DbConnection connection,
+        DateTime baseDate,
+        DateTimeOffset now,
+        Guid activePeriodId,
+        Guid mathUnitId,
+        Guid sciUnitId,
+        CancellationToken cancellationToken)
+    {
+        var dewiId = TeachingDemoDataSeeder.DewiLestariTeacherId;
+        var yohanesId = TeachingDemoDataSeeder.YohanesPrabowoTeacherId;
+        var startTerm = baseDate.AddMonths(-1);
+        var endTerm = baseDate.AddMonths(5);
+
+        const string insertDemandSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_demands WHERE id = @Id OR demand_code = @DemandCode)
+            BEGIN
+                INSERT INTO teaching.teaching_demands (
+                    id, demand_code, source_domain, source_work_reference, source_work_label,
+                    academic_period_id, required_capability_code, required_assignment_role_id,
+                    expected_workload_hours, workload_unit, requires_assessment_authority,
+                    requested_start_date, requested_end_date, campus_scope, required_teachers_count,
+                    status, requested_by, requested_at, created_at, created_by
+                ) VALUES (
+                    @Id, @DemandCode, 'Academics', @SourceWorkReference, @SourceWorkLabel,
+                    @AcademicPeriodId, @RequiredCapabilityCode, @RequiredAssignmentRoleId,
+                    @ExpectedHours, 'Teaching Hours', 1,
+                    @StartDate, @EndDate, @CampusScope, 1,
+                    @Status, @RequestedBy, @RequestedAt, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        const string insertAsnSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teaching_assignments WHERE id = @Id OR assignment_number = @AssignmentNumber)
+            BEGIN
+                INSERT INTO teaching.teaching_assignments (
+                    id, assignment_number, teaching_demand_id, teacher_profile_id, assignment_role_id,
+                    assignment_scope, scope_reference_id, scope_label, academic_period_id,
+                    effective_start_date, effective_end_date, workload_commitment_value, workload_unit,
+                    status, approved_by, approved_date, teacher_acknowledged, teacher_acknowledged_date,
+                    notes, created_at, created_by
+                ) VALUES (
+                    @Id, @AssignmentNumber, @TeachingDemandId, @TeacherProfileId, @AssignmentRoleId,
+                    'learning_unit', @ScopeReferenceId, @ScopeLabel, @AcademicPeriodId,
+                    @EffectiveStartDate, @EffectiveEndDate, @WorkloadHours, 'Teaching Hours',
+                    'approved', @ApprovedBy, @ApprovedDate, 1, @ApprovedDate,
+                    @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        const string insertAvailSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.teacher_availabilities WHERE teacher_profile_id = @TeacherId AND academic_period_id = @PeriodId AND status = 'active')
+            BEGIN
+                INSERT INTO teaching.teacher_availabilities (
+                    id, teacher_profile_id, academic_period_id, max_available_hours, campus_scope,
+                    available_delivery_modes, recurring_available_schedule, effective_start_date,
+                    effective_end_date, status, notes, created_at, created_by
+                ) VALUES (
+                    NEWID(), @TeacherId, @PeriodId, 24.00, @CampusScope,
+                    'face_to_face', '{"Monday":["07:30-15:00"],"Tuesday":["07:30-15:00"],"Wednesday":["07:30-15:00"],"Thursday":["07:30-15:00"],"Friday":["07:30-13:30"]}',
+                    @StartDate, @EndDate, 'active', @Notes, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        const string insertCommitmentSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.workload_commitments WHERE teacher_profile_id = @TeacherId AND academic_period_id = @PeriodId)
+            BEGIN
+                INSERT INTO teaching.workload_commitments (
+                    id, teacher_profile_id, academic_period_id, workload_policy_id,
+                    planned_workload_hours, committed_workload_hours, max_capacity_limit_hours,
+                    remaining_capacity_hours, status, active_assignment_count, approved_exception_count,
+                    as_of_timestamp, created_at, created_by
+                ) VALUES (
+                    NEWID(), @TeacherId, @PeriodId, @PolicyId,
+                    0.00, @CommittedHours, 24.00,
+                    @RemainingHours, @Status, @ActiveCount, @ExceptionCount,
+                    SYSUTCDATETIME(), @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        const string insertConflictSql = """
+            IF NOT EXISTS (SELECT 1 FROM teaching.capacity_conflicts WHERE teaching_assignment_id = @AssignmentId AND teacher_profile_id = @TeacherId)
+            BEGIN
+                INSERT INTO teaching.capacity_conflicts (
+                    id, teaching_assignment_id, teaching_demand_id, teacher_profile_id,
+                    conflict_type, conflict_classification, severity, description,
+                    detected_date, status, resolution_action, resolved_by, resolved_date,
+                    resolution_notes, created_at, created_by
+                ) VALUES (
+                    NEWID(), @AssignmentId, @DemandId, @TeacherId,
+                    @ConflictType, @ConflictClassification, @Severity, @Description,
+                    @DetectedDate, 'unresolved', NULL, NULL, NULL,
+                    NULL, @CreatedAt, @CreatedBy
+                );
+            END;
+            """;
+
+        // 1. Open unstaffed demand #2 on campus-east (DEM-2026-0006, status = 'received')
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertDemandSql,
+            new
+            {
+                Id = _demandEastOpenId,
+                DemandCode = "DEM-2026-0006",
+                SourceWorkReference = sciUnitId,
+                SourceWorkLabel = "IPA SMP Kelas 7 (Campus East)",
+                AcademicPeriodId = activePeriodId,
+                RequiredCapabilityCode = "IPA_PRIMARY",
+                RequiredAssignmentRoleId = _roleGuruUtamaId,
+                ExpectedHours = 6.00m,
+                StartDate = startTerm,
+                EndDate = endTerm,
+                CampusScope = _campusEast,
+                Status = "received",
+                RequestedBy = _coordinator,
+                RequestedAt = now.AddDays(-8),
+                CreatedAt = now.AddDays(-8),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        // 2. Dewi Lestari (campus-main): 26.00 hrs -> 'breached' + unresolved 'blocking' conflict
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertDemandSql,
+            new
+            {
+                Id = _demandDewiSciId,
+                DemandCode = "DEM-2026-0007",
+                SourceWorkReference = sciUnitId,
+                SourceWorkLabel = "IPA Terpadu SD Kelas 1-6",
+                AcademicPeriodId = activePeriodId,
+                RequiredCapabilityCode = "IPA_PRIMARY",
+                RequiredAssignmentRoleId = _roleGuruUtamaId,
+                ExpectedHours = 26.00m,
+                StartDate = startTerm,
+                EndDate = endTerm,
+                CampusScope = _campusMain,
+                Status = "staffed",
+                RequestedBy = _coordinator,
+                RequestedAt = now.AddDays(-25),
+                CreatedAt = now.AddDays(-25),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAsnSql,
+            new
+            {
+                Id = _assignmentDewiSciId,
+                AssignmentNumber = "ASN-2026-0006",
+                TeachingDemandId = _demandDewiSciId,
+                TeacherProfileId = dewiId,
+                AssignmentRoleId = _roleGuruUtamaId,
+                ScopeReferenceId = sciUnitId,
+                ScopeLabel = "IPA Terpadu SD Kelas 1-6",
+                AcademicPeriodId = activePeriodId,
+                EffectiveStartDate = startTerm,
+                EffectiveEndDate = endTerm,
+                WorkloadHours = 26.00m,
+                ApprovedBy = _kepalaSekolah,
+                ApprovedDate = startTerm,
+                Notes = "Penugasan intensif IPA SD melebihi batas kapasitas standar 24 jam.",
+                CreatedAt = now.AddDays(-20),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAvailSql,
+            new
+            {
+                TeacherId = dewiId,
+                PeriodId = activePeriodId,
+                CampusScope = _campusMain,
+                StartDate = startTerm,
+                EndDate = endTerm,
+                Notes = "Jadwal mengajar Kampus Utama.",
+                CreatedAt = now.AddDays(-25),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertCommitmentSql,
+            new
+            {
+                TeacherId = dewiId,
+                PeriodId = activePeriodId,
+                PolicyId = _workloadPolicyId,
+                CommittedHours = 26.00m,
+                RemainingHours = -2.00m,
+                Status = "breached",
+                ActiveCount = 1,
+                ExceptionCount = 0,
+                CreatedAt = now.AddDays(-20),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertConflictSql,
+            new
+            {
+                AssignmentId = _assignmentDewiSciId,
+                DemandId = _demandDewiSciId,
+                TeacherId = dewiId,
+                ConflictType = "workload_overload",
+                ConflictClassification = "capacity_exceeded",
+                Severity = "blocking",
+                Description = "Beban mengajar Dewi Lestari (26.00 jam) melampaui kapasitas maksimum standar 24.00 jam tanpa persetujuan pengecualian.",
+                DetectedDate = baseDate.AddDays(-3),
+                CreatedAt = now.AddDays(-3),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await RecordHistoryEntryAsync(connection, dewiId, "AssignmentApproved", "teaching_assignments", _assignmentDewiSciId, startTerm, "KepalaSekolah", _kepalaSekolah, "Penugasan IPA SD (ASN-2026-0006) disetujui dengan status kapasitas breached", now.AddDays(-20), cancellationToken);
+
+        // 3. Yohanes Prabowo (campus-east): 21.00 hrs -> 'approaching_limit' + unresolved 'advisory' conflict
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertDemandSql,
+            new
+            {
+                Id = _demandYohanesMathId,
+                DemandCode = "DEM-2026-0008",
+                SourceWorkReference = mathUnitId,
+                SourceWorkLabel = "Matematika SMP Kelas 7-9 (Campus East)",
+                AcademicPeriodId = activePeriodId,
+                RequiredCapabilityCode = "MATH_JUNIOR",
+                RequiredAssignmentRoleId = _roleGuruUtamaId,
+                ExpectedHours = 21.00m,
+                StartDate = startTerm,
+                EndDate = endTerm,
+                CampusScope = _campusEast,
+                Status = "staffed",
+                RequestedBy = _coordinator,
+                RequestedAt = now.AddDays(-25),
+                CreatedAt = now.AddDays(-25),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAsnSql,
+            new
+            {
+                Id = _assignmentYohanesMathId,
+                AssignmentNumber = "ASN-2026-0007",
+                TeachingDemandId = _demandYohanesMathId,
+                TeacherProfileId = yohanesId,
+                AssignmentRoleId = _roleGuruUtamaId,
+                ScopeReferenceId = mathUnitId,
+                ScopeLabel = "Matematika SMP Kelas 7-9 (Campus East)",
+                AcademicPeriodId = activePeriodId,
+                EffectiveStartDate = startTerm,
+                EffectiveEndDate = endTerm,
+                WorkloadHours = 21.00m,
+                ApprovedBy = _kepalaSekolah,
+                ApprovedDate = startTerm,
+                Notes = "Penugasan Matematika SMP Kampus East mendekati ambang kapasitas.",
+                CreatedAt = now.AddDays(-20),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertAvailSql,
+            new
+            {
+                TeacherId = yohanesId,
+                PeriodId = activePeriodId,
+                CampusScope = _campusEast,
+                StartDate = startTerm,
+                EndDate = endTerm,
+                Notes = "Jadwal mengajar Kampus East.",
+                CreatedAt = now.AddDays(-25),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertCommitmentSql,
+            new
+            {
+                TeacherId = yohanesId,
+                PeriodId = activePeriodId,
+                PolicyId = _workloadPolicyId,
+                CommittedHours = 21.00m,
+                RemainingHours = 3.00m,
+                Status = "approaching_limit",
+                ActiveCount = 1,
+                ExceptionCount = 0,
+                CreatedAt = now.AddDays(-20),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insertConflictSql,
+            new
+            {
+                AssignmentId = _assignmentYohanesMathId,
+                DemandId = _demandYohanesMathId,
+                TeacherId = yohanesId,
+                ConflictType = "workload_warning",
+                ConflictClassification = "approaching_capacity",
+                Severity = "advisory",
+                Description = "Beban mengajar Yohanes Prabowo (21.00 jam) melampaui ambang peringatan kebijakan 20.00 jam di Kampus East.",
+                DetectedDate = baseDate.AddDays(-3),
+                CreatedAt = now.AddDays(-3),
+                CreatedBy = _createdBy
+            },
+            cancellationToken: cancellationToken));
+
+        await RecordHistoryEntryAsync(connection, yohanesId, "AssignmentApproved", "teaching_assignments", _assignmentYohanesMathId, startTerm, "KepalaSekolah", _kepalaSekolah, "Penugasan Matematika SMP Kampus East (ASN-2026-0007) disetujui", now.AddDays(-20), cancellationToken);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

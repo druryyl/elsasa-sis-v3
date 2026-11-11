@@ -6,6 +6,10 @@ import { useQueryClient } from '@tanstack/vue-query';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { useUIStore } from '@/app/stores/ui.store';
+import {
+  LEVEL2_DASHBOARD_ACCESS,
+  isAuthorizedForAnyRule,
+} from '@/app/router/dashboardAccess';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import ResetDemoDataDialog from '@/app/layouts/components/ResetDemoDataDialog.vue';
 import {
@@ -31,6 +35,7 @@ import {
   Wallet,
   BookOpen,
   RotateCcw,
+  Sparkles,
 } from 'lucide-vue-next';
 
 interface NavChildItem {
@@ -39,7 +44,10 @@ interface NavChildItem {
   to: string;
   icon?: VueComponent | string;
   permission?: string;
+  permissions?: string[];
   roles?: string[];
+  excludedRoles?: string[];
+  authMode?: 'all' | 'any';
 }
 
 interface NavParentItem {
@@ -48,7 +56,10 @@ interface NavParentItem {
   to?: string;
   icon: VueComponent | string;
   permission?: string;
+  permissions?: string[];
   roles?: string[];
+  excludedRoles?: string[];
+  authMode?: 'all' | 'any';
   children?: NavChildItem[];
 }
 
@@ -72,6 +83,7 @@ const isCampusSelectorOpen = ref(false);
 
 // Expanded menu groups in expanded sidebar mode
 const openGroups = ref<Record<string, boolean>>({
+  dashboard: true,
   operations: true,
   academics: true,
   teaching: true,
@@ -94,15 +106,21 @@ function toggleGroup(groupId: string) {
   };
 }
 
+interface CampusOption {
+  id: string | null;
+  name: string;
+}
+
 // Available campus list for selector
-const campusOptions = [
+const campusOptions: CampusOption[] = [
+  { id: null, name: 'All Campuses (Semua Kampus)' },
   { id: 'campus-main', name: 'Main Campus (Kampus A)' },
   { id: 'campus-east', name: 'East Campus (Kampus B)' },
 ];
 
 const activeCampusName = computed(() => {
   const match = campusOptions.find((c) => c.id === appContextStore.activeCampusId);
-  return match ? match.name : 'Main Campus (Kampus A)';
+  return match ? match.name : 'All Campuses (Semua Kampus)';
 });
 
 const activeAcademicPeriodLabel = computed(() => {
@@ -114,8 +132,61 @@ const masterNavItems: NavParentItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    to: '/dashboard',
     icon: LayoutDashboard,
+    children: [
+      {
+        id: 'dashboard',
+        label: 'Executive Overview',
+        to: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        id: 'dashboard-students',
+        label: 'Students KPIs',
+        to: '/dashboard/students',
+        icon: GraduationCap,
+        authMode: 'any',
+        ...LEVEL2_DASHBOARD_ACCESS.students,
+      },
+      {
+        id: 'dashboard-academics',
+        label: 'Academics KPIs',
+        to: '/dashboard/academics',
+        icon: BookOpen,
+        authMode: 'any',
+        ...LEVEL2_DASHBOARD_ACCESS.academics,
+      },
+      {
+        id: 'dashboard-finance',
+        label: 'Finance KPIs',
+        to: '/dashboard/finance',
+        icon: DollarSign,
+        authMode: 'any',
+        ...LEVEL2_DASHBOARD_ACCESS.finance,
+      },
+      {
+        id: 'dashboard-teaching',
+        label: 'Teaching KPIs',
+        to: '/dashboard/teaching',
+        icon: 'pi pi-graduation-cap',
+        authMode: 'any',
+        ...LEVEL2_DASHBOARD_ACCESS.teaching,
+      },
+      {
+        id: 'dashboard-operations',
+        label: 'Operations KPIs',
+        to: '/dashboard/operations',
+        icon: Calendar,
+        authMode: 'any',
+        ...LEVEL2_DASHBOARD_ACCESS.operations,
+      },
+      {
+        id: 'dashboard-development',
+        label: 'Development (Stage 3)',
+        to: '/dashboard/development',
+        icon: Sparkles,
+      },
+    ],
   },
   {
     id: 'operations',
@@ -355,7 +426,20 @@ function checkPermission(permission: string): boolean {
   return false;
 }
 
-function isNavAuthorized(item: { permission?: string; roles?: string[] }): boolean {
+function isNavAuthorized(item: {
+  permission?: string;
+  permissions?: string[];
+  roles?: string[];
+  excludedRoles?: string[];
+  authMode?: 'all' | 'any';
+}): boolean {
+  if (
+    item.authMode === 'any' ||
+    (item.permissions && item.permissions.length > 0) ||
+    (item.excludedRoles && item.excludedRoles.length > 0)
+  ) {
+    return isAuthorizedForAnyRule(item, authStore, checkPermission);
+  }
   if (!item.permission && (!item.roles || item.roles.length === 0)) {
     return true;
   }
@@ -400,6 +484,9 @@ const filteredNavItems = computed<NavParentItem[]>(() => {
 // Checks if a route path is currently active
 function isItemActive(path?: string): boolean {
   if (!path) return false;
+  if (path === '/dashboard') {
+    return route.path === '/dashboard';
+  }
   return route.path === path || route.path.startsWith(`${path}/`);
 }
 
@@ -456,7 +543,7 @@ function handleLogout() {
   router.push('/auth/login');
 }
 
-function selectCampus(campusId: string) {
+function selectCampus(campusId: string | null) {
   appContextStore.setActiveCampus(campusId);
   isCampusSelectorOpen.value = false;
 }
@@ -512,6 +599,8 @@ function handleResetDemoDataSuccess() {
 
 function getDomainBadgeColor(groupId: string): string {
   switch (groupId) {
+    case 'dashboard':
+      return 'bg-teal-600';
     case 'operations':
       return 'bg-amber-500';
     case 'academics':
@@ -767,8 +856,9 @@ function getDomainBadgeColor(groupId: string): string {
               </div>
               <button
                 v-for="campus in campusOptions"
-                :key="campus.id"
+                :key="campus.id ?? 'all'"
                 type="button"
+                :data-testid="`campus-option-${campus.id ?? 'all'}`"
                 :class="[
                   'w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between',
                   appContextStore.activeCampusId === campus.id

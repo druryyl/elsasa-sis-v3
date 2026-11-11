@@ -2,8 +2,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import { createMemoryHistory } from 'vue-router';
-import { createAppRouter } from '@/app/router';
+import {
+  createMemoryHistory,
+  createRouter,
+  type RouteRecordRaw,
+} from 'vue-router';
+import { routes, setupNavigationGuards } from '@/app/router';
 import { useAuthStore, type UserSession } from '@/app/stores/auth.store';
 import { useAppContextStore } from '@/app/stores/appContext.store';
 import { useUIStore } from '@/app/stores/ui.store';
@@ -30,8 +34,32 @@ function createTestUser(overrides?: Partial<UserSession>): UserSession {
   };
 }
 
+const EmptyRouteView = { template: '<div />' };
+
+function stubRouteComponents(records: RouteRecordRaw[]): RouteRecordRaw[] {
+  return records.map((record) => {
+    const cloned: RouteRecordRaw = {
+      ...record,
+      ...(record.component && typeof record.component === 'function'
+        ? { component: () => Promise.resolve(EmptyRouteView) }
+        : {}),
+      ...(record.children ? { children: stubRouteComponents(record.children) } : {}),
+    } as RouteRecordRaw;
+    return cloned;
+  });
+}
+
+function createTestRouter() {
+  const testRouter = createRouter({
+    history: createMemoryHistory(),
+    routes: stubRouteComponents(routes),
+  });
+  setupNavigationGuards(testRouter);
+  return testRouter;
+}
+
 describe('AppLayout.vue', () => {
-  let router: ReturnType<typeof createAppRouter>;
+  let router: ReturnType<typeof createTestRouter>;
   let queryClient: QueryClient;
 
   beforeEach(async () => {
@@ -53,7 +81,7 @@ describe('AppLayout.vue', () => {
     uiStore.resetPreferences();
     const appContextStore = useAppContextStore();
     appContextStore.resetContext();
-    router = createAppRouter({ history: createMemoryHistory() });
+    router = createTestRouter();
     await router.push('/dashboard');
     await router.isReady();
   });
@@ -519,6 +547,82 @@ describe('AppLayout.vue', () => {
       expect(wrapper.find('[data-testid="nav-group-academics"]').exists()).toBe(false);
     });
 
+    it('renders Level 2 domain dashboard sidebar links with TD-05 parity and hides them from Guest, Student, and Parent', () => {
+      const authStore = useAuthStore();
+
+      // 1. AcademicCoordinator sees academics, teaching, operations dashboards (hides students, finance)
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['AcademicCoordinator', 'AcademicAuthority'],
+          permissions: ['academics.participations.view'],
+        }),
+      );
+      let wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-dashboard-academics"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-teaching"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-operations"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-students"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-finance"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      // 2. Teacher sees academics and teaching dashboards
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['Teacher', 'AcademicStaff'],
+          permissions: ['academics.participations.view'],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-dashboard-academics"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-teaching"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-operations"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      // 3. OperationsStaff with Calendar.Manage sees operations dashboard
+      authStore.setSession(
+        'test-token',
+        createTestUser({
+          roles: ['OperationsStaff'],
+          permissions: ['Permissions.Operations.Calendar.Manage'],
+        }),
+      );
+      wrapper = mountLayout();
+      expect(wrapper.find('[data-testid="nav-item-dashboard-operations"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-item-dashboard-students"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      // 4. Student and Parent must NOT see Academics or Finance dashboards even with portal view permissions
+      for (const selfServiceUser of [
+        {
+          roles: ['Student'],
+          permissions: ['academics.participations.view', 'Permissions.SelfService.Student'],
+        },
+        {
+          roles: ['Parent'],
+          permissions: [
+            'academics.participations.view',
+            'Permissions.Finance.Obligations.View',
+            'Permissions.SelfService.Parent',
+          ],
+        },
+        {
+          roles: ['Guest'],
+          permissions: [],
+        },
+      ]) {
+        authStore.setSession('test-token', createTestUser(selfServiceUser));
+        wrapper = mountLayout();
+        expect(wrapper.find('[data-testid="nav-item-dashboard-students"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="nav-item-dashboard-academics"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="nav-item-dashboard-finance"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="nav-item-dashboard-teaching"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="nav-item-dashboard-operations"]').exists()).toBe(false);
+        wrapper.unmount();
+      }
+    });
+
     it('toggles group accordion in expanded sidebar mode', async () => {
       const authStore = useAuthStore();
       authStore.setSession('test-token', createTestUser());
@@ -579,9 +683,11 @@ describe('AppLayout.vue', () => {
         }),
       );
 
-      // 1. Academics Participation
+      // Mount AppLayout once and verify reactive breadcrumbs + active nav items across route transitions
       await router.push('/academics/participation');
-      let wrapper = mountLayout();
+      const wrapper = mountLayout();
+
+      // 1. Academics Participation
       let breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -589,7 +695,7 @@ describe('AppLayout.vue', () => {
 
       // 2. Academics Sessions
       await router.push('/academics/sessions');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -597,7 +703,7 @@ describe('AppLayout.vue', () => {
 
       // 3. Academics Coursework
       await router.push('/academics/coursework');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -605,7 +711,7 @@ describe('AppLayout.vue', () => {
 
       // 4. Portal Learning
       await router.push('/portal/learning');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Student Portal');
@@ -613,7 +719,7 @@ describe('AppLayout.vue', () => {
 
       // 5. Academic Interventions (P8-S25)
       await router.push('/academics/interventions');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -625,7 +731,7 @@ describe('AppLayout.vue', () => {
 
       // 6. Cohort Academic Review (P8-S25)
       await router.push('/academics/cohort-review');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -637,7 +743,7 @@ describe('AppLayout.vue', () => {
 
       // 7. Student Learning Plans (P7-S25)
       await router.push('/academics/learning-plans');
-      wrapper = mountLayout();
+      await flushPromises();
       breadcrumbs = wrapper.find('[data-testid="layout-breadcrumbs"]');
       expect(breadcrumbs.text()).toContain('Home');
       expect(breadcrumbs.text()).toContain('Academics');
@@ -646,6 +752,8 @@ describe('AppLayout.vue', () => {
       expect(activeSlp.exists()).toBe(true);
       expect(activeSlp.classes()).toContain('border-l-2');
       expect(activeSlp.classes()).toContain('border-teal-600');
+
+      wrapper.unmount();
     });
   });
 
@@ -660,7 +768,7 @@ describe('AppLayout.vue', () => {
 
 describe('AuthLayout.vue', () => {
   it('renders centered distraction-free layout with branding and card container', () => {
-    const router = createAppRouter({ history: createMemoryHistory() });
+    const router = createTestRouter();
     const wrapper = mount(AuthLayout, {
       global: {
         plugins: [router],
@@ -680,7 +788,7 @@ describe('AuthLayout.vue', () => {
 describe('App.vue', () => {
   it('renders global Toast, ConfirmDialog, and RouterView', () => {
     setActivePinia(createPinia());
-    const router = createAppRouter({ history: createMemoryHistory() });
+    const router = createTestRouter();
 
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

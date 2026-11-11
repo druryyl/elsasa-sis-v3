@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 import {
   RotateCcw,
   Sparkles,
@@ -10,11 +12,15 @@ import {
   Info,
   CalendarDays,
   FileCheck2,
+  AlertTriangle,
+  Users,
 } from 'lucide-vue-next';
-import { PageHeader } from '@/shared/components';
+import { PageHeader, StatusPill, EmptyState, LoadingSpinner } from '@/shared/components';
+import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import type { BreadcrumbItem } from '@/shared/types/navigation';
 import { useAuthStore } from '@/app/stores/auth.store';
 import {
+  useCapacityConflicts,
   useWorkloadCommitments,
   useWorkloadPolicies,
   useRecalculateWorkloadMutation,
@@ -30,6 +36,7 @@ import {
   type PeriodOption,
 } from '../components/workloadConstants';
 import type {
+  CapacityConflictDto,
   TeacherWorkloadCommitmentDto,
   WorkloadCommitmentStatus,
   WorkloadPolicyDto,
@@ -124,9 +131,68 @@ const commitmentsErrorMessage = computed(() => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Filter State
+// 5. Filter & Tab State + Route Query Hydration
 // ---------------------------------------------------------------------------
+const activeTab = ref<'workload' | 'conflicts'>('workload');
 const selectedStatusFilter = ref<string>('all');
+const conflictSeverityFilter = ref<string>('all');
+
+const severityFilterOptions = [
+  { label: 'All Severities', value: 'all' },
+  { label: 'Blocking Only', value: 'blocking' },
+  { label: 'Advisory Only', value: 'advisory' },
+];
+
+useRouteQueryHydration((query) => {
+  const periodId = getQueryString(query, 'periodId');
+  if (periodId) {
+    selectedPeriodId.value = periodId;
+  }
+
+  const status = getQueryString(query, 'status');
+  if (status) {
+    selectedStatusFilter.value = status;
+  }
+
+  const tab = getQueryString(query, 'tab');
+  if (tab === 'conflicts' || tab === 'workload') {
+    activeTab.value = tab;
+  }
+
+  const severity = getQueryString(query, 'severity')?.toLowerCase();
+  if (severity === 'blocking' || severity === 'advisory' || severity === 'all') {
+    conflictSeverityFilter.value = severity;
+    if (!tab && severity !== 'all') {
+      activeTab.value = 'conflicts';
+    }
+  }
+});
+
+// Capacity Conflicts Query (enabled only when Conflicts tab is active)
+const {
+  data: conflictsResponse,
+  isLoading: isLoadingConflicts,
+  refetch: refetchConflicts,
+} = useCapacityConflicts(
+  computed(() => ({
+    status: 'unresolved',
+    severity:
+      conflictSeverityFilter.value !== 'all' ? conflictSeverityFilter.value : undefined,
+    page: 1,
+    pageSize: 100,
+  })),
+  { enabled: computed(() => activeTab.value === 'conflicts') },
+);
+
+const capacityConflicts = computed<CapacityConflictDto[]>(() => {
+  const raw = conflictsResponse.value;
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : (raw.items ?? []);
+  if (conflictSeverityFilter.value === 'all') return list;
+  return list.filter(
+    (c) => c.severity?.toLowerCase() === conflictSeverityFilter.value.toLowerCase(),
+  );
+});
 
 function handleKpiCardFilter(status: WorkloadCommitmentStatus | 'all') {
   selectedStatusFilter.value = status;
@@ -276,29 +342,170 @@ function handleExceptionApproved() {
       </div>
     </div>
 
-    <!-- 3. KPI Threshold Cards -->
-    <WorkloadKpiCards
-      :commitments="commitments"
-      :selected-status="selectedStatusFilter"
-      :is-loading="isLoadingCommitments"
-      @select-status="handleKpiCardFilter"
-    />
+    <!-- 3. Tabs: Workload Commitments & Capacity Conflicts -->
+    <div class="space-y-4" data-testid="workload-monitoring-tabs">
+      <div
+        role="tablist"
+        aria-label="Workload Monitoring Sections"
+        class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold"
+      >
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'workload'"
+          class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer"
+          :class="
+            activeTab === 'workload'
+              ? 'bg-white text-indigo-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          "
+          data-testid="tab-workload-commitments"
+          @click="activeTab = 'workload'"
+        >
+          <Users class="w-4 h-4" />
+          <span>Workload Commitments</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'conflicts'"
+          class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer"
+          :class="
+            activeTab === 'conflicts'
+              ? 'bg-white text-rose-700 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          "
+          data-testid="tab-capacity-conflicts"
+          @click="activeTab = 'conflicts'"
+        >
+          <AlertTriangle class="w-4 h-4" />
+          <span>Capacity & Qualification Conflicts</span>
+        </button>
+      </div>
 
-    <!-- 4. Faculty Workload Table -->
-    <FacultyWorkloadTable
-      :commitments="commitments"
-      :is-loading="isLoadingCommitments"
-      :is-error="isCommitmentsError"
-      :error-message="commitmentsErrorMessage"
-      :selected-status="selectedStatusFilter"
-      :can-request-exception="canRequestException"
-      :can-approve-exception="canApproveException"
-      @drill-down="openDrillDown"
-      @request-exception="openRequestException"
-      @approve-exception="openApproveException"
-      @update:selected-status="(status) => (selectedStatusFilter = status)"
-      @refresh="() => refetchCommitments()"
-    />
+      <div
+        v-if="activeTab === 'workload'"
+        role="tabpanel"
+        data-testid="panel-workload-commitments"
+        class="space-y-6"
+      >
+        <!-- 3. KPI Threshold Cards -->
+        <WorkloadKpiCards
+          :commitments="commitments"
+          :selected-status="selectedStatusFilter"
+          :is-loading="isLoadingCommitments"
+          @select-status="handleKpiCardFilter"
+        />
+
+        <!-- 4. Faculty Workload Table -->
+        <FacultyWorkloadTable
+          :commitments="commitments"
+          :is-loading="isLoadingCommitments"
+          :is-error="isCommitmentsError"
+          :error-message="commitmentsErrorMessage"
+          :selected-status="selectedStatusFilter"
+          :can-request-exception="canRequestException"
+          :can-approve-exception="canApproveException"
+          @drill-down="openDrillDown"
+          @request-exception="openRequestException"
+          @approve-exception="openApproveException"
+          @update:selected-status="(status) => (selectedStatusFilter = status)"
+          @refresh="() => refetchCommitments()"
+        />
+      </div>
+
+      <div
+        v-else-if="activeTab === 'conflicts'"
+        role="tabpanel"
+        data-testid="panel-capacity-conflicts"
+      >
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Unresolved Capacity Conflicts</h3>
+              <p class="text-xs text-slate-500">
+                Review blocking and advisory faculty capacity conflicts detected during assignment evaluation.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <Select
+                v-model="conflictSeverityFilter"
+                :options="severityFilterOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                class="w-44 text-xs"
+                data-testid="select-conflict-severity"
+              />
+              <Button
+                size="small"
+                severity="secondary"
+                outlined
+                class="!text-xs"
+                data-testid="refresh-conflicts-btn"
+                @click="() => refetchConflicts()"
+              >
+                <RotateCcw class="w-3.5 h-3.5 mr-1" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div v-if="isLoadingConflicts" class="py-12 flex justify-center">
+            <LoadingSpinner label="Loading capacity conflicts..." />
+          </div>
+
+          <DataTable
+            v-else
+            :value="capacityConflicts"
+            data-key="id"
+            responsive-layout="scroll"
+            class="text-xs"
+            data-testid="capacity-conflicts-table"
+          >
+            <template #empty>
+              <div class="py-10">
+                <EmptyState
+                  title="No Capacity Conflicts Found"
+                  description="No unresolved faculty capacity conflicts match the selected severity filter."
+                  size="sm"
+                />
+              </div>
+            </template>
+
+            <Column field="severity" header="Severity" style="min-width: 110px">
+              <template #body="{ data }">
+                <StatusPill
+                  :status="data.severity === 'blocking' ? 'rejected' : 'pending'"
+                  :label="data.severity"
+                  size="sm"
+                />
+              </template>
+            </Column>
+
+            <Column field="conflictType" header="Conflict Type" style="min-width: 160px">
+              <template #body="{ data }">
+                <span class="font-semibold text-slate-800">{{ data.conflictType }}</span>
+              </template>
+            </Column>
+
+            <Column field="description" header="Description" style="min-width: 260px">
+              <template #body="{ data }">
+                <span class="text-slate-600">{{ data.description }}</span>
+              </template>
+            </Column>
+
+            <Column field="detectedDate" header="Detected Date" style="min-width: 120px" />
+
+            <Column field="status" header="Status" style="min-width: 110px">
+              <template #body="{ data }">
+                <StatusPill :status="data.status" size="sm" />
+              </template>
+            </Column>
+          </DataTable>
+        </div>
+      </div>
+    </div>
 
     <!-- 5. Line-Item Assignment Drill-Down Drawer -->
     <WorkloadDrillDownDrawer

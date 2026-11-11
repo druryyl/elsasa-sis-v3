@@ -2,6 +2,7 @@ namespace Elsasa.Sis.Api.Configuration;
 
 using System.Reflection;
 using Elsasa.Sis.Academics;
+using Elsasa.Sis.Api.Features.Dashboard.GetExecutiveDashboard;
 using Elsasa.Sis.Api.Features.DemoData;
 using Elsasa.Sis.Api.Services;
 using Elsasa.Sis.Contracts;
@@ -112,6 +113,9 @@ public static class DependencyInjection
         // 7. Demo Data configuration & orchestrator (ADR-001, ADR-006, TD-01, TD-02, TD-08, OQ-004)
         services.Configure<DemoDataOptions>(configuration.GetSection(DemoDataOptions.SectionName));
         services.AddScoped<DemoDataOrchestrator>();
+
+        // 8. Executive KPI Dashboard handler (CR-KPI-EXECUTIVE-DOMAIN-DASHBOARDS P3-S08)
+        services.AddScoped<GetExecutiveDashboardHandler>();
 
         return services;
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
@@ -30,12 +30,14 @@ interface Props {
   isLoading?: boolean;
   isError?: boolean;
   errorMessage?: string | null;
+  initialStatusFilter?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isLoading: false,
   isError: false,
   errorMessage: null,
+  initialStatusFilter: 'all',
 });
 
 const emit = defineEmits<{
@@ -45,7 +47,17 @@ const emit = defineEmits<{
 }>();
 
 const searchFilter = ref('');
-const statusFilter = ref<string>('all');
+const statusFilter = ref<string>(props.initialStatusFilter || 'all');
+
+watch(
+  () => props.initialStatusFilter,
+  (val) => {
+    if (val) {
+      statusFilter.value = val;
+    }
+  },
+  { immediate: true },
+);
 
 const statusOptions = [
   { label: 'All Statuses', value: 'all' },
