@@ -31,6 +31,8 @@ import {
   Shield,
   CheckCircle2,
   ExternalLink,
+  Calendar,
+  Filter,
 } from 'lucide-vue-next';
 import { useToast } from 'primevue/usetoast';
 import {
@@ -44,6 +46,7 @@ import { formatDisplayDate } from '@/shared/utils/dateUtils';
 import { getQueryString, useRouteQueryHydration } from '@/shared/composables/useRouteQueryHydration';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { ADMISSION_PERMISSIONS } from '../constants/permissions';
+// eslint-disable-next-line no-restricted-imports
 import { ENROLLMENT_PERMISSIONS } from '../../enrollment/constants/permissions';
 import { tryGetToast } from '../composables/toastNotifications';
 import type {
@@ -248,6 +251,34 @@ function resetFilters() {
   searchInput.value = '';
 }
 
+// Visual helpers for avatar initials and level badges
+function getInitials(name?: string | null): string {
+  if (!name) return 'ST';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getLevelBadgeStyle(level?: string | null): string {
+  if (!level) return 'bg-slate-100 text-slate-700 border-slate-200';
+  const l = level.toUpperCase();
+  if (l.startsWith('TK')) return 'bg-amber-50 text-amber-800 border-amber-200';
+  if (
+    l.includes('GRADE 1') ||
+    l.includes('GRADE 2') ||
+    l.includes('GRADE 3') ||
+    l.includes('GRADE 4') ||
+    l.includes('GRADE 5') ||
+    l.includes('GRADE 6')
+  ) {
+    return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  }
+  if (l.includes('GRADE 7') || l.includes('GRADE 8') || l.includes('GRADE 9')) {
+    return 'bg-sky-50 text-sky-800 border-sky-200';
+  }
+  return 'bg-indigo-50 text-indigo-800 border-indigo-200';
+}
+
 // ---------------------------------------------------------------------------
 // 5. Selected Application Dossier Drawer State, Tabs & Query
 // ---------------------------------------------------------------------------
@@ -388,16 +419,19 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
     <!-- 1. Page Header -->
     <PageHeader
       title="Student Intake Workbench"
-      description="Triage prospective student applications, audit credential verification, and govern admission decisions."
+      subtitle="Triage prospective student applications, audit credential verification, and govern admission decisions."
       :breadcrumbs="breadcrumbs"
     >
       <template #actions>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
           <div
-            class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-teal-50 border border-teal-200/80 text-teal-800 text-xs font-semibold shadow-2xs"
+            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200/90 text-teal-800 text-xs font-semibold shadow-2xs"
             data-testid="active-intake-count-badge"
           >
-            <Users class="w-4 h-4 text-teal-600" />
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-teal-600"></span>
+            </span>
             <span>{{ totalActiveCount }} Active Intake Applications</span>
           </div>
 
@@ -406,7 +440,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
             severity="secondary"
             variant="outlined"
             :loading="isFetchingQueue"
-            class="!text-xs !py-1.5 cursor-pointer"
+            class="!text-xs !py-1.5 cursor-pointer hover:!bg-slate-100"
             data-testid="refresh-queue-button"
             @click="() => refetchQueue()"
           >
@@ -416,7 +450,8 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
 
           <Button
             size="small"
-            class="!text-xs !py-1.5 cursor-pointer bg-teal-700 hover:bg-teal-800 text-white font-medium"
+            :disabled="!canRegister"
+            class="!text-xs !py-1.5 cursor-pointer bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs"
             data-testid="new-application-button"
             @click="router.push('/admission/apply')"
           >
@@ -427,15 +462,92 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
       </template>
     </PageHeader>
 
-    <!-- 2. Filter & Search Panel -->
+    <!-- 2. Executive KPI Overview Metrics -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5" data-testid="intake-kpi-summary">
+      <!-- KPI 1: Active Intake -->
+      <div
+        class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between"
+      >
+        <div class="space-y-1">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Active Intake</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-slate-900">{{ totalActiveCount }}</span>
+            <span class="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">In Pipeline</span>
+          </div>
+          <span class="text-[11px] text-slate-400 block">Registered &amp; under review</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/70 text-teal-700 flex items-center justify-center shrink-0">
+          <Users class="w-5 h-5" />
+        </div>
+      </div>
+
+      <!-- KPI 2: Under Review -->
+      <div
+        class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between cursor-pointer"
+        @click="selectedStatus = 'under_review'"
+      >
+        <div class="space-y-1">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Under Review</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-slate-900">{{ statusCounts.under_review }}</span>
+            <span class="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">In Triage</span>
+          </div>
+          <span class="text-[11px] text-slate-400 block">Reviewing credentials</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/70 text-amber-700 flex items-center justify-center shrink-0">
+          <Shield class="w-5 h-5" />
+        </div>
+      </div>
+
+      <!-- KPI 3: Decided & Accepted -->
+      <div
+        class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between cursor-pointer"
+        @click="selectedStatus = 'decided'"
+      >
+        <div class="space-y-1">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Decided / Accepted</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-slate-900">{{ (statusCounts.decided || 0) + (statusCounts.accepted || 0) }}</span>
+            <span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Outcome Set</span>
+          </div>
+          <span class="text-[11px] text-slate-400 block">Ready for enrollment</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/70 text-emerald-700 flex items-center justify-center shrink-0">
+          <CheckCircle2 class="w-5 h-5" />
+        </div>
+      </div>
+
+      <!-- KPI 4: Total Applications -->
+      <div
+        class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow flex items-center justify-between cursor-pointer"
+        @click="selectedStatus = ''"
+      >
+        <div class="space-y-1">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Total Cohort</span>
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-slate-900">{{ statusCounts.all }}</span>
+            <span class="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">All Time</span>
+          </div>
+          <span class="text-[11px] text-slate-400 block">Full intake roster</span>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/70 text-slate-700 flex items-center justify-center shrink-0">
+          <GraduationCap class="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Filter & Search Panel -->
     <div
-      class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-4"
+      class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs space-y-4"
       data-testid="intake-filter-panel"
     >
       <!-- Row 1: Status Filter Pills -->
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div class="flex flex-wrap items-center gap-1.5" data-testid="status-pills-bar">
-          <span class="text-xs font-semibold text-slate-500 mr-2 uppercase tracking-wider">Status:</span>
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2 flex items-center gap-1">
+            <Filter class="w-3.5 h-3.5 text-slate-400" />
+            <span>Status:</span>
+          </span>
           <button
             v-for="pill in statusFilterPills"
             :key="pill.value"
@@ -443,8 +555,8 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
             :class="[
               'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer',
               selectedStatus === pill.value
-                ? 'bg-teal-700 text-white shadow-xs font-semibold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70',
+                ? 'bg-teal-700 text-white shadow-xs font-semibold ring-2 ring-teal-700/20'
+                : 'bg-slate-100/90 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900',
             ]"
             :data-testid="`filter-status-${pill.value || 'all'}`"
             @click="selectedStatus = pill.value"
@@ -452,14 +564,14 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
             <span>{{ pill.label }}</span>
             <span
               v-if="pill.value === '' && statusCounts.all > 0"
-              class="px-1.5 py-0.2 rounded-full text-[10px]"
+              class="px-1.5 py-0.2 rounded-full text-[10px] font-semibold"
               :class="selectedStatus === '' ? 'bg-teal-800 text-teal-100' : 'bg-slate-200 text-slate-700'"
             >
               {{ statusCounts.all }}
             </span>
             <span
               v-else-if="pill.value && statusCounts[pill.value] !== undefined"
-              class="px-1.5 py-0.2 rounded-full text-[10px]"
+              class="px-1.5 py-0.2 rounded-full text-[10px] font-semibold"
               :class="selectedStatus === pill.value ? 'bg-teal-800 text-teal-100' : 'bg-slate-200 text-slate-700'"
             >
               {{ statusCounts[pill.value] }}
@@ -467,16 +579,17 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
           </button>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <span
             v-if="selectedDocStatus"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs"
             data-testid="filter-doc-status-chip"
           >
+            <FileCheck class="w-3.5 h-3.5 text-amber-600" />
             <span>Documents: {{ selectedDocStatus }}</span>
             <button
               type="button"
-              class="text-amber-600 hover:text-amber-900 cursor-pointer"
+              class="text-amber-600 hover:text-amber-900 cursor-pointer ml-0.5"
               title="Clear document filter"
               @click="selectedDocStatus = ''"
             >
@@ -487,21 +600,24 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
           <button
             v-if="selectedPeriodId || selectedStatus || selectedDocStatus || selectedEntryLevel || searchInput"
             type="button"
-            class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+            class="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer px-2.5 py-1 rounded-md bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200 transition-colors"
             data-testid="reset-filters-button"
             @click="resetFilters"
           >
-            <RotateCcw class="w-3 h-3" />
+            <RotateCcw class="w-3 h-3 text-slate-400" />
             <span>Reset Filters</span>
           </button>
         </div>
       </div>
 
       <!-- Row 2: Secondary Dropdown Filters & Search Input -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
         <!-- Admission Period Dropdown -->
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Admission Period</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+            <Calendar class="w-3.5 h-3.5 text-slate-400" />
+            <span>Admission Period</span>
+          </label>
           <Select
             v-model="selectedPeriodId"
             :options="periodOptions"
@@ -509,35 +625,44 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
             option-value="id"
             placeholder="All Admission Periods"
             :loading="isLoadingPeriods"
-            class="w-full !text-xs"
+            class="w-full !text-xs !rounded-lg"
             data-testid="period-filter-select"
           />
         </div>
 
         <!-- Requested Entry Level Dropdown -->
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Requested Entry Level</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+            <GraduationCap class="w-3.5 h-3.5 text-slate-400" />
+            <span>Requested Entry Level</span>
+          </label>
           <Select
             v-model="selectedEntryLevel"
             :options="entryLevelOptions"
             option-label="label"
             option-value="value"
             placeholder="All Entry Levels"
-            class="w-full !text-xs"
+            class="w-full !text-xs !rounded-lg"
             data-testid="entry-level-filter-select"
           />
         </div>
 
         <!-- Search Input -->
         <div class="sm:col-span-2">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Search Applicants</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+            <span class="flex items-center gap-1">
+              <Search class="w-3.5 h-3.5 text-slate-400" />
+              <span>Search Applicants</span>
+            </span>
+            <span class="text-[11px] font-normal text-slate-400">Search by ID, Name, or NIK</span>
+          </label>
           <div class="relative flex items-center">
             <Search class="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
             <InputText
               v-model="searchInput"
               type="text"
               placeholder="Search by application number, applicant name, or NIK..."
-              class="w-full !pl-9 !pr-8 !text-xs !py-2"
+              class="w-full !pl-9 !pr-8 !text-xs !py-2 !rounded-lg"
               data-testid="search-applicants-input"
             />
             <button
@@ -554,7 +679,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
       </div>
     </div>
 
-    <!-- 3. PrimeVue DataTable Work Queue -->
+    <!-- 4. PrimeVue DataTable Work Queue -->
     <div
       class="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden"
       data-testid="intake-queue-card"
@@ -592,40 +717,52 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
         </template>
 
         <!-- Column 1: Application Number -->
-        <Column field="applicationNumber" header="Application #" sortable style="min-width: 140px">
+        <Column field="applicationNumber" header="Application #" sortable style="min-width: 150px">
           <template #body="{ data }">
             <button
               type="button"
-              class="font-mono font-semibold text-teal-700 hover:text-teal-900 hover:underline cursor-pointer text-left"
+              class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-teal-700 hover:text-teal-900 hover:underline bg-teal-50/70 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200/80 transition-colors cursor-pointer text-left"
               data-testid="app-number-link"
               @click="openDossier(data.id)"
             >
-              {{ data.applicationNumber }}
+              <span>{{ data.applicationNumber }}</span>
             </button>
           </template>
         </Column>
 
         <!-- Column 2: Applicant Name -->
-        <Column field="applicantName" header="Applicant Name" sortable style="min-width: 180px">
+        <Column field="applicantName" header="Applicant Name" sortable style="min-width: 220px">
           <template #body="{ data }">
-            <span class="font-medium text-slate-900">{{ data.applicantName }}</span>
+            <div class="flex items-center gap-2.5 py-0.5">
+              <div class="w-7 h-7 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center font-bold text-[11px] shrink-0 shadow-2xs">
+                {{ getInitials(data.applicantName) }}
+              </div>
+              <div class="min-w-0">
+                <span class="font-medium text-slate-900 block truncate leading-tight">{{ data.applicantName }}</span>
+              </div>
+            </div>
           </template>
         </Column>
 
         <!-- Column 3: NIK / Gov ID -->
         <Column field="governmentIdNumber" header="NIK / Gov ID" sortable style="min-width: 140px">
           <template #body="{ data }">
-            <span v-if="data.governmentIdNumber" class="font-mono text-slate-700">
+            <span v-if="data.governmentIdNumber" class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/70">
               {{ data.governmentIdNumber }}
             </span>
-            <span v-else class="text-slate-400 italic">—</span>
+            <span v-else class="text-slate-400 italic text-xs">—</span>
           </template>
         </Column>
 
         <!-- Column 4: Entry Level -->
-        <Column field="requestedEntryLevel" header="Entry Level" sortable style="min-width: 110px">
+        <Column field="requestedEntryLevel" header="Entry Level" sortable style="min-width: 115px">
           <template #body="{ data }">
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+            <span
+              :class="[
+                'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border',
+                getLevelBadgeStyle(data.requestedEntryLevel),
+              ]"
+            >
               {{ data.requestedEntryLevel }}
             </span>
           </template>
@@ -634,7 +771,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
         <!-- Column 5: Target Period -->
         <Column field="admissionPeriodId" header="Target Period" style="min-width: 160px">
           <template #body="{ data }">
-            <span class="text-slate-700 truncate max-w-[200px] block" :title="getPeriodName(data.admissionPeriodId)">
+            <span class="text-slate-700 truncate max-w-[200px] block text-xs" :title="getPeriodName(data.admissionPeriodId)">
               {{ getPeriodName(data.admissionPeriodId) }}
             </span>
           </template>
@@ -643,25 +780,25 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
         <!-- Column 6: Registration Date -->
         <Column field="registrationDate" header="Reg. Date" sortable style="min-width: 120px">
           <template #body="{ data }">
-            <span class="text-slate-600">{{ formatDisplayDate(data.registrationDate) }}</span>
+            <span class="text-slate-600 text-xs">{{ formatDisplayDate(data.registrationDate) }}</span>
           </template>
         </Column>
 
         <!-- Column 7: Status -->
-        <Column field="status" header="Status" sortable style="min-width: 120px">
+        <Column field="status" header="Status" sortable style="min-width: 125px">
           <template #body="{ data }">
             <StatusPill :status="data.status" size="sm" />
           </template>
         </Column>
 
         <!-- Column 8: Actions -->
-        <Column header="Actions" style="min-width: 120px; text-align: right">
+        <Column header="Actions" style="min-width: 125px; text-align: right">
           <template #body="{ data }">
             <Button
               size="small"
               severity="secondary"
               variant="outlined"
-              class="!text-xs !py-1 !px-2.5 cursor-pointer"
+              class="!text-xs !py-1 !px-2.5 cursor-pointer hover:!bg-teal-50 hover:!text-teal-700 hover:!border-teal-300 transition-colors"
               data-testid="view-dossier-button"
               @click="openDossier(data.id)"
             >
@@ -673,7 +810,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
       </DataTable>
     </div>
 
-    <!-- 4. Slide-over Drawer for Selected Application Dossier -->
+    <!-- 5. Slide-over Drawer for Selected Application Dossier -->
     <Drawer
       v-model:visible="isDossierOpen"
       position="right"
@@ -683,23 +820,28 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
     >
       <template #header>
         <div class="flex items-start justify-between w-full pr-2" data-testid="dossier-header">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="font-mono text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                {{ dossier?.applicationNumber ?? 'Loading...' }}
-              </span>
-              <StatusPill v-if="dossier" :status="dossier.status" size="sm" />
+          <div class="flex items-start gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 border border-teal-200 flex items-center justify-center font-bold text-base shrink-0 shadow-2xs mt-0.5">
+              {{ getInitials(dossier?.applicant?.fullName) }}
             </div>
-            <h2 class="text-lg font-bold text-slate-900 leading-tight">
-              {{ dossier?.applicant.fullName ?? 'Intake Dossier' }}
-            </h2>
-            <p v-if="dossier" class="text-xs text-slate-500 flex items-center gap-3">
-              <span>Entry: <strong>{{ dossier.requestedEntryLevel }}</strong></span>
-              <span>•</span>
-              <span>Target: <strong>{{ getPeriodName(dossier.admissionPeriodId) }}</strong></span>
-              <span>•</span>
-              <span>Registered: <strong>{{ formatDisplayDate(dossier.registrationDate) }}</strong></span>
-            </p>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  {{ dossier?.applicationNumber ?? 'Loading...' }}
+                </span>
+                <StatusPill v-if="dossier" :status="dossier.status" size="sm" />
+              </div>
+              <h2 class="text-xl font-bold text-slate-900 leading-tight">
+                {{ dossier?.applicant.fullName ?? 'Intake Dossier' }}
+              </h2>
+              <p v-if="dossier" class="text-xs text-slate-500 flex flex-wrap items-center gap-2">
+                <span>Entry: <strong class="text-slate-700">{{ dossier.requestedEntryLevel }}</strong></span>
+                <span>•</span>
+                <span>Target: <strong class="text-slate-700">{{ getPeriodName(dossier.admissionPeriodId) }}</strong></span>
+                <span>•</span>
+                <span>Registered: <strong class="text-slate-700">{{ formatDisplayDate(dossier.registrationDate) }}</strong></span>
+              </p>
+            </div>
           </div>
         </div>
       </template>
@@ -754,12 +896,14 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
 
         <!-- Dossier Workflow Actions Bar -->
         <div
-          class="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200/90"
+          class="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 shadow-2xs"
           data-testid="dossier-actions-bar"
         >
-          <div class="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-            <Shield class="w-4 h-4 text-teal-600" />
-            <span>Workflow Actions:</span>
+          <div class="flex items-center gap-2 text-xs text-slate-700 font-semibold">
+            <div class="w-6 h-6 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center">
+              <Shield class="w-3.5 h-3.5" />
+            </div>
+            <span>Workflow Governance:</span>
           </div>
 
           <div class="flex items-center gap-2">
@@ -770,7 +914,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
               severity="primary"
               :disabled="!canReview || startReviewMutation.isPending.value"
               :loading="startReviewMutation.isPending.value"
-              class="!text-xs cursor-pointer !bg-teal-700 hover:!bg-teal-800 !border-teal-700"
+              class="!text-xs cursor-pointer !bg-teal-700 hover:!bg-teal-800 !border-teal-700 shadow-xs"
               data-testid="start-review-button"
               @click="handleStartReview(dossier.id)"
             >
@@ -784,7 +928,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
               size="small"
               severity="success"
               :disabled="!canDecide"
-              class="!text-xs cursor-pointer"
+              class="!text-xs cursor-pointer shadow-xs"
               data-testid="record-decision-button"
               @click="openRecordDecisionModal"
             >
@@ -811,7 +955,7 @@ function handleEnrollSuccess(result: EnrollApplicantSuccessResult) {
               severity="danger"
               variant="outlined"
               :disabled="!canWithdraw"
-              class="!text-xs cursor-pointer"
+              class="!text-xs cursor-pointer hover:!bg-rose-50"
               data-testid="withdraw-application-button"
               @click="openWithdrawModal"
             >
