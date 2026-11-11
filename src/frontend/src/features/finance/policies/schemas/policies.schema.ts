@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-export const POLICY_CATEGORIES = [
-  'tuition',
-  'admission',
-  'facilities',
-  'activities',
-  'general',
-] as const;
-
 export const RECURRENCE_PATTERNS = [
   'one_time',
   'monthly',

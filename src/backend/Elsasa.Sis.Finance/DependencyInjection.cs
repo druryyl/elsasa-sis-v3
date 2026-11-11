@@ -18,6 +18,7 @@ using Elsasa.Sis.Finance.Features.Policies.CreateChargeRule;
 using Elsasa.Sis.Finance.Features.Policies.CreateFinancialPolicy;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicies;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicyById;
+using Elsasa.Sis.Finance.Features.Policies.GetPolicyCategories;
 using Elsasa.Sis.Finance.Features.Payments.ConfirmPayment;
 using Elsasa.Sis.Finance.Features.Payments.GetPaymentById;
 using Elsasa.Sis.Finance.Features.Payments.GetPaymentReceipt;
@@ -74,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<CreateChargeRuleHandler>();
         services.AddScoped<GetFinancialPoliciesHandler>();
         services.AddScoped<GetFinancialPolicyByIdHandler>();
+        services.AddScoped<GetPolicyCategoriesHandler>();
 
         // Demo Data services (P1-S04, P3-S06)
         // Register purger against the shared IDemoDataDomainPurger contract so the

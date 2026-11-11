@@ -2,8 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createApp, ref } from 'vue';
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+import { CACHE_TIERS } from '@/app/providers/queryClient';
 import {
   financeKeys,
+  useFinancePolicyCategoriesQuery,
   useFinancePoliciesQuery,
   useFinancePolicyDetailQuery,
   useCreatePolicyMutation,
@@ -66,6 +68,7 @@ describe('Finance TanStack Query Composables & Keys (P5-S14)', () => {
     it('generates cohesive policy query keys', () => {
       expect(financeKeys.all).toEqual(['finance']);
       expect(financeKeys.policies.all).toEqual(['finance', 'policies']);
+      expect(financeKeys.policies.categories).toEqual(['finance', 'policies', 'categories']);
       expect(financeKeys.policies.lists()).toEqual(['finance', 'policies', 'list']);
       expect(financeKeys.policies.list()).toEqual(['finance', 'policies', 'list']);
       expect(financeKeys.policies.list({ status: 'active' })).toEqual([
@@ -144,6 +147,54 @@ describe('Finance TanStack Query Composables & Keys (P5-S14)', () => {
   });
 
   describe('Policies Composables', () => {
+    it('useFinancePolicyCategoriesQuery fetches active categories using CACHE_TIERS.STATIC', async () => {
+      const mockCategories = [
+        {
+          code: 'tuition',
+          name: 'Tuition (SPP)',
+          description: 'Regular academic and instructional fees',
+          displayOrder: 1,
+          isActive: true,
+        },
+        {
+          code: 'general_fee',
+          name: 'General Institutional Fee (Biaya Umum)',
+          description: 'Institutional and operational charges',
+          displayOrder: 5,
+          isActive: true,
+        },
+      ];
+      const getCategoriesSpy = vi
+        .spyOn(policiesApi, 'getPolicyCategories')
+        .mockResolvedValue(mockCategories);
+
+      const { result, queryClient } = withSetup(() => useFinancePolicyCategoriesQuery());
+
+      await vi.waitFor(() => expect(result.isSuccess.value).toBe(true));
+      expect(getCategoriesSpy).toHaveBeenCalledTimes(1);
+      expect(result.data.value).toEqual(mockCategories);
+
+      const cachedQuery = queryClient
+        .getQueryCache()
+        .find({ queryKey: financeKeys.policies.categories });
+      expect(cachedQuery).toBeDefined();
+      expect(cachedQuery?.options.staleTime).toBe(CACHE_TIERS.STATIC.staleTime);
+      expect(cachedQuery?.options.gcTime).toBe(CACHE_TIERS.STATIC.gcTime);
+      expect(cachedQuery?.options.refetchOnWindowFocus).toBe(
+        CACHE_TIERS.STATIC.refetchOnWindowFocus,
+      );
+    });
+
+    it('useFinancePolicyCategoriesQuery respects enabled option when false', () => {
+      const getCategoriesSpy = vi.spyOn(policiesApi, 'getPolicyCategories');
+      const { result } = withSetup(() =>
+        useFinancePolicyCategoriesQuery({ enabled: false }),
+      );
+
+      expect(result.fetchStatus.value).toBe('idle');
+      expect(getCategoriesSpy).not.toHaveBeenCalled();
+    });
+
     it('useFinancePoliciesQuery calls getPolicies with reactive filters', async () => {
       const mockPolicies = [
         {
@@ -197,7 +248,7 @@ describe('Finance TanStack Query Composables & Keys (P5-S14)', () => {
         policyCode: 'FP-2026-002',
         name: 'New Draft Policy',
         academicYearId: 'AY2026',
-        category: 'general',
+        category: 'general_fee',
         effectiveStartDate: '2026-01-01',
         effectiveEndDate: '2026-12-31',
         version: '1.0',
@@ -223,7 +274,7 @@ describe('Finance TanStack Query Composables & Keys (P5-S14)', () => {
         policyCode: 'FP-2026-002',
         name: 'New Draft Policy',
         academicYearId: 'AY2026',
-        category: 'general' as const,
+        category: 'general_fee' as const,
         effectiveStartDate: '2026-01-01',
         effectiveEndDate: '2026-12-31',
         version: '1.0',
@@ -646,7 +697,7 @@ describe('Finance TanStack Query Composables & Keys (P5-S14)', () => {
           policyCode: 'FP-ERR',
           name: 'Err Policy',
           academicYearId: 'AY',
-          category: 'general' as const,
+          category: 'general_fee' as const,
           effectiveStartDate: '2026-01-01',
           effectiveEndDate: '2026-12-31',
           version: '1.0',

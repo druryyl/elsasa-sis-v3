@@ -2,12 +2,18 @@
  * TypeScript types and DTOs for Financial Policies & Charge Rules (GAP-006, TD-06, ADR-004).
  */
 
-export type PolicyCategory =
-  | 'tuition'
-  | 'admission'
-  | 'facilities'
-  | 'activities'
-  | 'general';
+export type PolicyCategory = string;
+
+/**
+ * Authoritative financial policy category reference item from master data.
+ */
+export interface PolicyCategoryDto {
+  code: string;
+  name: string;
+  description: string | null;
+  displayOrder: number;
+  isActive: boolean;
+}
 
 export type PolicyStatus = 'draft' | 'active' | 'superseded' | 'archived';
 

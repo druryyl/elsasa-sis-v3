@@ -34,6 +34,7 @@ using Elsasa.Sis.Finance.Features.Policies.CreateChargeRule;
 using Elsasa.Sis.Finance.Features.Policies.CreateFinancialPolicy;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicies;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicyById;
+using Elsasa.Sis.Finance.Features.Policies.GetPolicyCategories;
 using Elsasa.Sis.Finance.Services;
 using Elsasa.Sis.Shared.Common;
 using Elsasa.Sis.Shared.Database;
@@ -93,6 +94,7 @@ public sealed class FinanceDomainWiringTests
         Assert.NotNull(provider.GetService<CreateChargeRuleHandler>());
         Assert.NotNull(provider.GetService<GetFinancialPoliciesHandler>());
         Assert.NotNull(provider.GetService<GetFinancialPolicyByIdHandler>());
+        Assert.NotNull(provider.GetService<GetPolicyCategoriesHandler>());
 
         // Assert - Obligation Assessment Handlers
         Assert.NotNull(provider.GetService<BatchAssessObligationsHandler>());
@@ -235,6 +237,7 @@ public sealed class FinanceDomainWiringTests
         builder.MapEndpoints(typeof(FinanceAssemblyMarker).Assembly);
 
         // Assert - Specific endpoints verified
+        Assert.IsAssignableFrom<IEndpoint>(new GetPolicyCategoriesEndpoint());
         Assert.IsAssignableFrom<IEndpoint>(new GetStudentReceivablesEndpoint());
     }
 

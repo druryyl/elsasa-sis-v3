@@ -2,6 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { financeKeys } from '../shared/queryKeys';
 
 describe('financeKeys query key factories', () => {
+  it('generates expected cache keys for policies including categories', () => {
+    expect(financeKeys.policies.all).toEqual(['finance', 'policies']);
+    expect(financeKeys.policies.categories).toEqual(['finance', 'policies', 'categories']);
+    expect(financeKeys.policies.lists()).toEqual(['finance', 'policies', 'list']);
+    expect(financeKeys.policies.list({ status: 'active', category: 'general_fee' })).toEqual([
+      'finance',
+      'policies',
+      'list',
+      { status: 'active', category: 'general_fee' },
+    ]);
+    expect(financeKeys.policies.details()).toEqual(['finance', 'policies', 'detail']);
+    expect(financeKeys.policies.detail('pol-1')).toEqual(['finance', 'policies', 'detail', 'pol-1']);
+  });
+
   it('generates expected cache keys for payers', () => {
     expect(financeKeys.payers.all).toEqual(['finance', 'payers']);
     expect(financeKeys.payers.lists()).toEqual(['finance', 'payers', 'list']);

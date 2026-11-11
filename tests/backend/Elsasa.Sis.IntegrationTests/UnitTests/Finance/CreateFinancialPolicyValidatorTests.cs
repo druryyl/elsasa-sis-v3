@@ -234,7 +234,7 @@ public sealed class CreateFinancialPolicyValidatorTests
         var request = new CreateFinancialPolicyRequest(
             PolicyCode: "FP-2026-001",
             Name: "Single Day Policy",
-            Category: "special_event",
+            Category: "general_fee",
             BusinessPurpose: "One-day workshop policy",
             ApplicableContext: null,
             EffectiveDate: new DateOnly(2026, 7, 1),

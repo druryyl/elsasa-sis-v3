@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { apiClient } from '@/shared/services/http';
 import {
+  getPolicyCategories,
   getPolicies,
   getPolicyById,
   createPolicy,
@@ -15,6 +16,31 @@ describe('policies.api.spec.ts', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('getPolicyCategories calls GET /finance/policy-categories', async () => {
+    const mockCategories = [
+      {
+        code: 'tuition',
+        name: 'Tuition (SPP)',
+        description: 'Regular academic and instructional fees',
+        displayOrder: 1,
+        isActive: true,
+      },
+      {
+        code: 'general_fee',
+        name: 'General Institutional Fee (Biaya Umum)',
+        description: 'Institutional and operational charges',
+        displayOrder: 5,
+        isActive: true,
+      },
+    ];
+    const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce(mockCategories as never);
+
+    const result = await getPolicyCategories();
+
+    expect(getSpy).toHaveBeenCalledWith('/finance/policy-categories');
+    expect(result).toEqual(mockCategories);
   });
 
   it('getPolicies passes sanitized parameters to GET /finance/policies', async () => {

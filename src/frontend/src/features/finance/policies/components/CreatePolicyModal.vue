@@ -13,9 +13,11 @@ import { FormField } from '@/shared/components';
 import {
   createFinancialPolicySchema,
   type CreateFinancialPolicySchemaInput,
-  POLICY_CATEGORIES,
 } from '../schemas/policies.schema';
-import { useCreatePolicyMutation } from '../composables/useFinancePolicies';
+import {
+  useCreatePolicyMutation,
+  useFinancePolicyCategoriesQuery,
+} from '../composables/useFinancePolicies';
 import { formatDateOnly, parseIsoDate } from '@/shared/utils/dateUtils';
 import type { CreateFinancialPolicyResponse } from '../types/policies.types';
 
@@ -38,10 +40,17 @@ const isDialogVisible = computed({
   set: (val: boolean) => emit('update:visible', val),
 });
 
-const categoryOptions = POLICY_CATEGORIES.map((cat) => ({
-  value: cat,
-  label: cat.charAt(0).toUpperCase() + cat.slice(1),
-}));
+const {
+  data: policyCategories,
+  isLoading: isLoadingCategories,
+} = useFinancePolicyCategoriesQuery();
+
+const categoryOptions = computed(() =>
+  (policyCategories.value ?? []).map((cat) => ({
+    value: cat.code,
+    label: cat.name,
+  })),
+);
 
 const { handleSubmit, errors, defineField, resetForm, isSubmitting } =
   useForm<CreateFinancialPolicySchemaInput>({
@@ -49,7 +58,7 @@ const { handleSubmit, errors, defineField, resetForm, isSubmitting } =
     initialValues: {
       policyCode: '',
       name: '',
-      category: 'tuition',
+      category: '',
       businessPurpose: '',
       applicableContext: '',
       effectiveDate: formatDateOnly(new Date()),
@@ -101,7 +110,7 @@ watch(
         values: {
           policyCode: '',
           name: '',
-          category: 'tuition',
+          category: '',
           businessPurpose: '',
           applicableContext: '',
           effectiveDate: formatDateOnly(new Date()),
@@ -234,7 +243,10 @@ function handleClose() {
             :options="categoryOptions"
             option-label="label"
             option-value="value"
-            placeholder="Select Category"
+            :placeholder="isLoadingCategories ? 'Loading categories...' : 'Select Category'"
+            :loading="isLoadingCategories"
+            :disabled="isLoadingCategories"
+            empty-message="No categories available"
             class="w-full !text-xs"
             data-testid="policy-category-select"
           />

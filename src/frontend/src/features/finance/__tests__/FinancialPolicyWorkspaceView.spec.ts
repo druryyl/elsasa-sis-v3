@@ -1,19 +1,25 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
+import Select from 'primevue/select';
 import { ref } from 'vue';
 import FinancialPolicyWorkspaceView from '../policies/views/FinancialPolicyWorkspaceView.vue';
 import CreatePolicyModal from '../policies/components/CreatePolicyModal.vue';
 import CreateChargeRuleModal from '../policies/components/CreateChargeRuleModal.vue';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { FINANCE_POLICY_PERMISSIONS } from '../policies/constants/permissions';
-import type { FinancialPolicyDto } from '../policies/types/policies.types';
+import type {
+  FinancialPolicyDto,
+  PolicyCategoryDto,
+} from '../policies/types/policies.types';
 
 // Mock TanStack Vue Query composables
 const mockPoliciesList = ref<FinancialPolicyDto[]>([]);
 const mockPolicyDetail = ref<FinancialPolicyDto | null>(null);
+const mockPolicyCategories = ref<PolicyCategoryDto[]>([]);
+const mockIsLoadingCategories = ref(false);
 
 const mockRefetchPolicies = vi.fn();
 const mockRefetchDetail = vi.fn();
@@ -67,6 +73,10 @@ const mockCreateChargeRuleMutateAsync = vi.fn().mockResolvedValue({
 });
 
 vi.mock('../policies/composables/useFinancePolicies', () => ({
+  useFinancePolicyCategoriesQuery: () => ({
+    data: mockPolicyCategories,
+    isLoading: mockIsLoadingCategories,
+  }),
   useFinancePoliciesQuery: () => ({
     data: mockPoliciesList,
     isLoading: ref(false),
@@ -144,10 +154,57 @@ describe('FinancialPolicyWorkspaceView.vue (SCR-FIN-04, /finance/policies)', () 
     }
   });
 
+  let activeWrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    activeWrapper?.unmount();
+    activeWrapper = null;
+    document.body.innerHTML = '';
+  });
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     document.body.innerHTML = '';
+
+    mockIsLoadingCategories.value = false;
+    mockPolicyCategories.value = [
+      {
+        code: 'tuition',
+        name: 'Tuition (SPP)',
+        description: 'Regular academic and instructional fees',
+        displayOrder: 1,
+        isActive: true,
+      },
+      {
+        code: 'admission_fee',
+        name: 'Admission Fee (Uang Pangkal)',
+        description: 'One-time enrollment and registration fees',
+        displayOrder: 2,
+        isActive: true,
+      },
+      {
+        code: 'facilities',
+        name: 'Facilities (Sarana & Prasarana)',
+        description: 'Campus development, building, and facility maintenance fees',
+        displayOrder: 3,
+        isActive: true,
+      },
+      {
+        code: 'activities',
+        name: 'Activities (Kegiatan Siswa)',
+        description: 'Co-curricular activities, field trips, and student events',
+        displayOrder: 4,
+        isActive: true,
+      },
+      {
+        code: 'general_fee',
+        name: 'General Institutional Fee (Biaya Umum)',
+        description: 'Institutional and operational charges including materials and books',
+        displayOrder: 5,
+        isActive: true,
+      },
+    ];
 
     mockPoliciesList.value = [
       {
@@ -212,7 +269,7 @@ describe('FinancialPolicyWorkspaceView.vue (SCR-FIN-04, /finance/policies)', () 
   });
 
   function createWrapper() {
-    return mount(FinancialPolicyWorkspaceView, {
+    activeWrapper = mount(FinancialPolicyWorkspaceView, {
       attachTo: document.body,
       global: {
         plugins: [PrimeVue],
@@ -224,6 +281,7 @@ describe('FinancialPolicyWorkspaceView.vue (SCR-FIN-04, /finance/policies)', () 
         },
       },
     });
+    return activeWrapper;
   }
 
   it('renders workspace page header and filter panel', () => {
@@ -244,6 +302,52 @@ describe('FinancialPolicyWorkspaceView.vue (SCR-FIN-04, /finance/policies)', () 
     expect(masterCard.text()).toContain('FP-2025-001');
     expect(masterCard.text()).toContain('v1.0');
     expect(masterCard.text()).toContain('Kebijakan Biaya Pendidikan TP 2026/2027');
+    expect(masterCard.text()).toContain('Tuition (SPP)');
+  });
+
+  it('resolves category display name for FP-2026-002 (general_fee) in master list, detail dossier, and filter options', async () => {
+    const fp002Policy: FinancialPolicyDto = {
+      id: 'pol-3',
+      policyCode: 'FP-2026-002',
+      name: 'Hagios Institutional Fee Policy 2026/2027',
+      category: 'general_fee',
+      businessPurpose: 'Institutional and operational fee governance',
+      applicableContext: 'All Campuses',
+      effectiveDate: '2026-07-01',
+      endDate: '2027-06-30',
+      policyVersion: '1.0',
+      status: 'active',
+      approvingAuthority: 'Direktur Keuangan',
+      approvedDate: '2026-06-15',
+      supersedesPolicyId: null,
+      notes: null,
+      createdAt: '2026-06-01T00:00:00Z',
+      createdBy: 'finance_officer',
+      rules: [],
+    };
+    mockPoliciesList.value = [...mockPoliciesList.value, fp002Policy];
+    mockPolicyDetail.value = fp002Policy;
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const filterSelect = wrapper.findComponent(Select);
+    expect(filterSelect.props('options')).toEqual([
+      { label: 'All Categories', value: '' },
+      { label: 'Tuition (SPP)', value: 'tuition' },
+      { label: 'Admission Fee (Uang Pangkal)', value: 'admission_fee' },
+      { label: 'Facilities (Sarana & Prasarana)', value: 'facilities' },
+      { label: 'Activities (Kegiatan Siswa)', value: 'activities' },
+      { label: 'General Institutional Fee (Biaya Umum)', value: 'general_fee' },
+    ]);
+
+    const masterCard = wrapper.find('[data-testid="policies-master-card"]');
+    expect(masterCard.text()).toContain('FP-2026-002');
+    expect(masterCard.text()).toContain('General Institutional Fee (Biaya Umum)');
+
+    const detailCard = wrapper.find('[data-testid="policy-detail-card"]');
+    expect(detailCard.text()).toContain('FP-2026-002');
+    expect(detailCard.text()).toContain('General Institutional Fee (Biaya Umum)');
   });
 
   it('displays selected policy detail dossier and attached charge rules table', () => {
@@ -370,14 +474,40 @@ describe('CreatePolicyModal.vue', () => {
     }
   });
 
+  let activeWrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    activeWrapper?.unmount();
+    activeWrapper = null;
+    document.body.innerHTML = '';
+  });
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     document.body.innerHTML = '';
+
+    mockIsLoadingCategories.value = false;
+    mockPolicyCategories.value = [
+      {
+        code: 'tuition',
+        name: 'Tuition (SPP)',
+        description: 'Regular academic and instructional fees',
+        displayOrder: 1,
+        isActive: true,
+      },
+      {
+        code: 'general_fee',
+        name: 'General Institutional Fee (Biaya Umum)',
+        description: 'Institutional and operational charges including materials and books',
+        displayOrder: 5,
+        isActive: true,
+      },
+    ];
   });
 
   it('renders modal dialog and form fields when visible is true', async () => {
-    mount(CreatePolicyModal, {
+    const wrapper = (activeWrapper = mount(CreatePolicyModal, {
       attachTo: document.body,
       props: {
         visible: true,
@@ -385,17 +515,25 @@ describe('CreatePolicyModal.vue', () => {
       global: {
         plugins: [PrimeVue],
       },
-    });
+    }));
     await flushPromises();
 
     expect(document.querySelector('[data-testid="create-policy-dialog"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="policy-code-input"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="policy-name-input"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="policy-category-select"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="policy-purpose-input"]')).not.toBeNull();
+
+    const categorySelect = wrapper.findComponent(Select);
+    expect(categorySelect.props('placeholder')).toBe('Select Category');
+    expect(categorySelect.props('options')).toEqual([
+      { value: 'tuition', label: 'Tuition (SPP)' },
+      { value: 'general_fee', label: 'General Institutional Fee (Biaya Umum)' },
+    ]);
   });
 
-  it('submits valid policy creation data and invokes useCreatePolicyMutation', async () => {
-    const wrapper = mount(CreatePolicyModal, {
+  it('submits valid policy creation data after explicitly selecting a category', async () => {
+    const wrapper = (activeWrapper = mount(CreatePolicyModal, {
       attachTo: document.body,
       props: {
         visible: true,
@@ -403,7 +541,50 @@ describe('CreatePolicyModal.vue', () => {
       global: {
         plugins: [PrimeVue],
       },
-    });
+    }));
+    await flushPromises();
+
+    const codeInput = document.querySelector('[data-testid="policy-code-input"]') as HTMLInputElement;
+    const nameInput = document.querySelector('[data-testid="policy-name-input"]') as HTMLInputElement;
+    const purposeInput = document.querySelector('[data-testid="policy-purpose-input"]') as HTMLTextAreaElement;
+
+    codeInput.value = 'FP-2026-002';
+    codeInput.dispatchEvent(new Event('input'));
+    nameInput.value = 'New Draft Policy';
+    nameInput.dispatchEvent(new Event('input'));
+    purposeInput.value = 'Detailed purpose for fee collection and governance';
+    purposeInput.dispatchEvent(new Event('input'));
+
+    const categorySelect = wrapper.findComponent(Select);
+    categorySelect.vm.$emit('update:modelValue', 'general_fee');
+    await flushPromises();
+
+    const submitBtn = document.querySelector('[data-testid="submit-policy-button"]') as HTMLButtonElement;
+    expect(submitBtn).not.toBeNull();
+    submitBtn.click();
+    await flushPromises();
+
+    expect(mockCreatePolicyMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyCode: 'FP-2026-002',
+        name: 'New Draft Policy',
+        category: 'general_fee',
+        businessPurpose: 'Detailed purpose for fee collection and governance',
+      }),
+    );
+    expect(wrapper.emitted('created')).toBeTruthy();
+  });
+
+  it('blocks policy creation submission when category is empty', async () => {
+    const wrapper = (activeWrapper = mount(CreatePolicyModal, {
+      attachTo: document.body,
+      props: {
+        visible: true,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    }));
     await flushPromises();
 
     const codeInput = document.querySelector('[data-testid="policy-code-input"]') as HTMLInputElement;
@@ -423,14 +604,9 @@ describe('CreatePolicyModal.vue', () => {
     submitBtn.click();
     await flushPromises();
 
-    expect(mockCreatePolicyMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        policyCode: 'FP-2026-002',
-        name: 'New Draft Policy',
-        businessPurpose: 'Detailed purpose for fee collection and governance',
-      }),
-    );
-    expect(wrapper.emitted('created')).toBeTruthy();
+    expect(mockCreatePolicyMutateAsync).not.toHaveBeenCalled();
+    expect(wrapper.emitted('created')).toBeFalsy();
+    expect(document.body.textContent).toContain('Category is required.');
   });
 });
 
@@ -453,6 +629,14 @@ describe('CreateChargeRuleModal.vue', () => {
     }
   });
 
+  let activeWrapper: VueWrapper | null = null;
+
+  afterEach(() => {
+    activeWrapper?.unmount();
+    activeWrapper = null;
+    document.body.innerHTML = '';
+  });
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
@@ -460,7 +644,7 @@ describe('CreateChargeRuleModal.vue', () => {
   });
 
   it('renders modal dialog and charge rule parameters when visible is true', async () => {
-    mount(CreateChargeRuleModal, {
+    activeWrapper = mount(CreateChargeRuleModal, {
       attachTo: document.body,
       props: {
         visible: true,

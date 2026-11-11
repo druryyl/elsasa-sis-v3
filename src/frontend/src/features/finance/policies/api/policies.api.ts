@@ -8,7 +8,20 @@ import type {
   CreateFinancialPolicyResponse,
   FinancialPolicyDto,
   FinancialPolicyFilters,
+  PolicyCategoryDto,
 } from '../types/policies.types';
+
+/**
+ * Retrieves active financial policy categories ordered for UI consumption.
+ * GET /api/finance/policy-categories
+ */
+export async function getPolicyCategories(): Promise<PolicyCategoryDto[]> {
+  const response = (await apiClient.get(
+    '/finance/policy-categories',
+  )) as unknown as PolicyCategoryDto[];
+
+  return response;
+}
 
 /**
  * Queries financial policies matching optional status and category filters (FIN-WF-01, UC-FIN-10).

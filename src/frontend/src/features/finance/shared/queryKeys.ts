@@ -15,6 +15,7 @@ export const financeKeys = {
 
   policies: {
     all: ['finance', 'policies'] as const,
+    categories: ['finance', 'policies', 'categories'] as const,
     lists: () => [...financeKeys.policies.all, 'list'] as const,
     list: (filters?: FinancialPolicyFilters) =>
       filters !== undefined

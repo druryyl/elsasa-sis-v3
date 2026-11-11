@@ -39,6 +39,7 @@ import { formatIdr } from '../../shared/currency.utils';
 import { useAuthStore } from '@/app/stores/auth.store';
 import { FINANCE_POLICY_PERMISSIONS } from '../constants/permissions';
 import {
+  useFinancePolicyCategoriesQuery,
   useFinancePoliciesQuery,
   useFinancePolicyDetailQuery,
   useApprovePolicyMutation,
@@ -89,14 +90,26 @@ const isApproveModalOpen = ref(false);
 const approvingAuthorityInput = ref('');
 const approvalNotesInput = ref('');
 
-const categoryFilterOptions = [
+const {
+  data: policyCategories,
+  isLoading: isLoadingCategories,
+} = useFinancePolicyCategoriesQuery();
+
+const categoryFilterOptions = computed(() => [
   { label: 'All Categories', value: '' },
-  { label: 'Tuition (SPP)', value: 'tuition' },
-  { label: 'Admission (Pendaftaran)', value: 'admission' },
-  { label: 'Facilities (Sarana)', value: 'facilities' },
-  { label: 'Activities (Kegiatan)', value: 'activities' },
-  { label: 'General (Umum)', value: 'general' },
-];
+  ...(policyCategories.value ?? []).map((c) => ({
+    label: c.name,
+    value: c.code,
+  })),
+]);
+
+const categoryNameByCode = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {};
+  for (const category of policyCategories.value ?? []) {
+    map[category.code] = category.name;
+  }
+  return map;
+});
 
 const statusFilterPills = [
   { label: 'All', value: '' },
@@ -350,6 +363,7 @@ function onRuleCreated() {
             option-label="label"
             option-value="value"
             placeholder="All Categories"
+            :loading="isLoadingCategories"
             class="w-full !text-xs"
             data-testid="category-filter-select"
           />
@@ -451,8 +465,8 @@ function onRuleCreated() {
               </div>
 
               <div class="flex items-center justify-between text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-100/60">
-                <span class="capitalize text-teal-700 font-medium">
-                  {{ policy.category }}
+                <span class="text-teal-700 font-medium">
+                  {{ categoryNameByCode[policy.category] || policy.category }}
                 </span>
                 <span class="inline-flex items-center gap-1">
                   <Calendar class="w-3 h-3 text-slate-400" />
@@ -554,8 +568,8 @@ function onRuleCreated() {
           <div class="p-4 sm:p-5 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <span class="text-slate-400 block mb-0.5">Category</span>
-              <span class="font-semibold text-slate-800 uppercase tracking-wide">
-                {{ selectedPolicy.category }}
+              <span class="font-semibold text-slate-800">
+                {{ categoryNameByCode[selectedPolicy.category] || selectedPolicy.category }}
               </span>
             </div>
 

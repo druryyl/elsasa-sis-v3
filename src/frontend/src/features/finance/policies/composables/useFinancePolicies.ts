@@ -2,6 +2,7 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { CACHE_TIERS } from '@/app/providers/queryClient';
 import {
+  getPolicyCategories,
   getPolicies,
   getPolicyById,
   createPolicy,
@@ -9,6 +10,7 @@ import {
   createChargeRule,
 } from '../api/policies.api';
 import type {
+  PolicyCategoryDto,
   FinancialPolicyDto,
   FinancialPolicyFilters,
   CreateFinancialPolicyRequest,
@@ -26,6 +28,21 @@ import {
   type FinanceMutationOptions,
   type FinanceQueryOptions,
 } from '../../shared/toastNotifications';
+
+/**
+ * Reactive TanStack Query hook fetching active financial policy categories for filters and forms.
+ * Uses STATIC cache tier (30m stale, 60m gc, no refetch on window focus).
+ */
+export function useFinancePolicyCategoriesQuery(options?: FinanceQueryOptions) {
+  return useQuery<PolicyCategoryDto[]>({
+    queryKey: financeKeys.policies.categories,
+    queryFn: () => getPolicyCategories(),
+    enabled: computed(() => (options?.enabled !== undefined ? toValue(options.enabled) : true)),
+    staleTime: CACHE_TIERS.STATIC.staleTime,
+    gcTime: CACHE_TIERS.STATIC.gcTime,
+    refetchOnWindowFocus: CACHE_TIERS.STATIC.refetchOnWindowFocus,
+  });
+}
 
 /**
  * Reactive TanStack Query hook fetching financial policies matching optional filters (FIN-WF-01, UC-FIN-10).

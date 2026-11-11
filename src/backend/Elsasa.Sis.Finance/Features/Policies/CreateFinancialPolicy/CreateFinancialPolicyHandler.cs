@@ -17,6 +17,13 @@ public sealed class CreateFinancialPolicyHandler(
         WHERE policy_code = @PolicyCode;
         """;
 
+    private const string _checkActiveCategorySql = """
+        SELECT code
+        FROM finance.policy_categories
+        WHERE code = @Category
+          AND is_active = 1;
+        """;
+
     private const string _checkSupersedesExistsSql = """
         SELECT 1
         FROM finance.financial_policies
@@ -83,7 +90,21 @@ public sealed class CreateFinancialPolicyHandler(
                     $"Financial policy with code '{request.PolicyCode}' already exists."));
         }
 
-        // 2. Validate superseded policy if provided
+        // 2. Validate active master policy category and resolve canonical code
+        var canonicalCategory = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
+            _checkActiveCategorySql,
+            new { Category = request.Category.Trim() },
+            cancellationToken: cancellationToken));
+
+        if (string.IsNullOrWhiteSpace(canonicalCategory))
+        {
+            return Result.Failure<CreateFinancialPolicyResponse>(
+                DomainError.Validation(
+                    "Finance.Policy.InvalidCategory",
+                    $"Policy category '{request.Category}' is invalid or inactive."));
+        }
+
+        // 3. Validate superseded policy if provided
         if (request.SupersedesPolicyId.HasValue)
         {
             var supersedesExists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
@@ -100,7 +121,7 @@ public sealed class CreateFinancialPolicyHandler(
             }
         }
 
-        // 3. Persist financial policy draft
+        // 4. Persist financial policy draft
         var id = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
         var auditUser = currentUser.Username ?? "SYSTEM";
@@ -113,7 +134,7 @@ public sealed class CreateFinancialPolicyHandler(
                 Id = id,
                 PolicyCode = request.PolicyCode.Trim(),
                 Name = request.Name.Trim(),
-                Category = request.Category.Trim(),
+                Category = canonicalCategory,
                 BusinessPurpose = request.BusinessPurpose.Trim(),
                 ApplicableContext = string.IsNullOrWhiteSpace(request.ApplicableContext) ? null : request.ApplicableContext.Trim(),
                 EffectiveDate = request.EffectiveDate,
@@ -130,7 +151,7 @@ public sealed class CreateFinancialPolicyHandler(
             id,
             request.PolicyCode.Trim(),
             request.Name.Trim(),
-            request.Category.Trim(),
+            canonicalCategory,
             request.BusinessPurpose.Trim(),
             string.IsNullOrWhiteSpace(request.ApplicableContext) ? null : request.ApplicableContext.Trim(),
             request.EffectiveDate,

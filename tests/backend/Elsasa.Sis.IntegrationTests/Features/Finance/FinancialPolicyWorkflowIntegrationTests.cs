@@ -8,8 +8,10 @@ using Elsasa.Sis.Finance.Features.Policies.CreateChargeRule;
 using Elsasa.Sis.Finance.Features.Policies.CreateFinancialPolicy;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicies;
 using Elsasa.Sis.Finance.Features.Policies.GetFinancialPolicyById;
+using Elsasa.Sis.Finance.Features.Policies.GetPolicyCategories;
 using Elsasa.Sis.IntegrationTests.Fixtures;
 using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
 /// <summary>
@@ -139,7 +141,7 @@ public sealed class FinancialPolicyWorkflowIntegrationTests(IntegrationTestWebAp
         var createPolicyRequest = new CreateFinancialPolicyRequest(
             PolicyCode: policyCode,
             Name: "Kebijakan Draft",
-            Category: "general",
+            Category: "general_fee",
             BusinessPurpose: "Tujuan draft",
             ApplicableContext: "All",
             EffectiveDate: today,
@@ -169,5 +171,158 @@ public sealed class FinancialPolicyWorkflowIntegrationTests(IntegrationTestWebAp
 
         var ruleResponse = await Client.PostAsJsonAsync($"/api/finance/policies/{policy!.Id}/rules", createRuleRequest);
         ruleResponse.StatusCode.Should().Be(HttpStatusCode.Conflict, "charge rules can only be attached to active policies");
+    }
+
+    [SkippableFact]
+    public async Task GetPolicyCategories_Should_EnforceAuthorization_And_ReturnSeededActiveCategoriesInDisplayOrder()
+    {
+        SkipIfDatabaseUnavailable();
+
+        // 1. Unauthenticated request -> 401 Unauthorized
+        Factory.CurrentUser.SetUnauthenticated();
+        var unauthenticatedResponse = await Client.GetAsync("/api/finance/policy-categories");
+        unauthenticatedResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // 2. Authenticated user lacking Finance.Policies.View permission -> 403 Forbidden
+        Factory.CurrentUser.SetUser(
+            id: Guid.NewGuid(),
+            username: "unauthorized-user",
+            permissions: []);
+        var forbiddenResponse = await Client.GetAsync("/api/finance/policy-categories");
+        forbiddenResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // 3. Authorized user with Finance.Policies.View -> 200 OK with 8 seeded active categories ordered by display_order
+        Factory.CurrentUser.SetUser(
+            id: Guid.NewGuid(),
+            username: "finance-viewer",
+            permissions: [Permissions.Finance.Policies.View]);
+
+        var response = await Client.GetAsync("/api/finance/policy-categories");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var categories = await response.Content.ReadFromJsonAsync<List<PolicyCategoryDto>>();
+        Assert.NotNull(categories);
+        categories.Should().HaveCount(8);
+        categories.Should().OnlyContain(c => c.IsActive);
+        categories.Select(c => c.Code).Should().ContainInOrder(
+            "tuition",
+            "admission_fee",
+            "facilities",
+            "activities",
+            "general_fee",
+            "scholarship_guideline",
+            "refund_rule",
+            "clearance_rule");
+        categories.Select(c => c.DisplayOrder).Should().BeInAscendingOrder();
+    }
+
+    [SkippableFact]
+    public async Task CreateFinancialPolicy_WithUnknownOrInactiveCategory_Should_ReturnInvalidCategoryValidationError()
+    {
+        SkipIfDatabaseUnavailable();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var unknownPolicySuffix = Random.Shared.Next(100, 499);
+        var inactivePolicySuffix = Random.Shared.Next(500, 999);
+
+        // 1. Unknown category -> DomainError.Validation("Finance.Policy.InvalidCategory", ...) -> 422 UnprocessableEntity
+        var unknownRequest = new CreateFinancialPolicyRequest(
+            PolicyCode: $"FP-2026-{unknownPolicySuffix}",
+            Name: "Invalid Category Policy",
+            Category: "unknown_category_code",
+            BusinessPurpose: "Verify master category validation rejects unknown category codes.",
+            ApplicableContext: "All",
+            EffectiveDate: today,
+            EndDate: today.AddYears(1),
+            SupersedesPolicyId: null,
+            Notes: null);
+
+        var unknownResponse = await Client.PostAsJsonAsync("/api/finance/policies", unknownRequest);
+        unknownResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var unknownProblem = await unknownResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(unknownProblem);
+        unknownProblem.Extensions.Should().ContainKey("errorCode");
+        unknownProblem.Extensions["errorCode"]?.ToString().Should().Be("Finance.Policy.InvalidCategory");
+
+        // 2. Inactive category -> DomainError.Validation("Finance.Policy.InvalidCategory", ...) -> 422 UnprocessableEntity
+        var inactiveCode = $"inactive_cat_{Guid.NewGuid():N}"[..32];
+        await ExecuteAsync("""
+            INSERT INTO finance.policy_categories (code, name, description, display_order, is_active, created_by)
+            VALUES (@Code, N'Inactive Test Category', N'Temporary inactive category for integration test', 99, 0, N'TEST_SETUP');
+            """,
+            new { Code = inactiveCode });
+
+        try
+        {
+            var inactiveRequest = new CreateFinancialPolicyRequest(
+                PolicyCode: $"FP-2026-{inactivePolicySuffix}",
+                Name: "Inactive Category Policy",
+                Category: inactiveCode,
+                BusinessPurpose: "Verify master category validation rejects inactive category codes.",
+                ApplicableContext: "All",
+                EffectiveDate: today,
+                EndDate: today.AddYears(1),
+                SupersedesPolicyId: null,
+                Notes: null);
+
+            var inactiveResponse = await Client.PostAsJsonAsync("/api/finance/policies", inactiveRequest);
+            inactiveResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+            var inactiveProblem = await inactiveResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+            Assert.NotNull(inactiveProblem);
+            inactiveProblem.Extensions.Should().ContainKey("errorCode");
+            inactiveProblem.Extensions["errorCode"]?.ToString().Should().Be("Finance.Policy.InvalidCategory");
+        }
+        finally
+        {
+            await ExecuteAsync("DELETE FROM finance.policy_categories WHERE code = @Code;", new { Code = inactiveCode });
+        }
+    }
+
+    [SkippableFact]
+    public async Task GetFinancialPolicies_FilteredByGeneralFee_Should_ReturnMatchingPolicies()
+    {
+        SkipIfDatabaseUnavailable();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var generalPolicyCode = $"FP-2026-{Random.Shared.Next(100, 499)}";
+        var tuitionPolicyCode = $"FP-2026-{Random.Shared.Next(500, 999)}";
+
+        var createGeneralResponse = await Client.PostAsJsonAsync("/api/finance/policies", new CreateFinancialPolicyRequest(
+            PolicyCode: generalPolicyCode,
+            Name: "Hagios Institutional Fee Policy 2026/2027",
+            Category: "general_fee",
+            BusinessPurpose: "Verify general_fee policies are discoverable via category filter (IS017).",
+            ApplicableContext: "All",
+            EffectiveDate: today,
+            EndDate: today.AddYears(1),
+            SupersedesPolicyId: null,
+            Notes: null));
+        createGeneralResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var generalPolicy = await createGeneralResponse.Content.ReadFromJsonAsync<CreateFinancialPolicyResponse>();
+        Assert.NotNull(generalPolicy);
+
+        var createTuitionResponse = await Client.PostAsJsonAsync("/api/finance/policies", new CreateFinancialPolicyRequest(
+            PolicyCode: tuitionPolicyCode,
+            Name: "Tuition Policy 2026/2027",
+            Category: "tuition",
+            BusinessPurpose: "Control policy with a different category.",
+            ApplicableContext: "All",
+            EffectiveDate: today,
+            EndDate: today.AddYears(1),
+            SupersedesPolicyId: null,
+            Notes: null));
+        createTuitionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var tuitionPolicy = await createTuitionResponse.Content.ReadFromJsonAsync<CreateFinancialPolicyResponse>();
+        Assert.NotNull(tuitionPolicy);
+
+        var filterResponse = await Client.GetAsync("/api/finance/policies?category=general_fee");
+        filterResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var filtered = await filterResponse.Content.ReadFromJsonAsync<List<FinancialPolicyListItemDto>>();
+        Assert.NotNull(filtered);
+        filtered.Should().ContainSingle(p => p.Id == generalPolicy.Id && p.Category == "general_fee");
+        filtered.Should().NotContain(p => p.Id == tuitionPolicy.Id);
     }
 }

@@ -159,6 +159,8 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
                 [
                     new Respawn.Graph.Table("dbo", "_SchemaVersions"),
                     new Respawn.Graph.Table("_SchemaVersions"),
+                    // Master reference table seeded by DbUp migration 20261111_0201 must persist across test resets
+                    new Respawn.Graph.Table("finance", "policy_categories"),
                 ],
             });
 

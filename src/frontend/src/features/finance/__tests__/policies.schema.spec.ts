@@ -27,6 +27,48 @@ describe('policies.schema.spec.ts', () => {
       }
     });
 
+    it('accepts dynamic policy category codes such as general_fee and scholarship_guideline', () => {
+      for (const category of ['general_fee', 'scholarship_guideline', 'admission_fee', 'refund_rule', 'clearance_rule']) {
+        const result = createFinancialPolicySchema.safeParse({
+          policyCode: 'FP-2026-002',
+          name: 'Hagios Institutional Fee Policy 2026/2027',
+          category,
+          businessPurpose: 'Governs institutional fee rules.',
+          effectiveDate: '2026-07-01',
+        });
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it('rejects empty category string', () => {
+      const result = createFinancialPolicySchema.safeParse({
+        policyCode: 'FP-2026-002',
+        name: 'Hagios Institutional Fee Policy 2026/2027',
+        category: '',
+        businessPurpose: 'Governs institutional fee rules.',
+        effectiveDate: '2026-07-01',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('category');
+        expect(result.error.issues[0].message).toBe('Category is required.');
+      }
+    });
+
+    it('rejects category exceeding 64 characters', () => {
+      const result = createFinancialPolicySchema.safeParse({
+        policyCode: 'FP-2026-002',
+        name: 'Test Policy',
+        category: 'a'.repeat(65),
+        businessPurpose: 'Purpose',
+        effectiveDate: '2026-07-01',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('cannot exceed 64 characters');
+      }
+    });
+
     it('rejects when endDate is earlier than effectiveDate', () => {
       const invalid = {
         policyCode: 'FP-2026-001',
