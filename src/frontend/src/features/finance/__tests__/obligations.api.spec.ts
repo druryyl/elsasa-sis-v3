@@ -59,6 +59,27 @@ describe('obligations.api.spec.ts', () => {
     });
   });
 
+  it('getObligations includes aging and search query parameters when provided', async () => {
+    const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ items: [] } as never);
+
+    await getObligations({
+      aging: '90+ Days',
+      search: 'OBL-2026',
+      status: 'all',
+      chargeType: 'tuition',
+    });
+
+    expect(getSpy).toHaveBeenCalledWith('/finance/obligations', {
+      params: {
+        aging: '90+ Days',
+        search: 'OBL-2026',
+        chargeType: 'tuition',
+        pageNumber: 1,
+        pageSize: 20,
+      },
+    });
+  });
+
   it('batchAssessObligations posts preview mode request to /finance/obligations/batch-assess', async () => {
     const payload = {
       chargeRuleId: 'cr-1',

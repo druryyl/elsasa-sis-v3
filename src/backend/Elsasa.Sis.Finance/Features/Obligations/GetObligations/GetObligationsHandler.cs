@@ -17,10 +17,26 @@ public sealed class GetObligationsHandler(ISqlConnectionFactory connectionFactor
     private const string _countSql = """
         SELECT COUNT(1)
         FROM finance.financial_obligations fo
+        LEFT JOIN finance.v_student_receivables r ON r.obligation_id = fo.id
+        LEFT JOIN students.students s ON s.id = fo.student_id
         WHERE (@StudentId IS NULL OR fo.student_id = @StudentId)
-          AND (@Status IS NULL OR fo.status = @Status)
+          AND (
+            @Status IS NULL
+            OR (@Status = 'overdue' AND r.is_overdue = 1)
+            OR (@Status = 'unpaid' AND r.outstanding_amount > 0 AND fo.status NOT IN ('settled', 'waived', 'cancelled'))
+            OR (@Status = 'paid' AND (fo.status = 'settled' OR r.outstanding_amount = 0))
+            OR (@Status NOT IN ('overdue', 'unpaid', 'paid') AND fo.status = @Status)
+          )
+          AND (@Aging IS NULL OR r.aging_bracket = @Aging)
           AND (@AcademicPeriodId IS NULL OR fo.academic_period_id = @AcademicPeriodId)
-          AND (@ChargeType IS NULL OR fo.charge_type = @ChargeType);
+          AND (@ChargeType IS NULL OR fo.charge_type = @ChargeType)
+          AND (
+            @SearchPattern IS NULL
+            OR fo.obligation_number LIKE @SearchPattern
+            OR fo.description LIKE @SearchPattern
+            OR s.full_name LIKE @SearchPattern
+            OR s.student_number LIKE @SearchPattern
+          );
         """;
 
     private const string _selectObligationsSql = """
@@ -47,15 +63,32 @@ public sealed class GetObligationsHandler(ISqlConnectionFactory connectionFactor
             fo.status AS Status,
             fo.authorized_by AS AuthorizedBy,
             fo.notes AS Notes,
-            fo.created_at AS CreatedAt
+            fo.created_at AS CreatedAt,
+            r.outstanding_amount AS OutstandingAmount,
+            r.aging_bracket AS AgingBracket
         FROM finance.financial_obligations fo
+        LEFT JOIN finance.v_student_receivables r ON r.obligation_id = fo.id
         LEFT JOIN students.students s ON s.id = fo.student_id
         LEFT JOIN finance.financial_policies fp ON fp.id = fo.policy_id
         LEFT JOIN finance.charge_rules cr ON cr.id = fo.charge_rule_id
         WHERE (@StudentId IS NULL OR fo.student_id = @StudentId)
-          AND (@Status IS NULL OR fo.status = @Status)
+          AND (
+            @Status IS NULL
+            OR (@Status = 'overdue' AND r.is_overdue = 1)
+            OR (@Status = 'unpaid' AND r.outstanding_amount > 0 AND fo.status NOT IN ('settled', 'waived', 'cancelled'))
+            OR (@Status = 'paid' AND (fo.status = 'settled' OR r.outstanding_amount = 0))
+            OR (@Status NOT IN ('overdue', 'unpaid', 'paid') AND fo.status = @Status)
+          )
+          AND (@Aging IS NULL OR r.aging_bracket = @Aging)
           AND (@AcademicPeriodId IS NULL OR fo.academic_period_id = @AcademicPeriodId)
           AND (@ChargeType IS NULL OR fo.charge_type = @ChargeType)
+          AND (
+            @SearchPattern IS NULL
+            OR fo.obligation_number LIKE @SearchPattern
+            OR fo.description LIKE @SearchPattern
+            OR s.full_name LIKE @SearchPattern
+            OR s.student_number LIKE @SearchPattern
+          )
         ORDER BY fo.issue_date DESC, fo.created_at DESC
         OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
         """;
@@ -98,13 +131,56 @@ public sealed class GetObligationsHandler(ISqlConnectionFactory connectionFactor
         string Status,
         string AuthorizedBy,
         string? Notes,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        long? OutstandingAmount = null,
+        string? AgingBracket = null);
+
+    private static string? NormalizeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status) || status.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return status.Trim().ToLowerInvariant();
+    }
+
+    private static string? NormalizeAgingBracket(string? aging)
+    {
+        if (string.IsNullOrWhiteSpace(aging) || aging.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var clean = aging.Trim();
+        if (clean.Contains("%2B", StringComparison.OrdinalIgnoreCase))
+        {
+            clean = clean.Replace("%2B", "+", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (clean.Contains("%20", StringComparison.OrdinalIgnoreCase))
+        {
+            clean = clean.Replace("%20", " ", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return clean.ToLowerInvariant() switch
+        {
+            "current" => "Current",
+            "1-30" or "1-30 days" or "1-30-days" => "1-30 Days",
+            "31-60" or "31-60 days" or "31-60-days" => "31-60 Days",
+            "61-90" or "61-90 days" or "61-90-days" => "61-90 Days",
+            "90+" or "90+ days" or "90-plus-days" or "90 plus days" => "90+ Days",
+            _ => clean
+        };
+    }
 
     public async Task<Result<GetObligationsResponse>> HandleAsync(
         Guid? studentId = null,
         string? status = null,
         Guid? academicPeriodId = null,
         string? chargeType = null,
+        string? aging = null,
+        string? search = null,
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -115,12 +191,19 @@ public sealed class GetObligationsHandler(ISqlConnectionFactory connectionFactor
 
         await using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
 
+        var normalizedStatus = NormalizeStatus(status);
+        var normalizedAging = NormalizeAgingBracket(aging);
+        var trimmedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        var searchPattern = trimmedSearch is not null ? $"%{trimmedSearch}%" : null;
+
         var filterParams = new
         {
             StudentId = studentId,
-            Status = string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
+            Status = normalizedStatus,
+            Aging = normalizedAging,
             AcademicPeriodId = academicPeriodId,
-            ChargeType = string.IsNullOrWhiteSpace(chargeType) ? null : chargeType.Trim(),
+            ChargeType = string.IsNullOrWhiteSpace(chargeType) || chargeType.Equals("all", StringComparison.OrdinalIgnoreCase) ? null : chargeType.Trim(),
+            SearchPattern = searchPattern,
             Offset = offset,
             PageSize = effectivePageSize
         };
@@ -179,7 +262,9 @@ public sealed class GetObligationsHandler(ISqlConnectionFactory connectionFactor
             row.AuthorizedBy,
             row.Notes,
             row.CreatedAt,
-            schedulesByObligation.TryGetValue(row.Id, out var schedList) ? schedList : []
+            schedulesByObligation.TryGetValue(row.Id, out var schedList) ? schedList : [],
+            row.OutstandingAmount,
+            row.AgingBracket
         )).ToList();
 
         var response = GetObligationsResponse.Create(

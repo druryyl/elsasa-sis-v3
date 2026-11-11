@@ -140,4 +140,35 @@ public sealed class AdHocAssessmentWorkflowIntegrationTests(IntegrationTestWebAp
         var count = await ExecuteScalarAsync<int>(checkAccountSql, new { StudentId = studentId });
         count.Should().Be(1);
     }
+
+    [SkippableFact]
+    public async Task GetObligations_WithAgingFilter_Should_ReturnOverdueRecords()
+    {
+        SkipIfDatabaseUnavailable();
+
+        await using var connection = await OpenConnectionAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var studentId = await FinanceIntegrationTestHelpers.SeedStudentAsync(connection, suffix, "active");
+        var (_, periodId) = await FinanceIntegrationTestHelpers.EnsureAcademicYearAndPeriodAsync(connection, suffix);
+        await FinanceIntegrationTestHelpers.EnsureActivePolicyAsync(connection);
+
+        var request = new AssessAdHocObligationRequest(
+            StudentId: studentId,
+            ChargeType: "tuition",
+            Description: "Overdue SPP",
+            Amount: 1500000,
+            DueDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-95)),
+            AcademicPeriodId: periodId,
+            Notes: "Aging test");
+
+        var createResponse = await Client.PostAsJsonAsync("/api/finance/obligations", request);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var queryResponse = await Client.GetAsync("/api/finance/obligations?aging=90%2B%20Days");
+        queryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var responseList = await queryResponse.Content.ReadFromJsonAsync<GetObligationsResponse>();
+        responseList.Should().NotBeNull();
+        responseList!.Items.Should().Contain(o => o.StudentId == studentId && o.AgingBracket == "90+ Days");
+    }
 }

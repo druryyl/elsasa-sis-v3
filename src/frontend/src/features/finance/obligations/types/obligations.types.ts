@@ -56,6 +56,8 @@ export interface FinancialObligationDto {
   notes: string | null;
   createdAt: string;
   schedules: DueScheduleDto[];
+  outstandingAmount?: number | null;
+  agingBracket?: string | null;
 }
 
 /**
@@ -160,6 +162,8 @@ export interface GetObligationsParams {
   status?: string;
   academicPeriodId?: string;
   chargeType?: string;
+  aging?: string;
+  search?: string;
   page?: number;
   pageNumber?: number;
   pageSize?: number;

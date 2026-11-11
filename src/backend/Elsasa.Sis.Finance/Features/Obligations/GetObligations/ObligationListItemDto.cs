@@ -27,7 +27,9 @@ public sealed record ObligationListItemDto(
     string AuthorizedBy,
     string? Notes,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<ObligationScheduleDto> Schedules)
+    IReadOnlyList<ObligationScheduleDto> Schedules,
+    long? OutstandingAmount = null,
+    string? AgingBracket = null)
 {
     public ObligationListItemDto WithSchedules(IReadOnlyList<ObligationScheduleDto> schedules) =>
         this with { Schedules = schedules };

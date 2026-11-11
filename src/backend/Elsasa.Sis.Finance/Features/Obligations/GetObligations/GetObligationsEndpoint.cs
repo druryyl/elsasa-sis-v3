@@ -27,6 +27,8 @@ public sealed class GetObligationsEndpoint : IEndpoint
         string? status,
         Guid? academicPeriodId,
         string? chargeType,
+        string? aging,
+        string? search,
         int? pageNumber,
         int? page,
         int? pageSize,
@@ -41,6 +43,8 @@ public sealed class GetObligationsEndpoint : IEndpoint
             status,
             academicPeriodId,
             chargeType,
+            aging,
+            search,
             resolvedPageNumber,
             resolvedPageSize,
             cancellationToken);

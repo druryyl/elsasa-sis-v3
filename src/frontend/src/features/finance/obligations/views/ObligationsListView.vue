@@ -77,14 +77,15 @@ const chargeTypeOptions = [
   { label: 'Other', value: 'other' },
 ];
 
-const backendStatusValues = new Set([
-  'assessed',
-  'issued',
-  'partially_settled',
-  'settled',
-  'waived',
-  'cancelled',
-]);
+function normalizeAgingOption(val: string): string {
+  const clean = val.replace(/%2B/gi, '+').replace(/%20/gi, ' ').trim().toLowerCase();
+  if (clean === 'current') return 'Current';
+  if (clean === '1-30' || clean === '1-30 days' || clean === '1-30-days') return '1-30 Days';
+  if (clean === '31-60' || clean === '31-60 days' || clean === '31-60-days') return '31-60 Days';
+  if (clean === '61-90' || clean === '61-90 days' || clean === '61-90-days') return '61-90 Days';
+  if (clean === '90+' || clean === '90+ days' || clean === '90-plus-days' || clean === '90 plus days') return '90+ Days';
+  return val.trim();
+}
 
 useRouteQueryHydration((query) => {
   const status = getQueryString(query, 'status');
@@ -94,7 +95,7 @@ useRouteQueryHydration((query) => {
 
   const aging = getQueryString(query, 'aging');
   if (aging) {
-    selectedAging.value = aging;
+    selectedAging.value = normalizeAgingOption(aging);
   }
 
   const chargeType = getQueryString(query, 'chargeType');
@@ -109,14 +110,20 @@ const queryParams = computed<GetObligationsParams>(() => {
     pageSize: 100,
   };
 
-  if (backendStatusValues.has(selectedStatus.value)) {
+  if (selectedStatus.value !== 'all') {
     params.status = selectedStatus.value;
-  } else if (selectedStatus.value === 'paid') {
-    params.status = 'settled';
+  }
+
+  if (selectedAging.value !== 'all') {
+    params.aging = selectedAging.value;
   }
 
   if (selectedChargeType.value !== 'all') {
     params.chargeType = selectedChargeType.value;
+  }
+
+  if (searchInput.value.trim()) {
+    params.search = searchInput.value.trim();
   }
 
   return params;
@@ -148,6 +155,7 @@ function getDaysPastDue(dueDateStr?: string | null): number {
 }
 
 function computeAgingBracket(obligation: FinancialObligationDto): string {
+  if (obligation.agingBracket) return obligation.agingBracket;
   if (!isOpenStatus(obligation.status)) return 'Settled';
   const days = getDaysPastDue(obligation.dueDate);
   if (days <= 0) return 'Current';
@@ -170,9 +178,13 @@ const filteredObligations = computed<FinancialObligationDto[]>(() => {
     const statusLower = item.status?.toLowerCase() ?? '';
 
     if (selectedStatus.value === 'unpaid') {
-      if (!isOpenStatus(statusLower)) return false;
+      if (!isOpenStatus(statusLower) || (item.outstandingAmount !== undefined && item.outstandingAmount !== null && item.outstandingAmount <= 0)) {
+        return false;
+      }
     } else if (selectedStatus.value === 'paid') {
-      if (statusLower !== 'settled') return false;
+      if (statusLower !== 'settled' && (item.outstandingAmount === undefined || item.outstandingAmount === null || item.outstandingAmount > 0)) {
+        return false;
+      }
     } else if (selectedStatus.value === 'overdue') {
       if (!isOverdue(item)) return false;
     } else if (selectedStatus.value !== 'all') {
@@ -180,9 +192,15 @@ const filteredObligations = computed<FinancialObligationDto[]>(() => {
     }
 
     if (selectedAging.value !== 'all') {
-      if (!isOpenStatus(statusLower)) return false;
-      if (computeAgingBracket(item).toLowerCase() !== selectedAging.value.toLowerCase()) {
-        return false;
+      if (item.agingBracket) {
+        if (item.agingBracket.toLowerCase() !== selectedAging.value.toLowerCase()) {
+          return false;
+        }
+      } else {
+        if (!isOpenStatus(statusLower)) return false;
+        if (computeAgingBracket(item).toLowerCase() !== selectedAging.value.toLowerCase()) {
+          return false;
+        }
       }
     }
 

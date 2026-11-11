@@ -26,6 +26,8 @@ export async function getObligations(
   if (params?.status && params.status !== 'all') cleanParams.status = params.status;
   if (params?.academicPeriodId) cleanParams.academicPeriodId = params.academicPeriodId;
   if (params?.chargeType && params.chargeType !== 'all') cleanParams.chargeType = params.chargeType;
+  if (params?.aging && params.aging !== 'all') cleanParams.aging = params.aging;
+  if (params?.search && params.search.trim()) cleanParams.search = params.search.trim();
 
   const response = (await apiClient.get('/finance/obligations', {
     params: cleanParams,
