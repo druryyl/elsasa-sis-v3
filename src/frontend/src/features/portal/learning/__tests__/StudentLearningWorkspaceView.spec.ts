@@ -277,7 +277,7 @@ describe('StudentLearningWorkspaceView.spec.ts (SCR-SELF-03)', () => {
     await flushPromises();
 
     // In missing tab, Chemistry Essay is shown
-    expect(learningApi.getStudentCourseworkWorkspace).toHaveBeenCalledWith('missing');
+    expect(learningApi.getStudentCourseworkWorkspace).toHaveBeenCalledWith('missing', 'student-1');
   });
 
   it('filters tasks via search input field', async () => {

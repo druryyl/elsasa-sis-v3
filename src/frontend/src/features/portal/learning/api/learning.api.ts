@@ -13,10 +13,14 @@ import type {
  */
 export async function getStudentCourseworkWorkspace(
   statusFilter?: CourseworkStatusFilter | string,
+  studentId?: string,
 ): Promise<StudentCourseworkTask[]> {
   const params: Record<string, string> = {};
   if (statusFilter && statusFilter !== 'all') {
     params.statusFilter = statusFilter;
+  }
+  if (studentId) {
+    params.studentId = studentId;
   }
 
   const response = (await apiClient.get('/v1/portal/learning/coursework', {

@@ -34,9 +34,12 @@ const props = withDefaults(defineProps<Props>(), {
 
 const authStore = useAuthStore();
 
-// Fall back to authenticated student ID if parent has child linked
+// Fall back to the linked student identity carried on the authenticated session.
 const effectiveStudentId = computed(() => {
-  return props.studentId || authStore.user?.userId || '';
+  if (props.studentId) return props.studentId;
+  if (authStore.user?.studentId) return authStore.user.studentId;
+  if (authStore.roles.includes('Student')) return authStore.user?.userId ?? '';
+  return '';
 });
 
 // Academic period filter

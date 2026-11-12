@@ -192,6 +192,19 @@ export interface StudentAttendanceSummary {
 // ============================================================================
 
 /**
+ * Lightweight learning unit projection for activity planning selectors (SCR-ACD-01, P3-S07).
+ */
+export interface AvailableLearningUnit {
+  id: string;
+  learningStructureId: string;
+  code: string;
+  name: string;
+  unitType: string;
+  level?: string | null;
+  status: string;
+}
+
+/**
  * Request payload for planning an instructional activity or homeroom session (P3-S07, TD-03).
  */
 export interface PlanActivityRequest {

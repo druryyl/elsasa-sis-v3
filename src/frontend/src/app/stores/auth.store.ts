@@ -14,6 +14,8 @@ export interface UserSession {
   roles: string[];
   permissions: string[];
   campusId: string | null;
+  /** Student identifier from the authenticated JWT claim (present for student personas). */
+  studentId?: string | null;
 }
 
 export interface AuthState {

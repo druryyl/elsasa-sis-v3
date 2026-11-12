@@ -7,6 +7,12 @@ import LoginView from '../LoginView.vue';
 // eslint-disable-next-line no-restricted-imports -- ADR-FE-002: Pinia session store in @/app/stores
 import { useAuthStore } from '@/app/stores/auth.store';
 
+const { mockLogin } = vi.hoisted(() => ({ mockLogin: vi.fn() }));
+
+vi.mock('../../api/auth.api', () => ({
+  login: mockLogin,
+}));
+
 const mockPush = vi.fn();
 const mockRoute = {
   query: {} as Record<string, string>,
@@ -23,7 +29,20 @@ describe('LoginView.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockPush.mockReset();
+    mockLogin.mockReset();
     mockRoute.query = {};
+    mockLogin.mockImplementation(async (username: string) => ({
+      token: 'jwt-token',
+      user: {
+        userId: 'usr-1',
+        username,
+        fullName: 'Test User',
+        roles: ['AcademicStaff'],
+        permissions: [],
+        campusId: 'campus-main',
+        studentId: null,
+      },
+    }));
   });
 
   function createWrapper() {
@@ -84,18 +103,75 @@ describe('LoginView.vue', () => {
   });
 
   it('assigns SuperAdmin privileges and wildcard permission when logging in as admin', async () => {
+    mockLogin.mockResolvedValueOnce({
+      token: 'jwt-admin',
+      user: {
+        userId: '00000000-0000-0000-0000-000000000001',
+        username: 'admin',
+        fullName: 'Super Administrator',
+        roles: ['SuperAdmin', 'Admin'],
+        permissions: ['*'],
+        campusId: 'campus-main',
+        studentId: null,
+      },
+    });
+
     const authStore = useAuthStore();
     const wrapper = createWrapper();
 
     await wrapper.find('[data-testid="username-input"]').setValue('admin');
-    await wrapper.find('[data-testid="password-input"]').setValue('adminpass');
+    await wrapper.find('[data-testid="password-input"]').setValue('Demo123!');
 
     await submitForm(wrapper);
 
+    expect(mockLogin).toHaveBeenCalledWith('admin', 'Demo123!');
     expect(authStore.isAuthenticated).toBe(true);
     expect(authStore.hasRole('SuperAdmin')).toBe(true);
     expect(authStore.hasPermission('Any.Random.Permission')).toBe(true);
     expect(mockPush).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('stores the student identity claim when logging in as a student', async () => {
+    mockLogin.mockResolvedValueOnce({
+      token: 'jwt-student',
+      user: {
+        userId: '00000000-0000-0000-0001-000000000001',
+        username: 'student.jonathan',
+        fullName: 'Jonathan Pratama',
+        roles: ['Student'],
+        permissions: ['academics.assignments.view'],
+        campusId: 'campus-main',
+        studentId: '00000000-0000-0000-0001-000000000001',
+      },
+    });
+
+    const authStore = useAuthStore();
+    const wrapper = createWrapper();
+
+    await wrapper.find('[data-testid="username-input"]').setValue('student.jonathan');
+    await wrapper.find('[data-testid="password-input"]').setValue('Demo123!');
+
+    await submitForm(wrapper);
+
+    expect(authStore.currentUser?.roles).toContain('Student');
+    expect(authStore.currentUser?.studentId).toBe('00000000-0000-0000-0001-000000000001');
+    expect(mockPush).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('displays the backend authentication error and does not redirect', async () => {
+    mockLogin.mockRejectedValueOnce(new Error('Invalid username or password.'));
+
+    const wrapper = createWrapper();
+
+    await wrapper.find('[data-testid="username-input"]').setValue('unknown');
+    await wrapper.find('[data-testid="password-input"]').setValue('bad-password');
+
+    await submitForm(wrapper);
+
+    expect(wrapper.find('[data-testid="auth-error-banner"]').text()).toContain(
+      'Invalid username or password.',
+    );
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('redirects to query redirect parameter when provided', async () => {

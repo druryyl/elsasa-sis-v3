@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/services/http';
 import type {
   ActivityDetail,
   AttendanceRecord,
+  AvailableLearningUnit,
   CancelActivityRequest,
   CancelActivityResponse,
   ConductActivityRequest,
@@ -18,6 +19,27 @@ import type {
   TeacherDailyActivity,
   UnitActivitiesFilter,
 } from '../types';
+
+/**
+ * Retrieves active learning units across all structures for session planning selectors
+ * (SCR-ACD-01, P3-S07).
+ * GET /api/v1/academics/learning-units/available
+ */
+export async function getAvailableLearningUnits(
+  search?: string,
+): Promise<AvailableLearningUnit[]> {
+  const params: Record<string, string> = {};
+  if (search?.trim()) {
+    params.search = search.trim();
+  }
+
+  const response = (await apiClient.get(
+    '/v1/academics/learning-units/available',
+    { params },
+  )) as unknown as AvailableLearningUnit[];
+
+  return Array.isArray(response) ? response : [];
+}
 
 /**
  * Plans a new instructional learning activity or homeroom session (P3-S07, TD-03).

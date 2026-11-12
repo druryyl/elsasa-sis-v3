@@ -93,7 +93,7 @@ describe('useStudentCoursework Composables', () => {
 
       await vi.waitFor(() => expect(result.isSuccess.value).toBe(true));
       expect(result.data.value).toEqual(mockTasks);
-      expect(learningApi.getStudentCourseworkWorkspace).toHaveBeenCalledWith('missing');
+      expect(learningApi.getStudentCourseworkWorkspace).toHaveBeenCalledWith('missing', undefined);
     });
   });
 

@@ -152,6 +152,7 @@ const totalRecords = computed<number>(() => {
 
 // Summary Metrics calculations
 const todayDateStr = formatDateOnly(new Date());
+const todayUtcDateStr = new Date().toISOString().slice(0, 10);
 
 const pendingSubmissionsCount = computed<number>(() => {
   const all = metricsQuery.data.value?.items ?? paymentsList.value;
@@ -164,7 +165,10 @@ const confirmedTodayCount = computed<number>(() => {
     (p) =>
       p.confirmationStatus === 'confirmed' &&
       (p.paymentDate === todayDateStr ||
-        (p.confirmationDate && p.confirmationDate.startsWith(todayDateStr))),
+        p.paymentDate === todayUtcDateStr ||
+        (p.confirmationDate &&
+          (p.confirmationDate.startsWith(todayDateStr) ||
+            p.confirmationDate.startsWith(todayUtcDateStr)))),
   ).length;
 });
 

@@ -82,7 +82,10 @@ const formError = ref<string | null>(null);
 
 // Effective Student ID
 const effectiveStudentId = computed(() => {
-  return props.studentId || authStore.user?.userId || '';
+  if (props.studentId) return props.studentId;
+  if (authStore.user?.studentId) return authStore.user.studentId;
+  if (authStore.roles.includes('Student')) return authStore.user?.userId ?? '';
+  return '';
 });
 
 // Resubmission state

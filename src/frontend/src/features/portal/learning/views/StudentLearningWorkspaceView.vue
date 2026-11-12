@@ -72,8 +72,21 @@ const authStore = useAuthStore();
 const toast = useToast();
 
 const effectiveStudentId = computed(() => {
-  return props.studentId || authStore.user?.userId || '';
+  if (props.studentId) return props.studentId;
+
+  // Authoritative student identity from the JWT/session profile.
+  if (authStore.user?.studentId) return authStore.user.studentId;
+
+  // Backward-compatible fallback for legacy student sessions where the
+  // student ID was implicitly assumed to match the user ID.
+  if (authStore.roles.includes('Student')) {
+    return authStore.user?.userId ?? '';
+  }
+
+  return '';
 });
+
+const hasStudentContext = computed(() => Boolean(effectiveStudentId.value));
 
 // ---------------------------------------------------------------------------
 // 2. Active Filter & Query
@@ -88,12 +101,16 @@ const {
   isFetching,
   error: queryError,
   refetch,
-} = useStudentCourseworkWorkspaceQuery(activeFilter);
+} = useStudentCourseworkWorkspaceQuery(activeFilter, effectiveStudentId, {
+  enabled: hasStudentContext,
+});
 
 // All tasks query for calculating tab counter badges
 const {
   data: allTasksData,
-} = useStudentCourseworkWorkspaceQuery('all');
+} = useStudentCourseworkWorkspaceQuery('all', effectiveStudentId, {
+  enabled: hasStudentContext,
+});
 
 // Tab badge counters calculated from all tasks
 const countDueSoon = computed(() => {
@@ -449,6 +466,24 @@ function getCountdownBadge(task: StudentCourseworkTask): CountdownBadge {
       data-testid="workspace-loading-spinner"
     >
       <LoadingSpinner size="lg" message="Loading student coursework assignments..." />
+    </div>
+
+    <!-- Missing Student Context (teacher/administrator without an explicit student) -->
+    <div
+      v-else-if="!hasStudentContext"
+      class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3"
+      data-testid="workspace-no-student-banner"
+    >
+      <ShieldAlert class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+      <div>
+        <h4 class="text-sm font-semibold text-amber-950">Student context required</h4>
+        <p class="text-xs text-amber-800 mt-0.5">
+          This workspace displays a specific student's coursework. Sign in with a student account,
+          or open this page with a
+          <code class="px-1 py-0.5 rounded bg-amber-100 font-mono">?studentId=&lt;uuid&gt;</code>
+          query parameter as a teacher or administrator.
+        </p>
+      </div>
     </div>
 
     <!-- Empty State -->

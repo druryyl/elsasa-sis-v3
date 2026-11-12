@@ -12,7 +12,7 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { useQuery } from '@tanstack/vue-query';
 import { FormField } from '@/shared/components';
 import { useAuthStore } from '@/app/stores/auth.store';
-import { getLearningUnits } from '@/features/academics/curriculum/api/curriculumApi';
+import { getAvailableLearningUnits } from '../api/sessions.api';
 import {
   planActivitySchema,
   ACTIVITY_TYPES,
@@ -57,12 +57,11 @@ const isDialogVisible = computed({
 
 // Fetch active learning units if not provided via props
 const { data: fetchedUnits, isLoading: isLoadingUnits } = useQuery({
-  queryKey: ['academics', 'learning-units', 'active-list'],
-  queryFn: async () => {
-    const res = await getLearningUnits({ status: 'active' });
-    return res.items ?? [];
-  },
-  enabled: computed(() => !props.units || props.units.length === 0),
+  queryKey: ['academics', 'learning-units', 'available'],
+  queryFn: () => getAvailableLearningUnits(),
+  enabled: computed(
+    () => isDialogVisible.value && (!props.units || props.units.length === 0),
+  ),
 });
 
 const unitOptions = computed<LearningUnitOption[]>(() => {
@@ -169,6 +168,14 @@ watch(
     }
   },
 );
+
+// Auto-select the first available unit once the lookup resolves (options load asynchronously).
+watch(unitOptions, (units) => {
+  if (!isDialogVisible.value || units.length === 0) return;
+  if (!learningUnitId.value) {
+    setFieldValue('learningUnitId', props.preselectedUnitId ?? units[0].id, false);
+  }
+});
 
 const planMutation = usePlanActivityMutation();
 

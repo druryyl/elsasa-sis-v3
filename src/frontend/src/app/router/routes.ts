@@ -442,6 +442,9 @@ export const routes: RouteRecordRaw[] = [
               roles: ['Student'],
               title: 'My Learning & Coursework',
             },
+            props: (route) => ({
+              studentId: (route.query.studentId as string | undefined) || undefined,
+            }),
           },
         ],
       },

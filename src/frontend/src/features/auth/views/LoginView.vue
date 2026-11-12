@@ -9,6 +9,7 @@ import { LogIn, ShieldCheck, Lock, User as UserIcon } from 'lucide-vue-next';
 import FormField from '@/shared/components/forms/FormField.vue';
 // eslint-disable-next-line no-restricted-imports -- ADR-FE-002: Pinia session store in @/app/stores
 import { useAuthStore, type UserSession } from '@/app/stores/auth.store';
+import { login } from '../api/auth.api';
 import { loginSchema, type LoginFormValues } from '../schemas/login.schema';
 
 const route = useRoute();
@@ -34,33 +35,20 @@ const onSubmit = handleSubmit(async (values) => {
   authError.value = null;
 
   try {
-    const trimmedUsername = values.username.trim();
-    const isSuperAdmin =
-      trimmedUsername.toLowerCase() === 'admin' || trimmedUsername.toLowerCase() === 'superadmin';
+    const response = await login(values.username.trim(), values.password);
 
-    // Build authenticated user session context
+    // Build authenticated user session context from the authoritative JWT profile.
     const userSession: UserSession = {
-      userId: `usr-${Date.now().toString(36)}`,
-      username: trimmedUsername,
-      fullName: isSuperAdmin
-        ? 'Super Administrator'
-        : `${trimmedUsername.charAt(0).toUpperCase() + trimmedUsername.slice(1)} Staff`,
-      roles: isSuperAdmin ? ['SuperAdmin', 'AcademicAdmin'] : ['AcademicStaff', 'FinanceStaff'],
-      permissions: isSuperAdmin
-        ? ['*']
-        : [
-            'Permissions.Operations.Calendar.Manage',
-            'Permissions.Students.Admission.View',
-            'Permissions.Students.Admission.Review',
-            'Permissions.Students.Enrollment.Execute',
-            'Permissions.Finance.Obligations.View',
-            'Permissions.Finance.Payments.Receive',
-          ],
-      campusId: 'campus-main',
+      userId: response.user.userId,
+      username: response.user.username,
+      fullName: response.user.fullName,
+      roles: Array.isArray(response.user.roles) ? response.user.roles : [],
+      permissions: Array.isArray(response.user.permissions) ? response.user.permissions : [],
+      campusId: response.user.campusId ?? null,
+      studentId: response.user.studentId ?? null,
     };
 
-    const token = `token-${Date.now()}`;
-    authStore.setSession(token, userSession);
+    authStore.setSession(response.token, userSession);
     authStore.persistSession(true);
 
     // Navigate to original destination or default dashboard
@@ -167,9 +155,11 @@ const onSubmit = handleSubmit(async (values) => {
 
       <div class="pt-3 border-t border-slate-100 text-center">
         <p class="text-xs text-slate-400">
-          Development environment: use
+          Development environment: sign in with
           <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">admin</code> or
-          any username to test.
+          <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">student.jonathan</code>
+          using password
+          <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">Demo123!</code>.
         </p>
       </div>
     </form>

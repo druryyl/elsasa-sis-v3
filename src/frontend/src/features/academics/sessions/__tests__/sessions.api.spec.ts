@@ -26,6 +26,50 @@ describe('Sessions & Attendance API Client (P9-S24)', () => {
   const attendanceRecordId = '44444444-4444-4444-4444-444444444444';
   const periodId = '55555555-5555-5555-5555-555555555555';
 
+  describe('getAvailableLearningUnits', () => {
+    it('issues GET /v1/academics/learning-units/available with trimmed search param', async () => {
+      const mockResponse = [
+        {
+          id: learningUnitId,
+          learningStructureId: '66666666-6666-6666-6666-666666666666',
+          code: 'MATH-101',
+          name: 'Algebra I',
+          unitType: 'course',
+          level: 'Grade 10',
+          status: 'active',
+        },
+      ];
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce(mockResponse as never);
+
+      const result = await sessionsApi.getAvailableLearningUnits('  MATH  ');
+
+      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(getSpy).toHaveBeenCalledWith('/v1/academics/learning-units/available', {
+        params: { search: 'MATH' },
+      });
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('issues GET /v1/academics/learning-units/available without params when search is omitted', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce([] as never);
+
+      const result = await sessionsApi.getAvailableLearningUnits();
+
+      expect(getSpy).toHaveBeenCalledWith('/v1/academics/learning-units/available', {
+        params: {},
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('returns an empty array when the response payload is not an array', async () => {
+      vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ items: [] } as never);
+
+      const result = await sessionsApi.getAvailableLearningUnits();
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('planLearningActivity', () => {
     it('issues POST /v1/academics/learning-activities with request payload', async () => {
       const mockRequest: PlanActivityRequest = {

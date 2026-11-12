@@ -51,6 +51,30 @@ describe('Student Learning API Client (P9-S24)', () => {
       });
       expect(result).toEqual(mockResponse);
     });
+
+    it('includes the studentId param when a student context is provided', async () => {
+      const mockResponse = [{ id: 'task-1', title: 'Calculus Assignment 1' }];
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce(mockResponse as never);
+
+      const result = await learningApi.getStudentCourseworkWorkspace('missing', studentId);
+
+      expect(getSpy).toHaveBeenCalledWith('/v1/portal/learning/coursework', {
+        params: { statusFilter: 'missing', studentId },
+      });
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('includes only the studentId param when the filter is "all"', async () => {
+      const mockResponse = [{ id: 'task-1', title: 'Calculus Assignment 1' }];
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce(mockResponse as never);
+
+      const result = await learningApi.getStudentCourseworkWorkspace('all', studentId);
+
+      expect(getSpy).toHaveBeenCalledWith('/v1/portal/learning/coursework', {
+        params: { studentId },
+      });
+      expect(result).toEqual(mockResponse);
+    });
   });
 
   describe('submitCoursework', () => {

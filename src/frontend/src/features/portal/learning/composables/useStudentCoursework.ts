@@ -26,10 +26,12 @@ import {
 
 export const studentCourseworkKeys = {
   all: ['portal', 'coursework'] as const,
-  workspace: (statusFilter?: string | null | undefined) =>
-    statusFilter !== undefined
-      ? (['portal', 'coursework', 'workspace', statusFilter] as const)
-      : (['portal', 'coursework', 'workspace'] as const),
+  workspace: (statusFilter?: string | null | undefined, studentId?: string | null | undefined) => {
+    const key: Array<string> = ['portal', 'coursework', 'workspace'];
+    if (statusFilter !== undefined) key.push(statusFilter);
+    if (studentId) key.push(studentId);
+    return key as unknown as readonly ['portal', 'coursework', 'workspace', ...string[]];
+  },
 };
 
 // ============================================================================
@@ -65,16 +67,19 @@ export interface UploadSubmissionFileVariables {
  */
 export function useStudentCourseworkWorkspaceQuery(
   statusFilter?: MaybeRefOrGetter<CourseworkStatusFilter | string | null | undefined>,
+  studentId?: MaybeRefOrGetter<string | null | undefined>,
   options?: StudentCourseworkQueryOptions,
 ) {
   return useQuery<StudentCourseworkTask[]>({
     queryKey: computed(() => {
       const resolvedFilter = toValue(statusFilter);
-      return studentCourseworkKeys.workspace(resolvedFilter);
+      const resolvedStudentId = toValue(studentId);
+      return studentCourseworkKeys.workspace(resolvedFilter, resolvedStudentId);
     }),
     queryFn: () => {
       const resolvedFilter = toValue(statusFilter);
-      return getStudentCourseworkWorkspace(resolvedFilter ?? undefined);
+      const resolvedStudentId = toValue(studentId);
+      return getStudentCourseworkWorkspace(resolvedFilter ?? undefined, resolvedStudentId ?? undefined);
     },
     enabled: computed(() => (options?.enabled !== undefined ? toValue(options.enabled) : true)),
     staleTime: CACHE_TIERS.ACTIVE_QUEUE.staleTime,
