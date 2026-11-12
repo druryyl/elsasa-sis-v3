@@ -164,8 +164,8 @@ watch(
 // Campus and Grade Filter Options
 const campusOptions = [
   { label: 'All Campuses', value: '' },
-  { label: 'Main Campus (Kampus A)', value: 'Main Campus (Kampus A)' },
-  { label: 'East Campus (Kampus B)', value: 'East Campus (Kampus B)' },
+  { label: 'Main Campus (Kampus A)', value: 'campus-main' },
+  { label: 'East Campus (Kampus B)', value: 'campus-east' },
 ];
 
 const gradeOptions = [

@@ -228,7 +228,10 @@ public sealed class BatchAssessObligationsHandler(
                 {
                     ChargeRuleId = request.ChargeRuleId,
                     AcademicPeriodId = request.AcademicPeriodId,
-                    ApplicableProgram = string.IsNullOrWhiteSpace(rule.ApplicableProgram) ? null : rule.ApplicableProgram.Trim(),
+                    ApplicableProgram = string.IsNullOrWhiteSpace(rule.ApplicableProgram)
+                    || string.Equals(rule.ApplicableProgram.Trim(), "All", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : rule.ApplicableProgram.Trim(),
                     ApplicableGrade = string.IsNullOrWhiteSpace(rule.ApplicableGrade) ? null : rule.ApplicableGrade.Trim(),
                     TargetCampus = string.IsNullOrWhiteSpace(request.TargetCampus) ? null : request.TargetCampus.Trim(),
                     TargetGrade = string.IsNullOrWhiteSpace(request.TargetGrade) ? null : request.TargetGrade.Trim()
